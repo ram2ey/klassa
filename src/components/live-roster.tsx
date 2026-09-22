@@ -4,19 +4,26 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import type { listLiveStudents } from "@/lib/live-roster";
 import { createStudentAction, updateStudentStatusAction } from "@/app/actions/roster-actions";
+import { provisionStaffForCurrentSchoolAction } from "@/app/actions/school-access-actions";
 import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { AccountSignOut } from "@/components/account-sign-out";
 
-export function LiveRoster({ students }: { students: Awaited<ReturnType<typeof listLiveStudents>> }) {
+const staffRoles = ["school_admin", "office_staff", "teacher", "safeguarding_lead", "senco", "health_nurse"] as const;
+
+function roleLabel(role: string) {
+  return role.replaceAll("_", " ").replace(/\b\w/g, letter => letter.toUpperCase());
+}
+
+export function LiveRoster({ students, canManageStaff }: { students: Awaited<ReturnType<typeof listLiveStudents>>; canManageStaff: boolean }) {
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState("");
   const router = useRouter();
-  function run(operation: () => Promise<unknown>, success: string) {
+  function run(operation: () => Promise<unknown>, success: string | ((result: unknown) => string), failure = "The change could not be saved. Check the student number, class and grade, then retry. Contact your administrator if it persists.") {
     setMessage("");
     startTransition(async () => {
-      try { await operation(); setMessage(success); router.refresh(); }
-      catch { setMessage("The change could not be saved. Check the student number, class and grade, then retry. Contact your administrator if it persists."); }
+      try { const result = await operation(); setMessage(typeof success === "function" ? success(result) : success); router.refresh(); }
+      catch { setMessage(failure); }
     });
   }
   return <main className="mx-auto max-w-5xl space-y-6 p-6 text-slate-900">
@@ -50,5 +57,31 @@ export function LiveRoster({ students }: { students: Awaited<ReturnType<typeof l
         <Button type="submit" disabled={pending}>Enroll student</Button>
       </form>
     </section>
+    {canManageStaff && <section className="rounded border border-slate-200 bg-white p-5"><h2 className="font-bold">Create a staff account</h2>
+      <p className="mt-1 text-sm text-slate-600">Assign access to this school directly. New staff must replace the temporary password and configure MFA before accessing school data.</p>
+      <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={event => {
+        event.preventDefault(); const form = event.currentTarget; const data = new FormData(form);
+        run(async () => {
+          const result = await provisionStaffForCurrentSchoolAction({
+            administratorName: String(data.get("staffName") ?? ""),
+            administratorPhone: String(data.get("staffPhone") ?? ""),
+            temporaryPassword: String(data.get("temporaryPassword") ?? ""),
+            role: String(data.get("staffRole") ?? "office_staff") as typeof staffRoles[number],
+          });
+          form.reset();
+          return result;
+        }, result => (result as { accountCreated: boolean }).accountCreated
+          ? "Staff account created. Share the login phone and temporary password securely."
+          : "The existing Klassa account was added to this school. Their existing password was not changed.",
+        "The staff account could not be created. Check the phone number and whether this person already belongs to the school.");
+      }}>
+        <label className="text-sm sm:col-span-2">Full name<input name="staffName" required minLength={2} maxLength={180} className="mt-1 block w-full rounded border border-slate-300 px-3 py-2" /></label>
+        <label className="text-sm">Login phone<input name="staffPhone" type="tel" required placeholder="+3545551234" className="mt-1 block w-full rounded border border-slate-300 px-3 py-2" /></label>
+        <label className="text-sm">Role<select name="staffRole" defaultValue="office_staff" className="mt-1 block w-full rounded border border-slate-300 px-3 py-2">{staffRoles.map(role => <option key={role} value={role}>{roleLabel(role)}</option>)}</select></label>
+        <label className="text-sm sm:col-span-2">Temporary password<input name="temporaryPassword" type="password" required minLength={12} maxLength={128} autoComplete="new-password" className="mt-1 block w-full rounded border border-slate-300 px-3 py-2" /></label>
+        <p className="text-xs text-slate-500 sm:col-span-2">Share the phone and password through a secure channel. Klassa never displays the temporary password again.</p>
+        <Button type="submit" disabled={pending}>Create staff account</Button>
+      </form>
+    </section>}
   </main>;
 }

@@ -6,7 +6,7 @@ import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { accounts, organizationMemberships, organizations, sessions, staffRole, users } from "@/db/schema";
-import { requireAccount, requireLiveMode, requirePlatformAdmin } from "@/lib/action-access";
+import { requireAccount, requireLiveMode, requirePlatformAdmin, requireStaff } from "@/lib/action-access";
 import { logAuditEvent } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
 import { phoneNumberSchema } from "@/lib/phone";
@@ -67,6 +67,10 @@ const staffSchema = accountSchema.extend({
   role: z.enum(staffRole.enumValues),
 });
 
+const schoolStaffSchema = accountSchema.extend({
+  role: z.enum(staffRole.enumValues),
+});
+
 export async function provisionSchoolStaffAction(input: z.input<typeof staffSchema>) {
   const actor = await requirePlatformAdmin();
   const data = staffSchema.parse(input);
@@ -107,6 +111,53 @@ export async function provisionSchoolStaffAction(input: z.input<typeof staffSche
     return { accountCreated: !existing };
   });
   revalidatePath("/platform");
+  return result;
+}
+
+export async function provisionStaffForCurrentSchoolAction(input: z.input<typeof schoolStaffSchema>) {
+  const actor = await requireStaff(["school_admin"]);
+  const data = schoolStaffSchema.parse(input);
+  const result = await db.transaction(async tx => {
+    const [existing] = await tx.select().from(users).where(eq(users.phoneNumber, data.administratorPhone)).limit(1);
+    const userId = existing?.id ?? randomUUID();
+
+    if (!existing) {
+      await tx.insert(users).values({
+        id: userId,
+        name: data.administratorName,
+        email: `${userId}@accounts.klassa.invalid`,
+        phoneNumber: data.administratorPhone,
+        phoneNumberVerified: true,
+        organizationId: actor.organizationId,
+        role: data.role,
+        mustChangePassword: true,
+      });
+      await tx.insert(accounts).values({
+        id: randomUUID(),
+        userId,
+        accountId: userId,
+        providerId: "credential",
+        password: await hashPassword(data.temporaryPassword),
+      });
+    }
+
+    const [membership] = await tx.insert(organizationMemberships).values({
+      organizationId: actor.organizationId,
+      userId,
+      role: data.role,
+    }).onConflictDoNothing({ target: [organizationMemberships.organizationId, organizationMemberships.userId] }).returning({ id: organizationMemberships.id });
+    if (!membership) throw new Error("This account already belongs to your school.");
+    await logAuditEvent({
+      organizationId: actor.organizationId,
+      actorUserId: actor.userId,
+      action: "account.staff_provisioned",
+      entityType: "user",
+      entityId: userId,
+      metadata: { role: data.role, existingAccount: !!existing, provisionedBy: "school_admin" },
+    }, tx);
+    return { accountCreated: !existing };
+  });
+  revalidatePath("/");
   return result;
 }
 

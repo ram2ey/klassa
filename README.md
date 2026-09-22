@@ -54,7 +54,7 @@ Follow the complete [Coolify deployment guide](docs/coolify-deployment.md). For 
 2. Set the public `BETTER_AUTH_URL` to the production HTTPS origin.
 3. In a trusted administration shell, set `KLASSO_BOOTSTRAP_PHONE` (including country code), `KLASSO_BOOTSTRAP_NAME`, and `KLASSO_BOOTSTRAP_PASSWORD` (12–128 characters). Run `npm run admin:bootstrap`. Clear the bootstrap variables afterward.
 4. Sign in at `/login` and complete authenticator enrollment at `/setup-mfa`. Save the one-use recovery codes offline.
-5. Open `/platform`. Create each school together with its initial administrator, login phone, and a unique temporary password. Add more staff from the same page.
+5. Open `/platform`. Create each school together with its initial administrator, login phone, and a unique temporary password. Platform administrators can add more staff there; after setup, each school administrator can also create staff accounts directly inside their own school.
 6. Share the phone and temporary password through a secure channel. On first sign-in, the account must replace the temporary password before MFA enrollment or school access.
 
 If the phone already belongs to a Klassa user, provisioning adds the selected school membership and keeps the user's existing password. A user with several memberships chooses a school at `/schools`.

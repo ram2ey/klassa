@@ -136,7 +136,7 @@ Then verify the user flow:
 5. Open `/platform`.
 6. Create a school, its initial administrator, and a temporary password.
 7. In a private browser session, sign in as that administrator and confirm Klassa requires a new password before authenticator enrollment.
-8. Complete authenticator enrollment and confirm the new administrator can open their school.
+8. Complete authenticator enrollment, confirm the new administrator can open their school, and create a test staff account from the school workspace.
 
 Share login phone numbers and temporary passwords through a secure, separate channel. Never send them together in ordinary email or store them in tickets. Klassa never displays the temporary password again.
 

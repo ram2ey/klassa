@@ -26,5 +26,5 @@ export default async function Home() {
       <p>Your membership is active. Live workflows for your role are still being connected.</p>
       <Link href="/schools" className="text-blue-700 underline">Choose another school</Link><AccountSignOut /></main>;
   }
-  return <LiveRoster students={await listLiveStudents()} />;
+  return <LiveRoster students={await listLiveStudents()} canManageStaff={actor.role === "school_admin"} />;
 }
