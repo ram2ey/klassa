@@ -1,0 +1,271 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Klassa Institutional Student Information System API",
+    "version": "1.0.0",
+    "description": "Standardized OpenAPI 3.1 contract for Klassa SIS, covering Roster Management, Daily Attendance, Gradebook & Report Cards, Controlled Communications, Sensitive Records & Statutory Safeguarding, and GDPR Data Subject Rights.",
+    "contact": {
+      "name": "Klassa Systems Engineering & Compliance",
+      "email": "security@klasso.internal"
+    },
+    "license": {
+      "name": "Proprietary Institutional License"
+    }
+  },
+  "servers": [
+    {
+      "url": "http://localhost:3000",
+      "description": "Local Development Server"
+    },
+    {
+      "url": "https://klasso.northfield.edu.is",
+      "description": "Production Northfield Academy Gateway"
+    }
+  ],
+  "paths": {
+    "/api/health": {
+      "get": {
+        "summary": "System Health & Operational Diagnostics",
+        "description": "Returns telemetry diagnostics including DB connectivity, memory footprint, AES-256-GCM cipher self-test, and active operational incidents.",
+        "responses": {
+          "200": {
+            "description": "System operational and healthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemHealthReport"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "System degraded or unhealthy",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/SystemHealthReport"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/openapi": {
+      "get": {
+        "summary": "Retrieve OpenAPI 3.1.0 Specification",
+        "description": "Returns the complete machine-readable OpenAPI contract in JSON format.",
+        "responses": {
+          "200": {
+            "description": "OpenAPI specification JSON",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/students": {
+      "get": {
+        "summary": "Query Institutional Student Directory",
+        "security": [{ "SessionAuth": [] }],
+        "parameters": [
+          {
+            "name": "grade",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string" }
+          },
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "schema": { "type": "string", "enum": ["Active", "Pending", "Withdrawn"] }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "List of student records",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/Student" }
+                }
+              }
+            }
+          },
+          "401": { "$ref": "#/components/responses/Unauthorized" },
+          "429": { "$ref": "#/components/responses/RateLimited" }
+        }
+      }
+    },
+    "/api/v1/attendance/roll-call": {
+      "post": {
+        "summary": "Submit Daily Attendance Roll-Call",
+        "security": [{ "SessionAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": { "$ref": "#/components/schemas/RollCallSubmission" }
+            }
+          }
+        },
+        "responses": {
+          "200": { "description": "Roll call saved successfully" },
+          "400": { "description": "Invalid submission payload" },
+          "401": { "$ref": "#/components/responses/Unauthorized" }
+        }
+      }
+    },
+    "/api/v1/sensitive/cases": {
+      "get": {
+        "summary": "List Restricted Confidential Cases",
+        "security": [{ "SessionAuth": [] }],
+        "description": "Strict institutional firewall. Accessible only by Safeguarding Leads, SENCO, Health Nurses, and Executive Admins.",
+        "responses": {
+          "200": {
+            "description": "Confidential cases within authorized role area",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": { "$ref": "#/components/schemas/SensitiveCase" }
+                }
+              }
+            }
+          },
+          "403": { "description": "Access Denied: Role lacks safeguarding clearance" }
+        }
+      }
+    },
+    "/api/v1/gdpr/export/{studentId}": {
+      "get": {
+        "summary": "Generate GDPR Article 20 Data Portability Dossier",
+        "security": [{ "SessionAuth": [] }],
+        "parameters": [
+          {
+            "name": "studentId",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string" }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Complete student data portability package (JSON)",
+            "content": {
+              "application/json": {
+                "schema": { "$ref": "#/components/schemas/GdprPortabilityPackage" }
+              }
+            }
+          },
+          "404": { "description": "Student not found" }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "SessionAuth": {
+        "type": "apiKey",
+        "in": "cookie",
+        "name": "klasso.session_token"
+      },
+      "BearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    },
+    "responses": {
+      "Unauthorized": {
+        "description": "Authentication token missing, expired, or invalid"
+      },
+      "RateLimited": {
+        "description": "Too Many Requests (RFC 6585)",
+        "headers": {
+          "Retry-After": { "schema": { "type": "integer" } },
+          "X-RateLimit-Limit": { "schema": { "type": "integer" } },
+          "X-RateLimit-Remaining": { "schema": { "type": "integer" } }
+        }
+      }
+    },
+    "schemas": {
+      "Student": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "firstName": { "type": "string" },
+          "lastName": { "type": "string" },
+          "grade": { "type": "string" },
+          "className": { "type": "string" },
+          "status": { "type": "string", "enum": ["Active", "Pending", "Withdrawn"] }
+        },
+        "required": ["id", "firstName", "lastName", "grade", "status"]
+      },
+      "RollCallSubmission": {
+        "type": "object",
+        "properties": {
+          "classId": { "type": "string" },
+          "date": { "type": "string", "format": "date" },
+          "records": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "studentId": { "type": "string" },
+                "status": { "type": "string", "enum": ["present", "absent", "late", "excused"] },
+                "minutesLate": { "type": "integer" }
+              },
+              "required": ["studentId", "status"]
+            }
+          }
+        },
+        "required": ["classId", "date", "records"]
+      },
+      "SensitiveCase": {
+        "type": "object",
+        "properties": {
+          "id": { "type": "string" },
+          "caseNumber": { "type": "string" },
+          "studentName": { "type": "string" },
+          "area": { "type": "string", "enum": ["safeguarding", "health_medical", "special_needs", "disciplinary"] },
+          "confidentialityTier": { "type": "string" },
+          "hasCourtOrder": { "type": "boolean" },
+          "status": { "type": "string" }
+        },
+        "required": ["id", "caseNumber", "studentName", "area", "status"]
+      },
+      "GdprPortabilityPackage": {
+        "type": "object",
+        "properties": {
+          "exportMetadata": { "type": "object" },
+          "demographics": { "type": "object" },
+          "guardians": { "type": "array", "items": { "type": "object" } },
+          "academicHistory": { "type": "object" },
+          "attendanceSummary": { "type": "object" },
+          "confidentialSafeguardingDossier": { "type": "object" }
+        }
+      },
+      "SystemHealthReport": {
+        "type": "object",
+        "properties": {
+          "status": { "type": "string", "enum": ["healthy", "degraded", "unhealthy"] },
+          "timestamp": { "type": "string", "format": "date-time" },
+          "service": { "type": "string" },
+          "version": { "type": "string" },
+          "uptimeSeconds": { "type": "integer" },
+          "checks": { "type": "object" },
+          "metrics": { "type": "object" }
+        },
+        "required": ["status", "timestamp", "service", "version"]
+      }
+    }
+  }
+}

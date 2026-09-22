@@ -1,0 +1,40 @@
+services:
+  web:
+    build: .
+    restart: unless-stopped
+    environment:
+      DATABASE_URL: postgresql://klasso:${POSTGRES_PASSWORD}@postgres:5432/klasso
+      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
+      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
+      SENSITIVE_RECORD_ENCRYPTION_KEY: ${SENSITIVE_RECORD_ENCRYPTION_KEY:?Set a strong narrative encryption key}
+      KLASSO_DEMO_MODE: "false"
+      SMS_PROVIDER: ${SMS_PROVIDER:-twilio}
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000/api/health"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+
+  postgres:
+    image: postgres:17-alpine
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: klasso
+      POSTGRES_USER: klasso
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+    volumes:
+      - klasso_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U klasso -d klasso"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  klasso_postgres:

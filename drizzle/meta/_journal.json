@@ -1,0 +1,62 @@
+{
+  "version": "7",
+  "dialect": "postgresql",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "7",
+      "when": 1790029498996,
+      "tag": "0000_pink_karma",
+      "breakpoints": true
+    },
+    {
+      "idx": 1,
+      "version": "7",
+      "when": 1790029498997,
+      "tag": "0001_phase1_subjects_invitations",
+      "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1790029498998,
+      "tag": "0002_phase2_attendance_guardians_sms",
+      "breakpoints": true
+    },
+    {
+      "idx": 3,
+      "version": "7",
+      "when": 1790029498999,
+      "tag": "0003_phase3_assessments_report_cards",
+      "breakpoints": true
+    },
+    {
+      "idx": 4,
+      "version": "7",
+      "when": 1790029499000,
+      "tag": "0004_phase4_communications",
+      "breakpoints": true
+    },
+    {
+      "idx": 5,
+      "version": "7",
+      "when": 1790029499001,
+      "tag": "0005_phase5_sensitive_records",
+      "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790029499002,
+      "tag": "0006_phase6_production_hardening",
+      "breakpoints": true
+    },
+    {
+      "idx": 7,
+      "version": "7",
+      "when": 1790042090704,
+      "tag": "0007_sms_school_invitations",
+      "breakpoints": true
+    }
+  ]
+}
