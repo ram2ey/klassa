@@ -13,7 +13,8 @@ describe("deployment and action boundaries", () => {
     for (let i = 1; i < journal.entries.length; i++) expect(journal.entries[i].when).toBeGreaterThan(journal.entries[i - 1].when);
   });
   it("guards every fixture-backed server action before executing its body", () => {
-    for (const file of readdirSync("src/app/actions").filter(file => file.endsWith(".ts") && !["invitation-actions.ts", "school-access-actions.ts"].includes(file))) {
+    const liveActionFiles = ["invitation-actions.ts", "password-actions.ts", "school-access-actions.ts"];
+    for (const file of readdirSync("src/app/actions").filter(file => file.endsWith(".ts") && !liveActionFiles.includes(file))) {
       const source = readFileSync(`src/app/actions/${file}`, "utf8");
       const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);
       for (const node of ast.statements) {

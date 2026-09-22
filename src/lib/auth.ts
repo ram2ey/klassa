@@ -36,6 +36,7 @@ function createAuth() {
       organizationId: { type: "string", required: false, input: false },
       role: { type: "string", required: false, input: false },
       isPlatformAdmin: { type: "boolean", required: false, input: false },
+      mustChangePassword: { type: "boolean", required: false, input: false },
     },
   },
   plugins: [phoneNumber({

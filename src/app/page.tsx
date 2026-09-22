@@ -16,6 +16,7 @@ export default async function Home() {
   if (isDemoMode()) return <KlassoWorkspace roster={await getWorkspaceData()} />;
   const session = await getAuth().api.getSession({ headers: await headers() });
   if (!session) redirect("/login");
+  if (session.user.mustChangePassword) redirect("/change-password");
   if (!session.user.twoFactorEnabled) redirect("/setup-mfa");
   if (session.user.isPlatformAdmin) redirect("/platform");
   if (!session.session.activeOrganizationId && !session.user.organizationId) redirect("/schools");

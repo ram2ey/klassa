@@ -17,8 +17,7 @@ Have the following ready:
 1. A Coolify server with a working proxy and, preferably, a wildcard domain.
 2. Access to the GitHub repository: `https://github.com/ram2ey/klassa`.
 3. A public hostname such as `klassa.example.com` with an `A` or `AAAA` record pointing to the Coolify server.
-4. A Twilio account, an SMS-capable sender, and permission to send to the countries where staff phone numbers are located.
-5. The phone number, display name, and a new password for the first platform administrator.
+4. The phone number, display name, and a new password for the first platform administrator.
 
 Use an international E.164 phone number, for example `+3545551234`. The initial password must contain 12–128 characters. Use a unique password; do not reuse a personal password.
 
@@ -48,7 +47,7 @@ Replace the hostname with your real hostname. The `:3000` suffix tells the Cooli
 
 If you use Coolify's generated wildcard domain, select **Generate Domain** for `web` and confirm it targets port `3000`.
 
-The Compose file connects the generated `SERVICE_URL_WEB_3000` value to `BETTER_AUTH_URL`, so authentication and invitation links automatically use the domain configured for `web`. Do not create a separate `BETTER_AUTH_URL` variable.
+The Compose file connects the generated `SERVICE_URL_WEB_3000` value to `BETTER_AUTH_URL`, so authentication automatically uses the domain configured for `web`. Do not create a separate `BETTER_AUTH_URL` variable.
 
 ## 3. Review generated secrets
 
@@ -80,15 +79,7 @@ These variables are passed only to the one-time migration container, not to the 
 
 After the first administrator has signed in successfully, you may blank or remove all three bootstrap values. Future deployments detect the existing administrator and skip bootstrap safely.
 
-### Twilio
-
-```text
-TWILIO_ACCOUNT_SID=AC...
-TWILIO_AUTH_TOKEN=<Twilio auth token>
-TWILIO_PHONE_NUMBER=+1...
-```
-
-All three values are required by the Compose definition, so Coolify blocks deployment while any is empty. Mark the auth token and bootstrap password as secret if the Coolify UI offers that option.
+Mark the bootstrap password as secret if the Coolify UI offers that option. Klassa does not require an SMS provider: platform administrators create school and staff accounts directly and assign temporary passwords.
 
 ### Optional database pool size
 
@@ -106,7 +97,7 @@ Select **Deploy** and follow the deployment logs. A successful first deployment 
 
 1. Coolify builds the `runner` and `migrator` targets.
 2. PostgreSQL starts and passes `pg_isready`.
-3. `migrate` applies migrations `0000` through `0007`.
+3. `migrate` applies all pending migrations.
 4. `migrate` creates the first platform administrator.
 5. `migrate` exits with code `0`.
 6. `web` starts and its `/api/health` check verifies PostgreSQL and cryptography.
@@ -143,8 +134,11 @@ Then verify the user flow:
 3. Complete authenticator enrollment at `/setup-mfa`.
 4. Store the one-use recovery codes offline.
 5. Open `/platform`.
-6. Create a school and send a test invitation to a phone you control.
-7. Confirm that the SMS arrives and its HTTPS link opens the activation page.
+6. Create a school, its initial administrator, and a temporary password.
+7. In a private browser session, sign in as that administrator and confirm Klassa requires a new password before authenticator enrollment.
+8. Complete authenticator enrollment and confirm the new administrator can open their school.
+
+Share login phone numbers and temporary passwords through a secure, separate channel. Never send them together in ordinary email or store them in tickets. Klassa never displays the temporary password again.
 
 After this test succeeds, remove the bootstrap variables and redeploy once. Confirm that the migration log says an administrator already exists and that the application remains healthy.
 
@@ -201,13 +195,13 @@ Open `/api/health` and inspect the `database` and `cryptography` checks. Confirm
 
 Confirm the domain is assigned to `web`, includes the internal `:3000` target, DNS resolves to the Coolify server, and the `web` container is healthy. Do not publish PostgreSQL or port `3000` directly on the host.
 
-### Invitations fail
+### A new account cannot sign in
 
-Confirm the Twilio sender can send SMS to the destination country, the number uses E.164 format, and the Twilio account is not restricted to verified trial recipients. Inspect the web logs for the provider error; the application never reports a failed provider call as delivered.
+Confirm the login phone uses international E.164 format and that the temporary password was copied exactly. A new account must replace its temporary password before it can enroll an authenticator or access school data. If the phone already belonged to a Klassa user, provisioning adds a school membership and deliberately keeps that user's existing password.
 
 ## Production-readiness boundary
 
-The deployed live system supports authentication, MFA, platform-managed schools and invitations, school membership selection, and the connected roster workflows described in the README. Attendance, assessments, communications, sensitive cases, GDPR workflows, and some role-specific modules remain demonstrations whose live mutations are intentionally rejected. Do not use unfinished modules as systems of record until their roadmap items are completed and tested.
+The deployed live system supports authentication, forced temporary-password replacement, MFA, platform-managed schools and staff accounts, school membership selection, and the connected roster workflows described in the README. Attendance, assessments, communications, sensitive cases, GDPR workflows, and some role-specific modules remain demonstrations whose live mutations are intentionally rejected. Do not use unfinished modules as systems of record until their roadmap items are completed and tested.
 
 Relevant Coolify documentation:
 

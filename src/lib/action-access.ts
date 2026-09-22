@@ -13,6 +13,7 @@ export async function requireAccount(requireMfa = true) {
   if (!session) throw new Error("Authentication required.");
   const [user] = await db.select().from(users).where(eq(users.id, session.user.id)).limit(1);
   if (!user) throw new Error("Access denied.");
+  if (user.mustChangePassword) throw new Error("Password change required before accessing school data.");
   if (requireMfa && !user.twoFactorEnabled) throw new Error("Staff two-factor authentication is required.");
   return { session, user };
 }

@@ -49,7 +49,7 @@ export default function Login() {
       <Button type="button" variant="ghost" disabled={pending} onClick={() => { setError(""); if (twoFactor) setUseRecoveryCode(!useRecoveryCode); else setLegacyEmail(!legacyEmail); }}>
         {twoFactor ? (useRecoveryCode ? "Use authenticator" : "Use a recovery code") : (legacyEmail ? "Use mobile number" : "Use an existing email account")}
       </Button>
-      <p className="text-xs text-slate-600">New account? Open the invitation link sent to your mobile. Contact your administrator if you need help accessing your account.</p>
+      <p className="text-xs text-slate-600">Use the login phone and temporary password supplied by your administrator. On first sign-in, Klassa requires a new password and authenticator setup.</p>
     </form>
   </main>;
 }

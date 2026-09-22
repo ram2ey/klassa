@@ -13,10 +13,6 @@ services:
       BETTER_AUTH_SECRET: ${SERVICE_REALBASE64_64_AUTH}
       SENSITIVE_RECORD_ENCRYPTION_KEY: ${SERVICE_REALBASE64_64_RECORDS}
       KLASSO_DEMO_MODE: "false"
-      SMS_PROVIDER: twilio
-      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:?}
-      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:?}
-      TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER:?}
     depends_on:
       postgres:
         condition: service_healthy

@@ -47,6 +47,7 @@ export const users = pgTable("users", {
   phoneNumber: varchar("phone_number", { length: 16 }),
   phoneNumberVerified: boolean("phone_number_verified").default(false).notNull(),
   isPlatformAdmin: boolean("is_platform_admin").default(false).notNull(),
+  mustChangePassword: boolean("must_change_password").default(false).notNull(),
   image: text("image"),
   twoFactorEnabled: boolean("two_factor_enabled").default(false),
   organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "restrict" }),
