@@ -4,7 +4,9 @@ import { getAuth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { PlatformInvitations } from "@/components/platform-invitations";
-import { getSystemHealthReport } from "@/lib/monitoring";
+import { getLiveSystemHealthReport } from "@/lib/live-health";
+
+export const dynamic = "force-dynamic";
 
 export default async function PlatformPage() {
   if (isDemoMode()) return <main className="mx-auto max-w-xl space-y-3 p-6"><h1 className="text-xl font-bold">Platform administration</h1>
@@ -14,5 +16,5 @@ export default async function PlatformPage() {
   if (!session.user.twoFactorEnabled) redirect("/setup-mfa");
   if (!session.user.isPlatformAdmin) return <main className="p-6">Platform administrator access required.</main>;
   const data = await getPlatformInvitationData();
-  return <PlatformInvitations data={data} health={getSystemHealthReport()} />;
+  return <PlatformInvitations data={data} health={await getLiveSystemHealthReport()} />;
 }

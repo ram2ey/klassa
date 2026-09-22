@@ -4,8 +4,8 @@ Klassa is a secure K–12 school administration system. Phase 1 establishes the 
 
 ## Local development
 
-1. Copy `.env.example` to `.env.local` and replace every placeholder.
-2. Start PostgreSQL with `docker compose up postgres -d`, or point `DATABASE_URL` at an existing PostgreSQL 17 database.
+1. Copy `.env.example` to both `.env.local` (Next.js) and `.env` (local Compose), then replace every placeholder you use.
+2. Start PostgreSQL with `docker compose -f compose.local.yaml up -d`, or point `DATABASE_URL` at an existing PostgreSQL 17 database.
 3. Run `npm run db:migrate`. Use `npm run db:generate` only after intentionally changing the schema.
 4. Start Klassa with `npm run dev`.
 
@@ -37,13 +37,16 @@ npm run build
 
 ## Deployment
 
-The included `Dockerfile` and `compose.yaml` use multi-architecture Node and PostgreSQL images and do not pin `amd64`, so they can build on ARM64. In Coolify, keep PostgreSQL private, configure a strong `BETTER_AUTH_SECRET`, and attach scheduled encrypted off-server backups. The application health endpoint is `/api/health`.
+The recommended Coolify deployment is defined in `compose.yaml`. Coolify generates the database credentials, authentication secret, encryption key and public application URL. A one-time migration container applies the schema and creates the first platform administrator before the web service starts. PostgreSQL stays private and persists in a named volume. The application health endpoint at `/api/health` performs live database and cryptography checks.
+
+Follow the complete [Coolify deployment guide](docs/coolify-deployment.md). For local PostgreSQL, use `compose.local.yaml`; the production Compose file is intentionally optimized for Coolify's generated variables.
 
 ## Documentation & Roadmap
 
 - **Progress & Roadmap:** See [`ROADMAP.md`](ROADMAP.md) for the master 6-phase status, completed Phase 1 checklist, and Phase 2 backlog.
 - **Visual Guidelines:** See [`docs/design-system.md`](docs/design-system.md) for Klassa’s design system rules.
 - **Backup & Disaster Recovery:** See [`docs/backup-and-restore.md`](docs/backup-and-restore.md) for Coolify and Docker automated backup runbooks.
+- **Coolify Deployment:** See [`docs/coolify-deployment.md`](docs/coolify-deployment.md) for the complete first deployment, verification, backup, update and rollback procedure.
 
 ## SMS invitations and first superuser
 

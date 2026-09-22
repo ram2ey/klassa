@@ -1,8 +1,7 @@
-import { getSystemHealthReport } from "@/lib/monitoring";
+import { getLiveSystemHealthReport } from "@/lib/live-health";
 
 export async function GET() {
-  return Response.json({ status: "ok", service: "klasso-web", timestamp: new Date().toISOString() });
-  const report = getSystemHealthReport();
+  const report = await getLiveSystemHealthReport();
   const statusCode = report.status === "unhealthy" ? 503 : 200;
 
   return Response.json(report, {

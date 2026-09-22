@@ -21,7 +21,7 @@ describe("Phase 6 Operational Monitoring Engine", () => {
     const report = getSystemHealthReport();
 
     expect(report.status).toBe("healthy");
-    expect(report.service).toBe("gradia-klasso");
+    expect(report.service).toBe("gradia-klassa");
     expect(report.version).toContain("phase6");
     expect(report.uptimeSeconds).toBeGreaterThanOrEqual(0);
     expect(report.checks.cryptography.status).toBe("healthy");
@@ -53,4 +53,3 @@ describe("Phase 6 Operational Monitoring Engine", () => {
     expect(report.activeIncidents[0]?.severity).toBe("critical");
   });
 });
-

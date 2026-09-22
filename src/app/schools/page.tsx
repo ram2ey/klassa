@@ -7,6 +7,8 @@ import { getAuth } from "@/lib/auth";
 import { requireAccount } from "@/lib/action-access";
 import { SchoolSelector } from "@/components/school-selector";
 
+export const dynamic = "force-dynamic";
+
 export default async function SchoolsPage() {
   const session = await getAuth().api.getSession({ headers: await headers() });
   if (!session) redirect("/login");

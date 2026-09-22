@@ -41,6 +41,8 @@ export interface SystemHealthReport {
   activeIncidents: SystemIncident[];
 }
 
+export type DatabaseHealth = SystemHealthReport["checks"]["database"];
+
 // In-memory rolling metrics (last 5 minutes)
 const rollingSamples: MetricSample[] = [];
 const activeIncidents: SystemIncident[] = [];
@@ -139,7 +141,7 @@ export function runCryptoSelfTest(): boolean {
 /**
  * Compiles a full system health report.
  */
-export function getSystemHealthReport(): SystemHealthReport {
+export function getSystemHealthReport(database: DatabaseHealth = { status: "healthy", latencyMs: 0 }): SystemHealthReport {
   const now = Date.now();
   pruneRollingSamples(now);
 
@@ -176,12 +178,12 @@ export function getSystemHealthReport(): SystemHealthReport {
   return {
     status: overallStatus,
     timestamp: new Date().toISOString(),
-    service: "gradia-klasso",
+    service: "gradia-klassa",
     version: "1.0.0-phase6",
     environment: process.env.NODE_ENV || "production",
     uptimeSeconds: Math.floor(process.uptime ? process.uptime() : 3600),
     checks: {
-      database: { status: "healthy", latencyMs: 4 },
+      database,
       cryptography: { status: cryptoStatus, selfTestPassed: cryptoPassed },
       memory: { status: memoryStatus, heapUsedMb, heapTotalMb, rssMb },
       rateLimiter: { status: rateLimiterStatus, trackedKeys: rateLimitMetrics.activeTrackedKeys, violations: rateLimitMetrics.totalViolationsRecorded },

@@ -1,40 +1,67 @@
 services:
   web:
-    build: .
+    build:
+      context: .
+      target: runner
     restart: unless-stopped
+    init: true
     environment:
-      DATABASE_URL: postgresql://klasso:${POSTGRES_PASSWORD}@postgres:5432/klasso
-      BETTER_AUTH_URL: ${BETTER_AUTH_URL}
-      BETTER_AUTH_SECRET: ${BETTER_AUTH_SECRET}
-      SENSITIVE_RECORD_ENCRYPTION_KEY: ${SENSITIVE_RECORD_ENCRYPTION_KEY:?Set a strong narrative encryption key}
+      SERVICE_URL_WEB_3000: /
+      DATABASE_URL: postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_64_POSTGRES}@postgres:5432/klassa
+      DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:-10}
+      BETTER_AUTH_URL: ${SERVICE_URL_WEB_3000}
+      BETTER_AUTH_SECRET: ${SERVICE_REALBASE64_64_AUTH}
+      SENSITIVE_RECORD_ENCRYPTION_KEY: ${SERVICE_REALBASE64_64_RECORDS}
       KLASSO_DEMO_MODE: "false"
-      SMS_PROVIDER: ${SMS_PROVIDER:-twilio}
-      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
-      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
-      TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER:-}
+      SMS_PROVIDER: twilio
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:?}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:?}
+      TWILIO_PHONE_NUMBER: ${TWILIO_PHONE_NUMBER:?}
     depends_on:
       postgres:
         condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    expose:
+      - "3000"
     healthcheck:
       test: ["CMD", "wget", "--spider", "-q", "http://127.0.0.1:3000/api/health"]
       interval: 30s
       timeout: 5s
       retries: 3
+      start_period: 20s
+
+  migrate:
+    build:
+      context: .
+      target: migrator
+    restart: "no"
+    exclude_from_hc: true
+    environment:
+      DATABASE_URL: postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_64_POSTGRES}@postgres:5432/klassa
+      KLASSO_DEMO_MODE: "false"
+      KLASSO_BOOTSTRAP_PHONE: ${KLASSO_BOOTSTRAP_PHONE:-}
+      KLASSO_BOOTSTRAP_NAME: ${KLASSO_BOOTSTRAP_NAME:-}
+      KLASSO_BOOTSTRAP_PASSWORD: ${KLASSO_BOOTSTRAP_PASSWORD:-}
+    depends_on:
+      postgres:
+        condition: service_healthy
 
   postgres:
     image: postgres:17-alpine
     restart: unless-stopped
     environment:
-      POSTGRES_DB: klasso
-      POSTGRES_USER: klasso
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: klassa
+      POSTGRES_USER: ${SERVICE_USER_POSTGRES}
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_64_POSTGRES}
     volumes:
-      - klasso_postgres:/var/lib/postgresql/data
+      - klassa_postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U klasso -d klasso"]
+      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
       interval: 10s
       timeout: 5s
       retries: 5
+      start_period: 10s
 
 volumes:
-  klasso_postgres:
+  klassa_postgres:
