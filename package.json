@@ -12,6 +12,7 @@
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:check": "drizzle-kit check",
+    "db:deploy": "node scripts/deploy-database.mjs",
     "admin:bootstrap": "node scripts/bootstrap-superuser.mjs"
   },
   "dependencies": {

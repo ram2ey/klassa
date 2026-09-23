@@ -15,9 +15,8 @@ WORKDIR /app
 COPY drizzle.config.ts tsconfig.json ./
 COPY drizzle ./drizzle
 COPY src/db ./src/db
-COPY scripts/bootstrap-superuser.mjs scripts/deploy-migrate.sh ./scripts/
-RUN chmod +x ./scripts/deploy-migrate.sh
-CMD ["./scripts/deploy-migrate.sh"]
+COPY scripts/deploy-database.mjs scripts/deploy-migrate.sh ./scripts/
+CMD ["node", "scripts/deploy-database.mjs"]
 
 FROM node:22-alpine AS runner
 WORKDIR /app

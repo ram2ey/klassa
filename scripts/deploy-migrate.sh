@@ -1,10 +1,5 @@
 #!/usr/bin/env sh
-set -eu
+set -e
 
-echo "[deploy] Applying database migrations..."
-npm run db:migrate
+node scripts/deploy-database.mjs
 
-echo "[deploy] Ensuring the initial platform administrator exists..."
-npm run admin:bootstrap
-
-echo "[deploy] Database preparation completed."

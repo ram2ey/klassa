@@ -7,7 +7,12 @@ services:
     init: true
     environment:
       SERVICE_URL_WEB_3000: /
-      DATABASE_URL: postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_64_POSTGRES}@postgres:5432/klassa
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: klassa
+      PGUSER: ${SERVICE_USER_POSTGRES:-klasso}
+      PGPASSWORD: ${SERVICE_PASSWORD_64_POSTGRES:-}
+      DATABASE_URL: postgresql://${SERVICE_USER_POSTGRES:-klasso}:${SERVICE_PASSWORD_64_POSTGRES:-}@postgres:5432/klassa
       DATABASE_POOL_SIZE: ${DATABASE_POOL_SIZE:-10}
       BETTER_AUTH_URL: ${BETTER_AUTH_URL:-${SERVICE_URL_WEB_3000:-${COOLIFY_URL:-http://localhost:3000}}}
       BETTER_AUTH_SECRET: ${SERVICE_REALBASE64_64_AUTH}
@@ -34,7 +39,12 @@ services:
     restart: "no"
     exclude_from_hc: true
     environment:
-      DATABASE_URL: postgresql://${SERVICE_USER_POSTGRES}:${SERVICE_PASSWORD_64_POSTGRES}@postgres:5432/klassa
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: klassa
+      PGUSER: ${SERVICE_USER_POSTGRES:-klasso}
+      PGPASSWORD: ${SERVICE_PASSWORD_64_POSTGRES:-}
+      DATABASE_URL: postgresql://${SERVICE_USER_POSTGRES:-klasso}:${SERVICE_PASSWORD_64_POSTGRES:-}@postgres:5432/klassa
       KLASSO_DEMO_MODE: "false"
       KLASSO_BOOTSTRAP_PHONE: ${KLASSO_BOOTSTRAP_PHONE:-}
       KLASSO_BOOTSTRAP_NAME: ${KLASSO_BOOTSTRAP_NAME:-}
@@ -48,16 +58,16 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_DB: klassa
-      POSTGRES_USER: ${SERVICE_USER_POSTGRES}
-      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_64_POSTGRES}
+      POSTGRES_USER: ${SERVICE_USER_POSTGRES:-klasso}
+      POSTGRES_PASSWORD: ${SERVICE_PASSWORD_64_POSTGRES:-klasso_secure_password_dev}
     volumes:
       - klassa_postgres:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U \"$$POSTGRES_USER\" -d \"$$POSTGRES_DB\""]
-      interval: 10s
+      test: ["CMD-SHELL", "pg_isready -U \"$${POSTGRES_USER:-klasso}\" -d \"$${POSTGRES_DB:-klassa}\""]
+      interval: 5s
       timeout: 5s
-      retries: 5
-      start_period: 10s
+      retries: 8
+      start_period: 5s
 
 volumes:
   klassa_postgres:
