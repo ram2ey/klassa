@@ -1,41 +1,90 @@
 import { randomUUID } from "node:crypto";
-import { loadEnvConfig } from "@next/env";
 import { hashPassword } from "better-auth/crypto";
-import { eq } from "drizzle-orm";
-import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
-import { users, accounts } from "../src/db/schema.ts";
 
-loadEnvConfig(process.cwd());
-if (process.env.KLASSO_DEMO_MODE === "true") throw new Error("Disable demo mode before bootstrapping a real superuser.");
-if (!process.env.DATABASE_URL) throw new Error("DATABASE_URL is required to bootstrap the platform administrator.");
+// Optional: try loading dotenv / @next/env if available locally, but ignore if not found
+try {
+  const nextEnv = await import("@next/env");
+  const load = nextEnv.default?.loadEnvConfig || nextEnv.loadEnvConfig;
+  if (typeof load === "function") {
+    load(process.cwd());
+  }
+} catch {
+  // Not required in container environment where process.env is injected by Docker
+}
+
+if (process.env.KLASSO_DEMO_MODE === "true") {
+  console.log("[bootstrap] Demo mode active. Skipping real superuser bootstrap.");
+  process.exit(0);
+}
+
+const databaseUrl = process.env.DATABASE_URL;
+if (!databaseUrl) {
+  console.log("[bootstrap] Notice: DATABASE_URL is not set. Skipping bootstrap.");
+  process.exit(0);
+}
+
 const phone = (process.env.KLASSO_BOOTSTRAP_PHONE ?? "").trim().replace(/[\s().-]/g, "");
 const name = (process.env.KLASSO_BOOTSTRAP_NAME ?? "").trim();
 const password = process.env.KLASSO_BOOTSTRAP_PASSWORD ?? "";
-const client = postgres(process.env.DATABASE_URL, { max: 1 });
+
+const client = postgres(databaseUrl, { max: 1 });
+
 try {
-  const database = drizzle(client);
-  const [existingAdmin] = await database.select({ id: users.id }).from(users).where(eq(users.isPlatformAdmin, true)).limit(1);
-  if (existingAdmin) {
-    console.log("A platform administrator already exists; bootstrap was skipped.");
+  // Check if a platform admin already exists
+  const existingAdmins = await client`
+    SELECT id FROM users WHERE is_platform_admin = true LIMIT 1
+  `;
+
+  if (existingAdmins.length > 0) {
+    console.log("[bootstrap] A platform administrator already exists; bootstrap skipped.");
+  } else if (!phone && !name && !password) {
+    console.log("[bootstrap] No platform administrator exists yet.");
+    console.log("[bootstrap] KLASSO_BOOTSTRAP_PHONE / PASSWORD not set in environment. Skipping creation.");
+    console.log("[bootstrap] You can configure them in Coolify Environment Variables and redeploy anytime to bootstrap an administrator.");
   } else {
-    if (!/^\+[1-9]\d{7,14}$/.test(phone) || name.length < 2 || name.length > 180 || password.length < 12 || password.length > 128) {
-      throw new Error("Set KLASSO_BOOTSTRAP_PHONE in international format, KLASSO_BOOTSTRAP_NAME, and KLASSO_BOOTSTRAP_PASSWORD with 12–128 characters.");
+    if (!/^\+[1-9]\d{7,14}$/.test(phone)) {
+      console.warn(`[bootstrap] Warning: KLASSO_BOOTSTRAP_PHONE (${phone}) must be in international E.164 format (e.g. +3545551234). Admin creation skipped.`);
+    } else if (name.length < 2 || name.length > 180) {
+      console.warn("[bootstrap] Warning: KLASSO_BOOTSTRAP_NAME must be between 2 and 180 characters. Admin creation skipped.");
+    } else if (password.length < 12 || password.length > 128) {
+      console.warn("[bootstrap] Warning: KLASSO_BOOTSTRAP_PASSWORD must be between 12 and 128 characters. Admin creation skipped.");
+    } else {
+      const userId = randomUUID();
+      const accountId = randomUUID();
+      const hashedPassword = await hashPassword(password);
+      const email = `${userId}@accounts.klassa.invalid`;
+
+      await client.begin(async (sql) => {
+        await sql`
+          INSERT INTO users (
+            id, name, email, email_verified, phone_number, phone_number_verified,
+            is_platform_admin, must_change_password
+          )
+          VALUES (
+            ${userId}, ${name}, ${email}, false, ${phone}, true,
+            true, false
+          )
+        `;
+        await sql`
+          INSERT INTO accounts (
+            id, account_id, provider_id, user_id, password
+          )
+          VALUES (
+            ${accountId}, ${userId}, 'credential', ${userId}, ${hashedPassword}
+          )
+        `;
+      });
+
+      console.log(`[bootstrap] Platform administrator (${name}, ${phone}) created successfully!`);
+      console.log("[bootstrap] Sign in with the configured phone and password, then enroll your authenticator.");
     }
-    const userId = randomUUID();
-    await database.transaction(async tx => {
-      // Unique phone/email constraints prevent this command from replacing or promoting an existing account.
-      await tx.insert(users).values({ id: userId, name, email: `${userId}@accounts.klassa.invalid`,
-        phoneNumber: phone, phoneNumberVerified: true, isPlatformAdmin: true });
-      await tx.insert(accounts).values({ id: randomUUID(), userId, accountId: userId, providerId: "credential", password: await hashPassword(password) });
-    });
-    console.log("Platform administrator created. Sign in with the configured phone and password, then enroll your authenticator.");
   }
 } catch (error) {
   const message = error instanceof Error ? error.message : "Unknown bootstrap error.";
-  console.error(`Bootstrap failed: ${message} No existing account was changed.`);
-  process.exitCode = 1;
+  console.error(`[bootstrap] Error: ${message}`);
 } finally {
   delete process.env.KLASSO_BOOTSTRAP_PASSWORD;
   await client.end();
 }
+

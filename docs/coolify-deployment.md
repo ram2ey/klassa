@@ -14,9 +14,12 @@ The database has no published host port. Coolify's proxy exposes only `web`. Eve
 
 Have the following ready:
 
-1. A Coolify server with a working proxy and, preferably, a wildcard domain.
+1. A Coolify server with a working proxy and internet connectivity.
 2. Access to the GitHub repository: `https://github.com/ram2ey/klassa`.
-3. A public hostname such as `klassa.example.com` with an `A` or `AAAA` record pointing to the Coolify server.
+3. A domain for the web service. You have three options:
+   - **Custom public domain** (e.g. `klassa.example.com`) with an `A` or `AAAA` DNS record pointing to your Coolify server.
+   - **Coolify generated domain** (if wildcard domains are configured in your Coolify instance).
+   - **Free wildcard IP domain (`sslip.io`)** if you do not own a domain yet (e.g. `https://<YOUR_SERVER_IP>.sslip.io:3000`), which requires zero DNS configuration and automatically supports Let's Encrypt SSL.
 4. The phone number, display name, and a new password for the first platform administrator.
 
 Use an international E.164 phone number, for example `+3545551234`. The initial password must contain 12–128 characters. Use a unique password; do not reuse a personal password.
@@ -37,17 +40,40 @@ Do not create PostgreSQL as a separate public application. It is already defined
 
 ## 2. Configure the public domain
 
-Open the parsed `web` service and set its domain to:
+Open the parsed `web` service and configure its domain using one of the following methods:
+
+### Method A: Custom public domain
+If you already have a domain with DNS pointing to your Coolify server:
 
 ```text
 https://klassa.example.com:3000
 ```
 
-Replace the hostname with your real hostname. The `:3000` suffix tells the Coolify proxy which internal container port to use; visitors still open the normal HTTPS URL without a port.
+Replace the hostname with your real hostname. The `:3000` suffix tells the Coolify proxy which internal container port to use; visitors still open the normal HTTPS URL without typing a port.
 
-If you use Coolify's generated wildcard domain, select **Generate Domain** for `web` and confirm it targets port `3000`.
+### Method B: Coolify generated wildcard domain
+If your Coolify instance has a wildcard domain configured:
+1. Select **Generate Domain** under the `web` service settings.
+2. Confirm the generated URL targets port `3000` (e.g. `https://random-id.your-server.domain:3000`).
 
-The Compose file connects the generated `SERVICE_URL_WEB_3000` value to `BETTER_AUTH_URL`, so authentication automatically uses the domain configured for `web`. Do not create a separate `BETTER_AUTH_URL` variable.
+### Method C: Free wildcard IP domain (`sslip.io` — No domain purchase required)
+If you do not have a public domain yet and Coolify has no wildcard domain set up, you can use your server's public IP address with `sslip.io`. It resolves to your IP automatically without any DNS setup, and Coolify's proxy can provision a free Let's Encrypt SSL certificate for it:
+
+```text
+https://YOUR_SERVER_IP.sslip.io:3000
+```
+*(Example: `https://123.45.67.89.sslip.io:3000`)*
+
+> [!NOTE]
+> HTTPS is strongly recommended because Better Auth session cookies and Time-Based One-Time Password (TOTP) authenticator enrollment require a secure browser context. Both Method B and Method C provide automatic HTTPS.
+
+### Changing to your permanent domain later
+You can switch to a permanent custom domain at any time without data loss:
+1. Point your custom domain's DNS `A` or `AAAA` record to your Coolify server IP.
+2. In Coolify, update the `web` service domain to `https://klassa.example.com:3000`.
+3. Save and redeploy. Coolify automatically updates the proxy routes and provisions a new SSL certificate.
+
+The Compose file connects the generated `SERVICE_URL_WEB_3000` value to `BETTER_AUTH_URL`, so authentication automatically uses whatever domain is configured for `web`. Do not create a separate `BETTER_AUTH_URL` variable.
 
 ## 3. Review generated secrets
 
