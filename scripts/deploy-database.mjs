@@ -142,3 +142,4 @@ try {
   delete process.env.KLASSO_BOOTSTRAP_PASSWORD;
   await client.end();
 }
+

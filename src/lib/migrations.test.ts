@@ -12,6 +12,19 @@ describe("deployment and action boundaries", () => {
     expect(readMigrationFiles({ migrationsFolder: "drizzle" })).toHaveLength(files.length);
     for (let i = 1; i < journal.entries.length; i++) expect(journal.entries[i].when).toBeGreaterThan(journal.entries[i - 1].when);
   });
+  it("references tables created before each foreign key", () => {
+    const tables = new Set<string>();
+    for (const migration of readMigrationFiles({ migrationsFolder: "drizzle" })) {
+      for (const statement of migration.sql) {
+        for (const match of statement.matchAll(/CREATE TABLE (?:IF NOT EXISTS )?"([^"]+)"/g)) {
+          tables.add(match[1]);
+        }
+        for (const match of statement.matchAll(/REFERENCES "public"\."([^"]+)"/g)) {
+          expect(tables.has(match[1]), `Unknown referenced table: ${match[1]}`).toBe(true);
+        }
+      }
+    }
+  });
   it("guards every fixture-backed server action before executing its body", () => {
     const liveActionFiles = ["invitation-actions.ts", "password-actions.ts", "school-access-actions.ts"];
     for (const file of readdirSync("src/app/actions").filter(file => file.endsWith(".ts") && !liveActionFiles.includes(file))) {
