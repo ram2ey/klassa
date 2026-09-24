@@ -4,13 +4,13 @@ import { phoneNumber, twoFactor } from "better-auth/plugins";
 import { db } from "@/db";
 import { schema, sessions } from "@/db/schema";
 import { eq } from "drizzle-orm";
-import { requireSecret } from "@/lib/runtime-config";
+import { getAuthBaseURL, requireSecret } from "@/lib/runtime-config";
 import { phoneNumberSchema } from "@/lib/phone";
 
 function createAuth() {
   return betterAuth({
   appName: "Klassa",
-  baseURL: process.env.BETTER_AUTH_URL ?? "http://localhost:3000",
+  baseURL: getAuthBaseURL(),
   secret: requireSecret("BETTER_AUTH_SECRET"),
   database: drizzleAdapter(db, { provider: "pg", schema }),
   emailAndPassword: {

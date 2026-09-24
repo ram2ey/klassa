@@ -1,9 +1,33 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { isDemoMode, requireSecret, validateProductionConfiguration } from "./runtime-config";
+import { getAuthBaseURL, isDemoMode, requireSecret, validateProductionConfiguration } from "./runtime-config";
 
 afterEach(() => vi.unstubAllEnvs());
 
 describe("runtime security configuration", () => {
+  it.each([undefined, "", "   "])("rejects an empty production auth URL (%s)", value => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("BETTER_AUTH_URL", value);
+    expect(getAuthBaseURL).toThrow("BETTER_AUTH_URL is required");
+  });
+
+  it("uses the configured HTTPS origin", () => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("BETTER_AUTH_URL", " https://school.example.com/ ");
+    expect(getAuthBaseURL()).toBe("https://school.example.com");
+  });
+
+  it.each(["http://school.example.com", "invalid", "https://school.example.com/login", "https://user:pass@school.example.com", "https://school.example.com?x=1", "https://school.example.com#x"])("rejects an invalid production auth origin (%s)", value => {
+    vi.stubEnv("NODE_ENV", "production");
+    vi.stubEnv("BETTER_AUTH_URL", value);
+    expect(getAuthBaseURL).toThrow();
+  });
+
+  it("allows a local development fallback", () => {
+    vi.stubEnv("NODE_ENV", "development");
+    vi.stubEnv("BETTER_AUTH_URL", "");
+    expect(getAuthBaseURL()).toBe("http://localhost:3000");
+  });
+
   it("requires explicit demo opt-in and refuses it in production", () => {
     vi.stubEnv("KLASSO_DEMO_MODE", "false");
     expect(isDemoMode()).toBe(false);

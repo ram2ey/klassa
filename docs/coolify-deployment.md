@@ -73,7 +73,7 @@ You can switch to a permanent custom domain at any time without data loss:
 2. In Coolify, update the `web` service domain to `https://klassa.example.com:3000`.
 3. Save and redeploy. Coolify automatically updates the proxy routes and provisions a new SSL certificate.
 
-The Compose file passes Coolify's generated `SERVICE_URL_WEB_3000` value directly to `BETTER_AUTH_URL`, so authentication uses the domain configured for `web`. After changing the domain, redeploy and confirm that `SERVICE_URL_WEB_3000` has the new HTTPS origin. A separately saved `BETTER_AUTH_URL` value from an older deployment is no longer used.
+In **Environment Variables**, explicitly set `BETTER_AUTH_URL` to the public HTTPS origin, for example `https://klassa.example.com`. Use the same hostname as the browser, without a path or the internal `:3000` port. This variable must be available at runtime. The Compose file requires it rather than relying on generated URL interpolation. Update it whenever the domain changes, then redeploy.
 
 ## 3. Review generated secrets
 
