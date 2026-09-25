@@ -1,6 +1,6 @@
 "use server";
 
-import { and, count, desc, eq, gte, ilike, lt, or } from "drizzle-orm";
+import { and, count, desc, eq, gte, ilike, isNull, lt, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { auditEvents, organizations, users } from "@/db/schema";
@@ -8,6 +8,7 @@ import { requirePlatformAdmin } from "@/lib/action-access";
 
 const auditFilterSchema = z.object({
   search: z.string().trim().max(120).default(""),
+  scope: z.union([z.literal("all"), z.literal("platform"), z.uuid()]).default("all"),
   action: z.string().trim().max(120).default(""),
   from: z.iso.date().optional().or(z.literal("")),
   to: z.iso.date().optional().or(z.literal("")),
@@ -18,6 +19,8 @@ const auditFilterSchema = z.object({
 
 function filtersFor(input: z.infer<typeof auditFilterSchema>) {
   const filters = [];
+  if (input.scope === "platform") filters.push(isNull(auditEvents.organizationId));
+  else if (input.scope !== "all") filters.push(eq(auditEvents.organizationId, input.scope));
   if (input.action) filters.push(eq(auditEvents.action, input.action));
   if (input.from) filters.push(gte(auditEvents.createdAt, new Date(`${input.from}T00:00:00.000Z`)));
   if (input.to) {

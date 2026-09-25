@@ -55,12 +55,14 @@ function ReviewControl({ member }: { member: Member }) {
 
 export function PlatformAccessReviews({ data }: { data: Data }) {
   const [search, setSearch] = useState("");
+  const [schoolId, setSchoolId] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [page, setPage] = useState(1);
   const now = data.loadedAt;
   const schoolNames = useMemo(() => new Map(data.schools.map(school => [school.id, school.name])), [data.schools]);
   const reviewerNames = useMemo(() => new Map(data.platformAdmins.map(admin => [admin.id, admin.name])), [data.platformAdmins]);
-  const stats = data.memberships.map(member => ({ member, state: accessReviewState(member, now) }));
+  const stats = data.memberships.filter(member => !schoolId || member.organizationId === schoolId)
+    .map(member => ({ member, state: accessReviewState(member, now) }));
   const filtered = stats.filter(({ member, state }) => {
     if (search && !`${member.name} ${member.username ?? ""} ${member.role} ${schoolNames.get(member.organizationId) ?? ""}`.toLowerCase().includes(search.toLowerCase())) return false;
     return filter === "all" || (filter === "dormant" && state.dormant) || (filter === "no_record" && state.noRecord)
@@ -78,6 +80,9 @@ export function PlatformAccessReviews({ data }: { data: Data }) {
       <div><p className="text-xs font-semibold text-slate-500">No sign-in record</p><p className="text-2xl font-bold">{stats.filter(item => item.state.noRecord).length}</p></div>
     </div>
     <div className="flex flex-wrap gap-3 border-b border-slate-200 p-4">
+      <label className="min-w-44 text-xs font-semibold">School<select value={schoolId} onChange={event => { setSchoolId(event.target.value); setPage(1); }} className="mt-1 block h-10 w-full border border-slate-300 px-3 font-normal">
+        <option value="">All schools</option>{data.schools.map(school => <option key={school.id} value={school.id}>{school.name}</option>)}
+      </select></label>
       <label className="min-w-52 flex-1 text-xs font-semibold">Search<input type="search" value={search} onChange={event => { setSearch(event.target.value); setPage(1); }} placeholder="Name, login, role or school" className="mt-1 block h-10 w-full border border-slate-300 px-3 font-normal" /></label>
       <label className="text-xs font-semibold">Show<select value={filter} onChange={event => { setFilter(event.target.value as Filter); setPage(1); }} className="mt-1 block h-10 w-full border border-slate-300 px-3 font-normal">
         <option value="all">All accounts</option><option value="review_due">Review due</option><option value="dormant">Dormant (90+ days)</option>
