@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { getAuth } from "@/lib/auth";
 import { isDemoMode } from "@/lib/runtime-config";
 import { db } from "@/db";
-import { organizationMemberships, users } from "@/db/schema";
+import { guardians, organizationMemberships, users } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 
 export type StaffRole = typeof users.$inferSelect.role;
@@ -37,6 +37,16 @@ export async function requireStaff(roles: NonNullable<StaffRole>[]) {
     .where(and(eq(organizationMemberships.userId, user.id), eq(organizationMemberships.organizationId, organizationId))).limit(1);
   if (!membership || !roles.includes(membership.role)) throw new Error("Access denied.");
   return { userId: user.id, name: user.name, organizationId, role: membership.role };
+}
+
+/** Guardian access is granted only through an explicit guardian record link. */
+export async function requireGuardian() {
+  const { user } = await requireAccount();
+  if (user.isPlatformAdmin || user.role !== null) throw new Error("Guardian access required.");
+  const linked = await db.select({ id: guardians.id, organizationId: guardians.organizationId })
+    .from(guardians).where(eq(guardians.userId, user.id));
+  if (!linked.length) throw new Error("Guardian access required.");
+  return { userId: user.id, name: user.name, guardians: linked };
 }
 
 /** Keep unfinished, fixture-backed operations away from live accounts and databases. */

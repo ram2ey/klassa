@@ -13,8 +13,8 @@ export default function Login() {
   const [error, setError] = useState("");
   const router = useRouter();
   return <main className="mx-auto max-w-md p-8 text-slate-900">
-    <h1 className="text-2xl font-bold">Klassa staff sign in</h1>
-    <p className="mt-2 text-sm text-slate-600">Use your existing school account.</p>
+    <h1 className="text-2xl font-bold">Klassa sign in</h1>
+    <p className="mt-2 text-sm text-slate-600">Staff and guardians: use the school tenant ID, username, and password provided to you.</p>
     <form className="mt-6 space-y-4" onSubmit={async event => {
       event.preventDefault(); setPending(true); setError("");
       const data = new FormData(event.currentTarget);
@@ -47,7 +47,7 @@ export default function Login() {
       {twoFactor && <Button type="button" variant="ghost" disabled={pending} onClick={() => { setError(""); setUseRecoveryCode(!useRecoveryCode); }}>
         {useRecoveryCode ? "Use authenticator" : "Use a recovery code"}
       </Button>}
-      <p className="text-xs text-slate-600">Use the tenant ID, username and password supplied by your administrator. Platform administrators use tenant ID platform. New staff must change their temporary password. Only platform administrators use an authenticator. Contact your administrator if you need help signing in.</p>
+      <p className="text-xs text-slate-600">New staff and guardian accounts must change their temporary password after first sign-in. Platform administrators use tenant ID platform and an authenticator. Contact your school if you need help signing in.</p>
     </form>
   </main>;
 }

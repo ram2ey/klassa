@@ -12,7 +12,7 @@ The live teacher workspace shows assigned current-year classes and rosters, atte
 
 The live office workspace covers student intake and placement, guardian relationships, CSV imports, submitted attendance corrections, school notices, and limited pickup or disclosure restriction flags. Office actions remain school-scoped and cannot alter grades, staff permissions, or confidential case notes.
 
-Guardian access, SMS and emergency delivery, delivery of specialist directives, operational enforcement of court restrictions, and GDPR still need production integration. The historical phase checklists below describe the demo implementation and must not be read as production completion. See README.md for current live boundaries.
+The live guardian portal now supports manually provisioned guardian accounts, linked legal-student access, submitted attendance, published report cards, targeted notices and category-only absence notes for office review. Email/SMS invitations and messaging, SMS and emergency delivery, delivery of specialist directives, operational enforcement of court restrictions, and GDPR still need production integration. The historical phase checklists below describe the demo implementation and must not be read as production completion. See README.md for current live boundaries.
 
 ### Historical demo roadmap
 

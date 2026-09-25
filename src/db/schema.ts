@@ -14,6 +14,7 @@ export const relationshipType = pgEnum("relationship_type", ["parent", "guardian
 export const importStatus = pgEnum("import_status", ["uploaded", "validating", "ready", "processing", "completed", "failed"]);
 export const attendanceStatus = pgEnum("attendance_status", ["present", "absent", "late", "excused"]);
 export const attendanceSessionStatus = pgEnum("attendance_session_status", ["in_progress", "submitted", "locked"]);
+export const guardianAbsenceNoteStatus = pgEnum("guardian_absence_note_status", ["submitted", "reviewed"]);
 export const gradingSchemeType = pgEnum("grading_scheme_type", ["letter", "percentage", "standards_based"]);
 export const assessmentStatus = pgEnum("assessment_status", ["draft", "published"]);
 export const gradeStatus = pgEnum("grade_status", ["draft", "submitted", "published"]);
@@ -323,6 +324,20 @@ export const attendanceCorrections = pgTable("attendance_corrections", {
   correctedBy: text("corrected_by").references(() => users.id, { onDelete: "set null" }),
   correctedAt: timestamp("corrected_at", { withTimezone: true }).defaultNow().notNull(),
 }, (table) => [index("attendance_corrections_student_idx").on(table.organizationId, table.studentId), index("attendance_corrections_record_idx").on(table.attendanceRecordId)]);
+
+export const guardianAbsenceNotes = pgTable("guardian_absence_notes", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  guardianId: uuid("guardian_id").notNull().references(() => guardians.id, { onDelete: "cascade" }),
+  studentId: uuid("student_id").notNull().references(() => students.id, { onDelete: "cascade" }),
+  absenceDate: date("absence_date").notNull(),
+  reasonCategory: varchar("reason_category", { length: 40 }).notNull(),
+  status: guardianAbsenceNoteStatus("status").default("submitted").notNull(),
+  reviewedBy: text("reviewed_by").references(() => users.id, { onDelete: "set null" }),
+  reviewedAt: timestamp("reviewed_at", { withTimezone: true }),
+  ...timestamps,
+}, (table) => [index("guardian_absence_notes_org_status_idx").on(table.organizationId, table.status, table.absenceDate),
+  index("guardian_absence_notes_student_idx").on(table.organizationId, table.studentId, table.absenceDate)]);
 
 export const notifications = pgTable("notifications", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -702,6 +717,7 @@ export const schema = {
   attendanceSessions,
   attendanceRecords,
   attendanceCorrections,
+  guardianAbsenceNotes,
   notifications,
   smsDispatches,
   gradingSchemes,

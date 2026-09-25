@@ -1,13 +1,13 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { academicYears, attendanceRecords, attendanceSessions, classes, courtRestrictions, enrollments,
-  gradeLevels, guardians, organizations, studentGuardians, students } from "@/db/schema";
+  gradeLevels, guardianAbsenceNotes, guardians, organizations, studentGuardians, students, users } from "@/db/schema";
 import { requireStaff } from "@/lib/action-access";
 
 export async function getOfficeData(sessionDate: string) {
   const actor = await requireStaff(["office_staff"]);
   const org = actor.organizationId;
-  const [school, years, grades, classRows, studentRows, guardianRows, links, enrollmentRows, sessionRows, restrictions] = await Promise.all([
+  const [school, years, grades, classRows, studentRows, guardianRows, links, enrollmentRows, sessionRows, restrictions, absenceNotes] = await Promise.all([
     db.select({ id: organizations.id, name: organizations.name, slug: organizations.slug }).from(organizations).where(eq(organizations.id, org)).then(rows => rows[0]),
     db.select().from(academicYears).where(eq(academicYears.organizationId, org)),
     db.select().from(gradeLevels).where(eq(gradeLevels.organizationId, org)).orderBy(gradeLevels.position),
@@ -21,13 +21,20 @@ export async function getOfficeData(sessionDate: string) {
       prohibitPickup: courtRestrictions.prohibitPickup, prohibitDisclosure: courtRestrictions.prohibitDisclosure,
       effectiveDate: courtRestrictions.effectiveDate, expirationDate: courtRestrictions.expirationDate, isEnforced: courtRestrictions.isEnforced })
       .from(courtRestrictions).where(eq(courtRestrictions.organizationId, org)),
+    db.select({ id: guardianAbsenceNotes.id, studentId: guardianAbsenceNotes.studentId, guardianId: guardianAbsenceNotes.guardianId,
+      absenceDate: guardianAbsenceNotes.absenceDate, reasonCategory: guardianAbsenceNotes.reasonCategory, status: guardianAbsenceNotes.status,
+      createdAt: guardianAbsenceNotes.createdAt, reviewedAt: guardianAbsenceNotes.reviewedAt, guardianName: guardians.firstName,
+      guardianLastName: guardians.lastName, reviewerName: users.name })
+      .from(guardianAbsenceNotes).innerJoin(guardians, eq(guardianAbsenceNotes.guardianId, guardians.id))
+      .leftJoin(users, eq(guardianAbsenceNotes.reviewedBy, users.id)).where(eq(guardianAbsenceNotes.organizationId, org))
+      .orderBy(desc(guardianAbsenceNotes.createdAt)).limit(200),
   ]);
   if (!school) throw new Error("School not found.");
   const sessionIds = sessionRows.map(row => row.id);
   const records = sessionIds.length ? await db.select().from(attendanceRecords)
     .where(and(eq(attendanceRecords.organizationId, org), inArray(attendanceRecords.sessionId, sessionIds))) : [];
   return { actor, school, years, grades, classes: classRows, students: studentRows, guardians: guardianRows,
-    links, enrollments: enrollmentRows, sessions: sessionRows, records, restrictions };
+    links, enrollments: enrollmentRows, sessions: sessionRows, records, restrictions, absenceNotes };
 }
 
 export type OfficeData = Awaited<ReturnType<typeof getOfficeData>>;

@@ -4,7 +4,7 @@ import { getWorkspaceData } from "@/app/actions/roster-actions";
 import { getAuth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { requireStaff } from "@/lib/action-access";
+import { requireAccount, requireStaff } from "@/lib/action-access";
 import Link from "next/link";
 import { AccountSignOut } from "@/components/account-sign-out";
 import { SchoolAdminWorkspace } from "@/components/school-admin-workspace";
@@ -16,6 +16,11 @@ import { getTeacherData } from "@/lib/teacher-data";
 import { TeacherWorkspace } from "@/components/teacher-workspace";
 import { getOfficeData } from "@/lib/office-data";
 import { OfficeWorkspace } from "@/components/office-workspace";
+import { db } from "@/db";
+import { guardians, organizationMemberships } from "@/db/schema";
+import { eq } from "drizzle-orm";
+import { getGuardianPortalData } from "@/lib/guardian-portal-data";
+import { GuardianPortalWorkspace } from "@/components/guardian-portal-workspace";
 
 export const dynamic = "force-dynamic";
 
@@ -25,8 +30,15 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
   if (!session) redirect("/login");
   if (session.user.mustChangePassword) redirect("/change-password");
   if (session.user.isPlatformAdmin && !session.user.twoFactorEnabled) redirect("/setup-mfa");
-  if (session.user.isPlatformAdmin) redirect("/platform");
-  if (!session.session.activeOrganizationId && !session.user.organizationId) redirect("/schools");
+  const { user, session: accountSession } = await requireAccount();
+  if (user.isPlatformAdmin && !user.twoFactorEnabled) redirect("/setup-mfa");
+  if (user.isPlatformAdmin) redirect("/platform");
+  const memberships = await db.select({ id: organizationMemberships.id }).from(organizationMemberships).where(eq(organizationMemberships.userId, user.id)).limit(1);
+  if (!memberships.length) {
+    const linkedGuardian = await db.select({ id: guardians.id }).from(guardians).where(eq(guardians.userId, user.id)).limit(1);
+    if (linkedGuardian.length) return <GuardianPortalWorkspace data={await getGuardianPortalData()} />;
+  }
+  if (!accountSession.session.activeOrganizationId && !user.organizationId) redirect("/schools");
   const actor = await requireStaff(["school_admin", "office_staff", "teacher", "safeguarding_lead", "senco", "health_nurse"]);
   if (actor.role === "school_admin") {
     const { section, date } = await searchParams;
