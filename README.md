@@ -38,7 +38,17 @@ School administrators land on the school overview at `/`. Navigation links use `
 - Audit history: search the latest 100 events for this school.
 - School settings: edit the school's display name and timezone. The sign-in tenant ID remains managed separately.
 
-For a new school, create the academic year and mark it current, add grades and classes, then enroll students and link guardians. These workflows use the existing schema and require no additional database migration. Every mutation checks the authenticated school and commits its audit entry in the same transaction. Office staff retain their roster workspace; dedicated teacher, specialist and guardian dashboards remain future work. Guardian delivery, emergency two-party broadcasts, operational enforcement of court restrictions at pickup, delivery of specialist directives to other roles, and GDPR requests are not connected to the live administrator workspace.
+For a new school, create the academic year and mark it current, add grades and classes, then enroll students and link guardians. These workflows use the existing schema and require no additional database migration. Every mutation checks the authenticated school and commits its audit entry in the same transaction. Specialist and guardian dashboards remain future work. Guardian delivery, emergency two-party broadcasts, operational enforcement of court restrictions at pickup, delivery of specialist directives to other roles, and GDPR requests are not connected to the live administrator workspace.
+
+### Live school office workspace
+
+Office staff land on their own overview at `/`. They can enroll and update students, change current-year class placement and status, maintain guardian contacts and relationships, import validated student CSV files, and correct a submitted roll call with a written reason. The student directory flags active pickup or disclosure restrictions for office follow-up. Staff can read published school notices. Server actions reject attempts to manage staff roles, academic setup, grades, report publication, or sensitive cases.
+
+### Live teacher workspace
+
+Teachers land on their own overview at `/`. School administrators assign a teacher to a class as homeroom teacher; subject assignments already stored in `teacher_class_assignments` are also supported. Teachers see only current-year classes assigned to them, their enrolled students, and the published notices addressed to them.
+
+Homeroom teachers can record and submit attendance and generate draft report cards with teacher remarks. Assigned subject teachers can create assessments from administrator-defined categories, enter grades and publish complete assessments for their subject and class. Homeroom teachers can also manage assessments in their class. Administrators retain approval and publication of report cards. Server actions recheck the teacher's class or subject assignment on every save. No school-wide roster, guardian contacts or sensitive case details are sent to the teacher workspace.
 
 Production startup requires `DATABASE_URL`, `BETTER_AUTH_SECRET` and `SENSITIVE_RECORD_ENCRYPTION_KEY`. Generate independent random secrets (at least 32 characters) and keep them outside source control. Keep the narrative key securely backed up; changing it without a migration makes existing ciphertext unreadable. No default production key is provided. Platform-managed school and staff provisioning, forced temporary-password replacement, and MFA enrollment are implemented. No SMS provider is required for the in-app workflows.
 

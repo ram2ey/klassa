@@ -14,8 +14,10 @@ function found<T>(row: T | undefined, label: string): T {
 
 /** Called only after server authorization; every referenced record is checked in this tenant. */
 export async function saveSchoolRecord(actor: Actor, raw: SchoolCommand) {
-  if (actor.role !== "school_admin") throw new SchoolAdminError("School administrator access required.");
   const value = schoolCommandSchema.parse(raw);
+  if (actor.role !== "school_admin" && !(actor.role === "office_staff" && ["student", "guardian", "guardian_link"].includes(value.kind))) {
+    throw new SchoolAdminError("You cannot change this school record.");
+  }
   const org = actor.organizationId;
   return db.transaction(async tx => {
     // Serialize school setup changes, including current-year and primary-contact selection.

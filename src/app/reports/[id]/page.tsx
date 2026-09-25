@@ -2,19 +2,27 @@ import { and, eq } from "drizzle-orm";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { db } from "@/db";
-import { academicYears, organizations, reportCards, reportCardSubjectGrades, students, subjects, terms } from "@/db/schema";
+import { academicYears, classes, organizations, reportCards, reportCardSubjectGrades, students, subjects, teacherClassAssignments, terms } from "@/db/schema";
 import { requireStaff } from "@/lib/action-access";
 import { PrintReportButton } from "@/components/print-report-button";
 
 export const dynamic = "force-dynamic";
 
 export default async function ReportCardPage({ params }: { params: Promise<{ id: string }> }) {
-  const actor = await requireStaff(["school_admin"]);
+  const actor = await requireStaff(["school_admin", "teacher"]);
   const { id } = await params;
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)) notFound();
   const org = actor.organizationId;
   const [card] = await db.select().from(reportCards).where(and(eq(reportCards.id, id), eq(reportCards.organizationId, org)));
   if (!card) notFound();
+  if (actor.role === "teacher") {
+    const [classRow, assignments] = await Promise.all([
+      db.select({ homeroomTeacherId: classes.homeroomTeacherId }).from(classes).where(and(eq(classes.id, card.classId), eq(classes.organizationId, org))).then(rows => rows[0]),
+      db.select({ id: teacherClassAssignments.id }).from(teacherClassAssignments).where(and(eq(teacherClassAssignments.organizationId, org),
+        eq(teacherClassAssignments.classId, card.classId), eq(teacherClassAssignments.teacherId, actor.userId), eq(teacherClassAssignments.isPrimaryHomeroom, true))),
+    ]);
+    if (classRow?.homeroomTeacherId !== actor.userId && !assignments.length) notFound();
+  }
   const [school, student, term, year, results, subjectRows] = await Promise.all([
     db.select().from(organizations).where(eq(organizations.id, org)).then(rows => rows[0]),
     db.select().from(students).where(and(eq(students.id, card.studentId), eq(students.organizationId, org))).then(rows => rows[0]),

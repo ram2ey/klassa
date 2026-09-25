@@ -8,6 +8,10 @@ This document tracks architectural decisions, phase deliverables, completed feat
 
 The school administrator workspace connects school directories, setup, roll call, gradebook, report cards, in-app announcements, encrypted case notes, settings and audit history to PostgreSQL. Platform administrators manage tenants separately. MFA is required only for platform administrators.
 
+The live teacher workspace shows assigned current-year classes and rosters, attendance for homeroom classes, assessments and grading for assigned classes or subjects, draft report cards with teacher remarks, and relevant published notices. The server rechecks assignments on every mutation; school administrators retain report approval and publication.
+
+The live office workspace covers student intake and placement, guardian relationships, CSV imports, submitted attendance corrections, school notices, and limited pickup or disclosure restriction flags. Office actions remain school-scoped and cannot alter grades, staff permissions, or confidential case notes.
+
 Guardian access, SMS and emergency delivery, delivery of specialist directives, operational enforcement of court restrictions, and GDPR still need production integration. The historical phase checklists below describe the demo implementation and must not be read as production completion. See README.md for current live boundaries.
 
 ### Historical demo roadmap

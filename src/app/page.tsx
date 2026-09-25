@@ -1,8 +1,6 @@
 import { KlassoWorkspace } from "@/components/klasso-workspace";
 import { isDemoMode } from "@/lib/runtime-config";
 import { getWorkspaceData } from "@/app/actions/roster-actions";
-import { listLiveStudents } from "@/lib/live-roster";
-import { LiveRoster } from "@/components/live-roster";
 import { getAuth } from "@/lib/auth";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
@@ -14,6 +12,10 @@ import { getSchoolAdminData } from "@/lib/school-admin-data";
 import { getSchoolWorkflowData } from "@/lib/school-workflow-data";
 import { getStaffAnnouncements } from "@/lib/school-announcements";
 import { SchoolNoticeBoard } from "@/components/school-notice-board";
+import { getTeacherData } from "@/lib/teacher-data";
+import { TeacherWorkspace } from "@/components/teacher-workspace";
+import { getOfficeData } from "@/lib/office-data";
+import { OfficeWorkspace } from "@/components/office-workspace";
 
 export const dynamic = "force-dynamic";
 
@@ -33,11 +35,21 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
     const [data, workflow] = await Promise.all([getSchoolAdminData(), getSchoolWorkflowData(selected, selectedDate)]);
     return <SchoolAdminWorkspace key={data.school.id} data={data} workflow={workflow} section={selected} date={selectedDate} />;
   }
-  if (actor.role !== "office_staff") {
-    return <><main className="mx-auto max-w-xl space-y-4 p-6"><h1 className="text-xl font-bold">Your school account is ready</h1>
+  if (actor.role === "teacher") {
+    const { section, date } = await searchParams;
+    const selected = section ?? "overview";
+    const selectedDate = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : new Date().toISOString().slice(0, 10);
+    const [data, notices] = await Promise.all([getTeacherData(selected, selectedDate), getStaffAnnouncements()]);
+    return <TeacherWorkspace key={data.school.id} data={data} notices={notices} section={selected} date={selectedDate} />;
+  }
+  if (actor.role === "office_staff") {
+    const { section, date } = await searchParams;
+    const selected = section ?? "overview";
+    const selectedDate = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : new Date().toISOString().slice(0, 10);
+    const [data, notices] = await Promise.all([getOfficeData(selectedDate), getStaffAnnouncements()]);
+    return <OfficeWorkspace key={data.school.id} data={data} notices={notices} section={selected} date={selectedDate} />;
+  }
+  return <><main className="mx-auto max-w-xl space-y-4 p-6"><h1 className="text-xl font-bold">Your school account is ready</h1>
       <p>Your membership is active. Live workflows for your role are still being connected.</p>
       <Link href="/schools" className="text-blue-700 underline">Choose another school</Link><AccountSignOut /></main><SchoolNoticeBoard notices={await getStaffAnnouncements()} /></>;
-  }
-  const [roster, notices] = await Promise.all([listLiveStudents(), getStaffAnnouncements()]);
-  return <><SchoolNoticeBoard notices={notices} /><LiveRoster students={roster} canManageStaff={false} /></>;
 }

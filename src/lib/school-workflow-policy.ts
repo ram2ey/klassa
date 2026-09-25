@@ -16,6 +16,7 @@ export const workflowCommandSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("grade_entry"), assessmentId: id, studentId: id, score: z.number().min(0).max(1000),
     feedback: z.string().trim().max(1000).default(""), correctionReason: z.string().trim().max(500).default("") }),
   z.object({ kind: z.literal("report_generate"), studentId: id, termId: id }),
+  z.object({ kind: z.literal("report_remarks"), reportCardId: id, teacherRemarks: z.string().trim().max(5000) }),
   z.object({ kind: z.literal("report_status"), reportCardId: id, status: z.enum(["approved", "published"]) }),
   z.object({ kind: z.literal("announcement"), title: z.string().trim().min(2).max(200), content: z.string().trim().min(2).max(10000),
     targetType: z.enum(["school", "grade", "class"]), targetId: z.string().max(80), priority: z.enum(["normal", "important"]),

@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { academicYears, announcements, assessmentCategories, assessmentGrades, assessments,
   attendanceCorrections, attendanceRecords, attendanceSessions, classes, enrollments, gradeCorrections,
   gradeLevels, organizations, reportCards, reportCardSubjectGrades, sensitiveAccessLogs,
-  sensitiveCaseNotes, sensitiveCases, needToKnowAlerts, courtRestrictions, students, subjects, terms } from "@/db/schema";
+  sensitiveCaseNotes, sensitiveCases, needToKnowAlerts, courtRestrictions, students, subjects, terms, teacherClassAssignments } from "@/db/schema";
 import { logAuditEvent } from "@/lib/audit";
 import type { requireStaff } from "@/lib/action-access";
 import { SchoolAdminError } from "@/lib/school-admin-policy";
@@ -19,11 +19,43 @@ function found<T>(row: T | undefined, label: string): T {
 function decimal(value: number) { return value.toFixed(2); }
 
 export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
-  if (actor.role !== "school_admin") throw new SchoolAdminError("School administrator access required.");
+  if (actor.role !== "school_admin" && actor.role !== "teacher" && actor.role !== "office_staff") throw new SchoolAdminError("School staff access required.");
   const value = workflowCommandSchema.parse(raw);
+  if (actor.role === "office_staff" && value.kind !== "attendance") throw new SchoolAdminError("Office staff can only correct recorded attendance.");
   const org = actor.organizationId;
   return db.transaction(async tx => {
     found((await tx.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, org)).for("update"))[0], "School");
+    if (actor.role === "teacher") {
+      const permitted = ["attendance", "attendance_submit", "assessment", "assessment_publish", "grade_entry", "report_generate", "report_remarks"];
+      if (!permitted.includes(value.kind)) throw new SchoolAdminError("Teachers cannot change this school record.");
+      let assignedClassId: string | null = null;
+      let assignedSubjectId: string | null = null;
+      let homeroomOnly = false;
+      if (value.kind === "attendance" || value.kind === "attendance_submit") { assignedClassId = value.classId; homeroomOnly = true; }
+      if (value.kind === "assessment") { assignedClassId = value.classId; assignedSubjectId = value.subjectId; }
+      if (value.kind === "assessment_publish" || value.kind === "grade_entry") {
+        const row = found((await tx.select({ classId: assessments.classId, subjectId: assessments.subjectId }).from(assessments)
+          .where(and(eq(assessments.id, value.assessmentId), eq(assessments.organizationId, org))))[0], "Assessment");
+        assignedClassId = row.classId; assignedSubjectId = row.subjectId;
+      }
+      if (value.kind === "report_generate") {
+        const term = found((await tx.select({ academicYearId: terms.academicYearId }).from(terms).where(and(eq(terms.id, value.termId), eq(terms.organizationId, org))))[0], "Term");
+        const enrollment = found((await tx.select({ classId: enrollments.classId }).from(enrollments).where(and(eq(enrollments.organizationId, org),
+          eq(enrollments.studentId, value.studentId), eq(enrollments.academicYearId, term.academicYearId))))[0], "Enrollment");
+        assignedClassId = enrollment.classId; homeroomOnly = true;
+      }
+      if (value.kind === "report_remarks") {
+        const card = found((await tx.select({ classId: reportCards.classId }).from(reportCards).where(and(eq(reportCards.id, value.reportCardId), eq(reportCards.organizationId, org))))[0], "Report card");
+        assignedClassId = card.classId; homeroomOnly = true;
+      }
+      if (!assignedClassId) throw new SchoolAdminError("This record has no assigned class.");
+      const assignments = await tx.select().from(teacherClassAssignments).where(and(eq(teacherClassAssignments.organizationId, org),
+        eq(teacherClassAssignments.teacherId, actor.userId), eq(teacherClassAssignments.classId, assignedClassId)));
+      const assignedClass = found((await tx.select({ homeroomTeacherId: classes.homeroomTeacherId }).from(classes).where(and(eq(classes.id, assignedClassId), eq(classes.organizationId, org))))[0], "Class");
+      if (assignedClass.homeroomTeacherId !== actor.userId && !assignments.some(row => homeroomOnly ? row.isPrimaryHomeroom : row.isPrimaryHomeroom || (!!assignedSubjectId && row.subjectId === assignedSubjectId))) {
+        throw new SchoolAdminError("You are not assigned to this class or subject.");
+      }
+    }
     let entityId = "";
     let noteText: string[] | undefined;
     switch (value.kind) {
@@ -33,6 +65,7 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
         const year = found((await tx.select().from(academicYears).where(and(eq(academicYears.id, classRow.academicYearId), eq(academicYears.organizationId, org))))[0], "Academic year");
         if (value.sessionDate < year.startsOn || value.sessionDate > year.endsOn) throw new SchoolAdminError("Attendance date must be within the class academic year.");
         let [session] = await tx.select().from(attendanceSessions).where(and(eq(attendanceSessions.organizationId, org), eq(attendanceSessions.classId, value.classId), eq(attendanceSessions.sessionDate, value.sessionDate), eq(attendanceSessions.period, "morning_roll_call")));
+        if (actor.role === "office_staff" && (!session || session.status !== "submitted")) throw new SchoolAdminError("Only submitted roll calls can be corrected by the office.");
         if (!session && value.kind === "attendance_submit") throw new SchoolAdminError("Record attendance before submitting the roll call.");
         if (!session) [session] = await tx.insert(attendanceSessions).values({ organizationId: org, academicYearId: year.id, classId: classRow.id, sessionDate: value.sessionDate, recordedBy: actor.userId }).returning();
         if (session.status === "locked") throw new SchoolAdminError("This roll call is locked.");
@@ -46,7 +79,9 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
         }
         found((await tx.select({ id: enrollments.id }).from(enrollments).where(and(eq(enrollments.organizationId, org), eq(enrollments.classId, classRow.id), eq(enrollments.academicYearId, year.id), eq(enrollments.studentId, value.studentId), eq(enrollments.status, "active"))))[0], "Active enrollment");
         const [previous] = await tx.select().from(attendanceRecords).where(and(eq(attendanceRecords.organizationId, org), eq(attendanceRecords.sessionId, session.id), eq(attendanceRecords.studentId, value.studentId)));
-        if (previous && session.status === "submitted" && previous.status !== value.status) {
+        if (actor.role === "office_staff" && (!previous || value.correctionReason.length < 4)) throw new SchoolAdminError("Explain the attendance correction.");
+        if (previous && session.status === "submitted" &&
+          (previous.status !== value.status || (actor.role === "office_staff" && (previous.reason ?? "") !== value.reason))) {
           if (value.correctionReason.length < 4) throw new SchoolAdminError("Explain the correction to submitted attendance.");
           await tx.insert(attendanceCorrections).values({ organizationId: org, attendanceRecordId: previous.id, studentId: value.studentId,
             previousStatus: previous.status, newStatus: value.status, reason: value.correctionReason, correctedBy: actor.userId });
@@ -151,6 +186,14 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
         if ((value.status === "approved" && card.status !== "draft") || (value.status === "published" && card.status !== "approved")) throw new SchoolAdminError("Approve the draft before publishing the report card.");
         await tx.update(reportCards).set({ status: value.status, approvedBy: value.status === "approved" ? actor.userId : card.approvedBy,
           publishedAt: value.status === "published" ? new Date() : null, updatedAt: new Date() }).where(and(eq(reportCards.id, card.id), eq(reportCards.organizationId, org)));
+        entityId = card.id;
+        break;
+      }
+      case "report_remarks": {
+        const card = found((await tx.select().from(reportCards).where(and(eq(reportCards.id, value.reportCardId), eq(reportCards.organizationId, org))))[0], "Report card");
+        if (card.status !== "draft") throw new SchoolAdminError("Teacher remarks can only be changed on a draft report card.");
+        await tx.update(reportCards).set({ teacherRemarks: value.teacherRemarks || null, updatedAt: new Date() })
+          .where(and(eq(reportCards.id, card.id), eq(reportCards.organizationId, org)));
         entityId = card.id;
         break;
       }

@@ -26,7 +26,7 @@ describe("deployment and action boundaries", () => {
     }
   });
   it("guards every fixture-backed server action before executing its body", () => {
-    const liveActionFiles = ["invitation-actions.ts", "password-actions.ts", "school-access-actions.ts"];
+    const liveActionFiles = ["invitation-actions.ts", "password-actions.ts", "school-access-actions.ts", "school-workflow-actions.ts", "teacher-actions.ts", "office-actions.ts"];
     for (const file of readdirSync("src/app/actions").filter(file => file.endsWith(".ts") && !liveActionFiles.includes(file))) {
       const source = readFileSync(`src/app/actions/${file}`, "utf8");
       const ast = ts.createSourceFile(file, source, ts.ScriptTarget.Latest, true);

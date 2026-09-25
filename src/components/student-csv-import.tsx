@@ -3,9 +3,10 @@
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { importStudentsAction } from "@/app/actions/school-admin-actions";
+import { importOfficeStudentsAction } from "@/app/actions/office-actions";
 import { generateStudentCsvTemplate, validateStudentCsv } from "@/lib/csv";
 
-export function StudentCsvImport() {
+export function StudentCsvImport({ role = "school_admin" }: { role?: "school_admin" | "office_staff" }) {
   const router = useRouter();
   const [pending, start] = useTransition();
   const [content, setContent] = useState("");
@@ -33,7 +34,7 @@ export function StudentCsvImport() {
     </div>}
     {message && <p className="mt-3 text-sm" role="status">{message}</p>}
     <button type="button" className="mt-4 min-h-11 bg-blue-700 px-4 text-sm font-semibold text-white disabled:opacity-50" disabled={pending || !preview?.isValid || preview.validCount > 1000} onClick={() => start(async () => {
-      const result = await importStudentsAction(content);
+      const result = await (role === "office_staff" ? importOfficeStudentsAction(content) : importStudentsAction(content));
       if (!result.success) { setMessage(result.error); return; }
       setMessage(`Imported ${result.count} students.`);
       setContent("");

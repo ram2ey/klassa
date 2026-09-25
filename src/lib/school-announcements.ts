@@ -11,7 +11,8 @@ export async function getStaffAnnouncements() {
     db.select().from(teacherClassAssignments).where(and(eq(teacherClassAssignments.organizationId, org), eq(teacherClassAssignments.teacherId, actor.userId))),
     db.select().from(classes).where(eq(classes.organizationId, org)),
   ]);
-  const assignedClasses = new Set(assignments.map(row => row.classId));
+  const assignedClasses = new Set([...assignments.map(row => row.classId),
+    ...classRows.filter(row => row.homeroomTeacherId === actor.userId).map(row => row.id)]);
   const assignedGrades = new Set(classRows.filter(row => assignedClasses.has(row.id)).map(row => row.gradeLevelId));
   const seesAll = actor.role !== "teacher";
   return rows.filter(row => row.targetType === "school" || seesAll ||

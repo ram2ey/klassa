@@ -9,7 +9,7 @@ import type { requireStaff } from "@/lib/action-access";
 type Actor = Awaited<ReturnType<typeof requireStaff>>;
 
 export async function importSchoolStudents(actor: Actor, csvText: string) {
-  if (actor.role !== "school_admin") throw new SchoolAdminError("School administrator access required.");
+  if (actor.role !== "school_admin" && actor.role !== "office_staff") throw new SchoolAdminError("School office access required.");
   if (typeof csvText !== "string" || Buffer.byteLength(csvText, "utf8") > 2_000_000) throw new SchoolAdminError("Choose a CSV file smaller than 2 MB.");
   const validation = validateStudentCsv(csvText);
   if (!validation.isValid || validation.validRecords.length > 1000) throw new SchoolAdminError(
