@@ -9,7 +9,7 @@ Klassa is a secure K–12 school administration system. Phase 1 establishes the 
 3. Run `npm run db:migrate`. Use `npm run db:generate` only after intentionally changing the schema.
 4. Start Klassa with `npm run dev`.
 
-The UI currently uses representative local records so the design and workflows can be reviewed before production data is connected. Better Auth is mounted at `/api/auth/[...all]`; public registration is disabled and platform administrator MFA is provided through the TOTP plugin.
+The local demo uses representative records. In live mode, school administrators have a database-connected workspace for school administration. Better Auth is mounted at `/api/auth/[...all]`; public registration is disabled and platform administrator MFA is provided through the TOTP plugin.
 
 ### Preview and live boundaries
 
@@ -17,9 +17,30 @@ For the synthetic local preview, set `KLASSO_DEMO_MODE=true` in `.env.local` and
 
 Demo mode is rejected in production. With demo mode disabled, the home page requires an existing staff account and school membership. Platform administrators also need enabled MFA. Live roster reads, student enrollment and status updates use PostgreSQL and enforce the authenticated organization. Enrollment requires an existing class/grade in the school's current academic year. Mutations and their audit entries commit atomically. Database errors are never converted into successful demo writes.
 
-Attendance, assessments, communications, sensitive cases, GDPR workflows and the old school-provisioning preview remain local demonstrations. Their server actions reject live requests, including requests from administrators. Anonymization is unavailable even in the preview: it cannot yet erase all related records and must not mark requests complete. Emergency approvals are simulations; class/grade SMS audiences are unavailable, and scheduled previews do not dispatch automatically. SMS simulations have zero cost and are not marked delivered.
+The older demo action routes for attendance, assessments, communications and sensitive records remain preview-only; the live school administrator sections use separate school-scoped actions. GDPR workflows and the old school-provisioning preview remain local demonstrations. Anonymization is unavailable even in the preview: it cannot yet erase all related records and must not mark requests complete. Emergency approvals are simulations; live SMS, scheduled delivery and guardian messaging are not connected. SMS simulations have zero cost and are not marked delivered.
 
-Production startup requires `DATABASE_URL`, `BETTER_AUTH_SECRET` and `SENSITIVE_RECORD_ENCRYPTION_KEY`. Generate independent random secrets (at least 32 characters) and keep them outside source control. Keep the narrative key securely backed up; changing it without a migration makes existing ciphertext unreadable. No default production key is provided. Platform-managed school and staff provisioning, forced temporary-password replacement, and MFA enrollment are implemented. No SMS provider is required. The remaining live school modules are still being connected.
+### Live school administrator workspace
+
+School administrators land on the school overview at `/`. Navigation links use `?section=` so sections can be bookmarked. The workspace includes:
+
+- Overview: real student, staff, class and guardian counts, school setup checklist, and recent activity.
+- Students: search, enroll, edit details and status, assign a class in the current academic year, and import validated CSV files.
+- Guardians: create and edit optional contact details, link students, and maintain primary-contact and legal-responsibility flags.
+- Staff & access: create tenant username accounts, list staff, and change school roles. Administrators cannot change their own role.
+- Classes & grades: create and edit grade levels and classes, assign a homeroom teacher, and see enrollment counts.
+- Subjects: create and edit the school subject catalog.
+- Academic years: create and edit years and terms, select one current year, and validate term dates against year boundaries.
+- Attendance: mark active class rosters by date, submit complete roll calls, record reasons for later corrections, and export a dated CSV.
+- Gradebook: create weighted categories and assessments, enter scores, publish complete class grades, and explain published-grade corrections.
+- Report cards: generate versioned cards from published grades and submitted attendance, inspect subject results, approve, publish, and print or save a PDF.
+- Communications: draft and publish school, grade and class in-app announcements. Staff see published notices relevant to their role and class assignment.
+- Sensitive records: create cases, store encrypted notes, require an access reason for decryption, maintain case status and access history, and record staff directives and court restrictions.
+- Audit history: search the latest 100 events for this school.
+- School settings: edit the school's display name and timezone. The sign-in tenant ID remains managed separately.
+
+For a new school, create the academic year and mark it current, add grades and classes, then enroll students and link guardians. These workflows use the existing schema and require no additional database migration. Every mutation checks the authenticated school and commits its audit entry in the same transaction. Office staff retain their roster workspace; dedicated teacher, specialist and guardian dashboards remain future work. Guardian delivery, emergency two-party broadcasts, operational enforcement of court restrictions at pickup, delivery of specialist directives to other roles, and GDPR requests are not connected to the live administrator workspace.
+
+Production startup requires `DATABASE_URL`, `BETTER_AUTH_SECRET` and `SENSITIVE_RECORD_ENCRYPTION_KEY`. Generate independent random secrets (at least 32 characters) and keep them outside source control. Keep the narrative key securely backed up; changing it without a migration makes existing ciphertext unreadable. No default production key is provided. Platform-managed school and staff provisioning, forced temporary-password replacement, and MFA enrollment are implemented. No SMS provider is required for the in-app workflows.
 
 ### Migration recovery
 

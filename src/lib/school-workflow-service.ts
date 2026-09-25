@@ -1,0 +1,242 @@
+import { and, eq } from "drizzle-orm";
+import { db } from "@/db";
+import { academicYears, announcements, assessmentCategories, assessmentGrades, assessments,
+  attendanceCorrections, attendanceRecords, attendanceSessions, classes, enrollments, gradeCorrections,
+  gradeLevels, organizations, reportCards, reportCardSubjectGrades, sensitiveAccessLogs,
+  sensitiveCaseNotes, sensitiveCases, needToKnowAlerts, courtRestrictions, students, subjects, terms } from "@/db/schema";
+import { logAuditEvent } from "@/lib/audit";
+import type { requireStaff } from "@/lib/action-access";
+import { SchoolAdminError } from "@/lib/school-admin-policy";
+import { workflowCommandSchema, type WorkflowCommand } from "@/lib/school-workflow-policy";
+import { calculateWeightedTermGrade, scoreToGrade } from "@/lib/assessments";
+import { decryptNarrative, encryptNarrative } from "@/lib/narrative-crypto";
+
+type Actor = Awaited<ReturnType<typeof requireStaff>>;
+function found<T>(row: T | undefined, label: string): T {
+  if (!row) throw new SchoolAdminError(`${label} was not found in your school.`);
+  return row;
+}
+function decimal(value: number) { return value.toFixed(2); }
+
+export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
+  if (actor.role !== "school_admin") throw new SchoolAdminError("School administrator access required.");
+  const value = workflowCommandSchema.parse(raw);
+  const org = actor.organizationId;
+  return db.transaction(async tx => {
+    found((await tx.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, org)).for("update"))[0], "School");
+    let entityId = "";
+    let noteText: string[] | undefined;
+    switch (value.kind) {
+      case "attendance":
+      case "attendance_submit": {
+        const classRow = found((await tx.select().from(classes).where(and(eq(classes.id, value.classId), eq(classes.organizationId, org))))[0], "Class");
+        const year = found((await tx.select().from(academicYears).where(and(eq(academicYears.id, classRow.academicYearId), eq(academicYears.organizationId, org))))[0], "Academic year");
+        if (value.sessionDate < year.startsOn || value.sessionDate > year.endsOn) throw new SchoolAdminError("Attendance date must be within the class academic year.");
+        let [session] = await tx.select().from(attendanceSessions).where(and(eq(attendanceSessions.organizationId, org), eq(attendanceSessions.classId, value.classId), eq(attendanceSessions.sessionDate, value.sessionDate), eq(attendanceSessions.period, "morning_roll_call")));
+        if (!session && value.kind === "attendance_submit") throw new SchoolAdminError("Record attendance before submitting the roll call.");
+        if (!session) [session] = await tx.insert(attendanceSessions).values({ organizationId: org, academicYearId: year.id, classId: classRow.id, sessionDate: value.sessionDate, recordedBy: actor.userId }).returning();
+        if (session.status === "locked") throw new SchoolAdminError("This roll call is locked.");
+        if (value.kind === "attendance_submit") {
+          const roster = await tx.select().from(enrollments).where(and(eq(enrollments.organizationId, org), eq(enrollments.classId, classRow.id), eq(enrollments.academicYearId, year.id), eq(enrollments.status, "active")));
+          const marked = await tx.select({ studentId: attendanceRecords.studentId }).from(attendanceRecords).where(and(eq(attendanceRecords.organizationId, org), eq(attendanceRecords.sessionId, session.id)));
+          if (roster.some(item => !marked.some(row => row.studentId === item.studentId))) throw new SchoolAdminError("Mark every active student before submitting attendance.");
+          await tx.update(attendanceSessions).set({ status: "submitted", submittedAt: new Date(), updatedAt: new Date() }).where(and(eq(attendanceSessions.id, session.id), eq(attendanceSessions.organizationId, org)));
+          entityId = session.id;
+          break;
+        }
+        found((await tx.select({ id: enrollments.id }).from(enrollments).where(and(eq(enrollments.organizationId, org), eq(enrollments.classId, classRow.id), eq(enrollments.academicYearId, year.id), eq(enrollments.studentId, value.studentId), eq(enrollments.status, "active"))))[0], "Active enrollment");
+        const [previous] = await tx.select().from(attendanceRecords).where(and(eq(attendanceRecords.organizationId, org), eq(attendanceRecords.sessionId, session.id), eq(attendanceRecords.studentId, value.studentId)));
+        if (previous && session.status === "submitted" && previous.status !== value.status) {
+          if (value.correctionReason.length < 4) throw new SchoolAdminError("Explain the correction to submitted attendance.");
+          await tx.insert(attendanceCorrections).values({ organizationId: org, attendanceRecordId: previous.id, studentId: value.studentId,
+            previousStatus: previous.status, newStatus: value.status, reason: value.correctionReason, correctedBy: actor.userId });
+        }
+        const fields = { status: value.status, reason: value.reason || null, arrivalMinutesLate: 0, updatedAt: new Date() };
+        const [record] = previous
+          ? await tx.update(attendanceRecords).set(fields).where(and(eq(attendanceRecords.id, previous.id), eq(attendanceRecords.organizationId, org))).returning()
+          : await tx.insert(attendanceRecords).values({ ...fields, organizationId: org, sessionId: session.id, studentId: value.studentId }).returning();
+        entityId = record.id;
+        break;
+      }
+      case "category": {
+        found((await tx.select({ id: academicYears.id }).from(academicYears).where(and(eq(academicYears.id, value.academicYearId), eq(academicYears.organizationId, org))))[0], "Academic year");
+        found((await tx.select({ id: subjects.id }).from(subjects).where(and(eq(subjects.id, value.subjectId), eq(subjects.organizationId, org))))[0], "Subject");
+        const [row] = await tx.insert(assessmentCategories).values({ organizationId: org, academicYearId: value.academicYearId,
+          subjectId: value.subjectId, name: value.name, weight: value.weight }).returning();
+        entityId = row.id;
+        break;
+      }
+      case "assessment": {
+        const classRow = found((await tx.select().from(classes).where(and(eq(classes.id, value.classId), eq(classes.organizationId, org))))[0], "Class");
+        const term = found((await tx.select().from(terms).where(and(eq(terms.id, value.termId), eq(terms.organizationId, org))))[0], "Term");
+        const category = found((await tx.select().from(assessmentCategories).where(and(eq(assessmentCategories.id, value.categoryId), eq(assessmentCategories.organizationId, org))))[0], "Category");
+        found((await tx.select({ id: subjects.id }).from(subjects).where(and(eq(subjects.id, value.subjectId), eq(subjects.organizationId, org))))[0], "Subject");
+        if (term.academicYearId !== classRow.academicYearId || category.academicYearId !== classRow.academicYearId || category.subjectId !== value.subjectId) throw new SchoolAdminError("Class, term, subject and category must belong to the same school year.");
+        if (value.dateDue < term.startsOn || value.dateDue > term.endsOn) throw new SchoolAdminError("Due date must be within the term.");
+        const [row] = await tx.insert(assessments).values({ organizationId: org, academicYearId: classRow.academicYearId,
+          termId: term.id, classId: classRow.id, subjectId: value.subjectId, categoryId: category.id,
+          title: value.title, maxScore: value.maxScore, dateDue: value.dateDue, createdById: actor.userId }).returning();
+        entityId = row.id;
+        break;
+      }
+      case "assessment_publish": {
+        const assessment = found((await tx.select().from(assessments).where(and(eq(assessments.id, value.assessmentId), eq(assessments.organizationId, org))))[0], "Assessment");
+        const roster = await tx.select({ studentId: enrollments.studentId }).from(enrollments).where(and(eq(enrollments.organizationId, org), eq(enrollments.classId, assessment.classId), eq(enrollments.academicYearId, assessment.academicYearId), eq(enrollments.status, "active")));
+        const grades = await tx.select({ studentId: assessmentGrades.studentId }).from(assessmentGrades).where(and(eq(assessmentGrades.organizationId, org), eq(assessmentGrades.assessmentId, assessment.id)));
+        if (!roster.length || roster.some(item => !grades.some(grade => grade.studentId === item.studentId))) throw new SchoolAdminError("Enter a grade for every active student before publishing.");
+        await tx.update(assessments).set({ status: "published", updatedAt: new Date() }).where(and(eq(assessments.id, assessment.id), eq(assessments.organizationId, org)));
+        await tx.update(assessmentGrades).set({ status: "published", updatedAt: new Date() }).where(and(eq(assessmentGrades.organizationId, org), eq(assessmentGrades.assessmentId, assessment.id)));
+        entityId = assessment.id;
+        break;
+      }
+      case "grade_entry": {
+        const assessment = found((await tx.select().from(assessments).where(and(eq(assessments.id, value.assessmentId), eq(assessments.organizationId, org))))[0], "Assessment");
+        found((await tx.select({ id: enrollments.id }).from(enrollments).where(and(eq(enrollments.organizationId, org), eq(enrollments.classId, assessment.classId), eq(enrollments.academicYearId, assessment.academicYearId), eq(enrollments.studentId, value.studentId), eq(enrollments.status, "active"))))[0], "Active enrollment");
+        if (value.score > assessment.maxScore) throw new SchoolAdminError("Score cannot exceed the assessment maximum.");
+        const [previous] = await tx.select().from(assessmentGrades).where(and(eq(assessmentGrades.organizationId, org), eq(assessmentGrades.assessmentId, assessment.id), eq(assessmentGrades.studentId, value.studentId)));
+        if (previous?.status === "published" && Number(previous.score) !== value.score && value.correctionReason.length < 4) throw new SchoolAdminError("Explain the correction to a published grade.");
+        const percentage = value.score / assessment.maxScore * 100;
+        const fields = { score: decimal(value.score), percentage: decimal(percentage), letterGrade: scoreToGrade(percentage).label,
+          feedback: value.feedback || null, status: assessment.status === "published" ? "published" as const : "draft" as const,
+          gradedBy: actor.userId, gradedAt: new Date(), updatedAt: new Date() };
+        const [row] = previous
+          ? await tx.update(assessmentGrades).set(fields).where(and(eq(assessmentGrades.id, previous.id), eq(assessmentGrades.organizationId, org))).returning()
+          : await tx.insert(assessmentGrades).values({ ...fields, organizationId: org, assessmentId: assessment.id, studentId: value.studentId }).returning();
+        if (previous?.status === "published" && Number(previous.score) !== value.score) await tx.insert(gradeCorrections).values({
+          organizationId: org, assessmentGradeId: row.id, studentId: value.studentId, previousScore: previous.score,
+          newScore: fields.score, previousGrade: previous.letterGrade, newGrade: fields.letterGrade,
+          reason: value.correctionReason, correctedBy: actor.userId });
+        entityId = row.id;
+        break;
+      }
+      case "report_generate": {
+        const term = found((await tx.select().from(terms).where(and(eq(terms.id, value.termId), eq(terms.organizationId, org))))[0], "Term");
+        const enrollment = found((await tx.select().from(enrollments).where(and(eq(enrollments.organizationId, org), eq(enrollments.studentId, value.studentId), eq(enrollments.academicYearId, term.academicYearId))))[0], "Student enrollment");
+        if (!enrollment.classId) throw new SchoolAdminError("Assign the student to a class before generating a report card.");
+        const previous = await tx.select().from(reportCards).where(and(eq(reportCards.organizationId, org), eq(reportCards.studentId, value.studentId), eq(reportCards.termId, term.id)));
+        const published = await tx.select().from(assessments).where(and(eq(assessments.organizationId, org), eq(assessments.classId, enrollment.classId), eq(assessments.termId, term.id), eq(assessments.status, "published")));
+        if (!published.length) throw new SchoolAdminError("Publish assessments before generating a report card.");
+        const gradeRows = await tx.select().from(assessmentGrades).where(and(eq(assessmentGrades.organizationId, org), eq(assessmentGrades.studentId, value.studentId), eq(assessmentGrades.status, "published")));
+        const categories = await tx.select().from(assessmentCategories).where(and(eq(assessmentCategories.organizationId, org), eq(assessmentCategories.academicYearId, term.academicYearId)));
+        const subjectIds = [...new Set(published.map(item => item.subjectId))];
+        const results = subjectIds.map(subjectId => {
+          const items = published.filter(item => item.subjectId === subjectId && gradeRows.some(grade => grade.assessmentId === item.id));
+          if (!items.length) return null;
+          const calculation = calculateWeightedTermGrade(categories.filter(item => item.subjectId === subjectId).map(item => ({ id: item.id, weight: item.weight })),
+            items.map(item => ({ id: item.id, categoryId: item.categoryId, maxScore: item.maxScore })),
+            gradeRows.filter(grade => items.some(item => item.id === grade.assessmentId)).map(grade => ({ assessmentId: grade.assessmentId, score: Number(grade.score) })));
+          return { subjectId, ...calculation };
+        }).filter((row): row is NonNullable<typeof row> => row !== null);
+        if (!results.length) throw new SchoolAdminError("Published grades are needed to generate a report card.");
+        const percentage = results.reduce((sum, row) => sum + row.percentage, 0) / results.length;
+        const gpa = results.reduce((sum, row) => sum + row.gpaPoint, 0) / results.length;
+        const sessions = await tx.select().from(attendanceSessions).where(and(eq(attendanceSessions.organizationId, org), eq(attendanceSessions.classId, enrollment.classId), eq(attendanceSessions.academicYearId, term.academicYearId)));
+        const recordRows = await tx.select().from(attendanceRecords).where(and(eq(attendanceRecords.organizationId, org), eq(attendanceRecords.studentId, value.studentId)));
+        const termRecords = recordRows.filter(record => sessions.some(session => session.id === record.sessionId && session.sessionDate >= term.startsOn && session.sessionDate <= term.endsOn && session.status !== "in_progress"));
+        const present = termRecords.filter(row => row.status === "present").length;
+        const absent = termRecords.filter(row => row.status === "absent").length;
+        const late = termRecords.filter(row => row.status === "late").length;
+        const attendanceRate = termRecords.length ? (present + late + termRecords.filter(row => row.status === "excused").length) / termRecords.length * 100 : null;
+        const [card] = await tx.insert(reportCards).values({ organizationId: org, studentId: value.studentId, academicYearId: term.academicYearId,
+          termId: term.id, classId: enrollment.classId, version: Math.max(0, ...previous.map(row => row.version)) + 1,
+          overallPercentage: decimal(percentage), gpa: decimal(gpa), attendanceRate: attendanceRate === null ? null : attendanceRate.toFixed(1),
+          daysPresent: present, daysAbsent: absent, daysLate: late }).returning();
+        await tx.insert(reportCardSubjectGrades).values(results.map(row => ({ organizationId: org, reportCardId: card.id,
+          subjectId: row.subjectId, scorePercentage: decimal(row.percentage), letterGrade: row.letterGrade })));
+        entityId = card.id;
+        break;
+      }
+      case "report_status": {
+        const card = found((await tx.select().from(reportCards).where(and(eq(reportCards.id, value.reportCardId), eq(reportCards.organizationId, org))))[0], "Report card");
+        if ((value.status === "approved" && card.status !== "draft") || (value.status === "published" && card.status !== "approved")) throw new SchoolAdminError("Approve the draft before publishing the report card.");
+        await tx.update(reportCards).set({ status: value.status, approvedBy: value.status === "approved" ? actor.userId : card.approvedBy,
+          publishedAt: value.status === "published" ? new Date() : null, updatedAt: new Date() }).where(and(eq(reportCards.id, card.id), eq(reportCards.organizationId, org)));
+        entityId = card.id;
+        break;
+      }
+      case "announcement": {
+        if (value.targetType === "school" && value.targetId !== "all") throw new SchoolAdminError("Choose the whole school target.");
+        if (value.targetType === "grade") found((await tx.select({ id: gradeLevels.id }).from(gradeLevels).where(and(eq(gradeLevels.id, value.targetId), eq(gradeLevels.organizationId, org))))[0], "Grade");
+        if (value.targetType === "class") found((await tx.select({ id: classes.id }).from(classes).where(and(eq(classes.id, value.targetId), eq(classes.organizationId, org))))[0], "Class");
+        const [row] = await tx.insert(announcements).values({ organizationId: org, title: value.title, content: value.content,
+          targetType: value.targetType, targetId: value.targetId, priority: value.priority, channels: "in_app",
+          status: value.status, publishedAt: value.status === "published" ? new Date() : null, authorId: actor.userId }).returning();
+        entityId = row.id;
+        break;
+      }
+      case "announcement_publish": {
+        const announcement = found((await tx.select().from(announcements).where(and(eq(announcements.id, value.announcementId), eq(announcements.organizationId, org))))[0], "Announcement");
+        if (announcement.status !== "draft") throw new SchoolAdminError("Only drafts can be published.");
+        await tx.update(announcements).set({ status: "published", publishedAt: new Date(), updatedAt: new Date() }).where(and(eq(announcements.id, announcement.id), eq(announcements.organizationId, org)));
+        entityId = announcement.id;
+        break;
+      }
+      case "sensitive_case": {
+        found((await tx.select({ id: students.id }).from(students).where(and(eq(students.id, value.studentId), eq(students.organizationId, org))))[0], "Student");
+        const [row] = await tx.insert(sensitiveCases).values({ organizationId: org, studentId: value.studentId, caseNumber: value.caseNumber,
+          area: value.area, confidentialityTier: value.confidentialityTier, title: value.title }).returning();
+        entityId = row.id;
+        break;
+      }
+      case "sensitive_note": {
+        const caseRow = found((await tx.select().from(sensitiveCases).where(and(eq(sensitiveCases.id, value.caseId), eq(sensitiveCases.organizationId, org))))[0], "Case");
+        const encrypted = encryptNarrative(value.note);
+        const [row] = await tx.insert(sensitiveCaseNotes).values({ organizationId: org, caseId: caseRow.id, authorId: actor.userId,
+          confidentialityTier: caseRow.confidentialityTier, encryptedCiphertext: encrypted.ciphertext, ivHex: encrypted.ivHex, authTagHex: encrypted.authTagHex }).returning();
+        entityId = row.id;
+        break;
+      }
+      case "sensitive_access": {
+        const caseRow = found((await tx.select().from(sensitiveCases).where(and(eq(sensitiveCases.id, value.caseId), eq(sensitiveCases.organizationId, org))))[0], "Case");
+        const notes = await tx.select().from(sensitiveCaseNotes).where(and(eq(sensitiveCaseNotes.organizationId, org), eq(sensitiveCaseNotes.caseId, caseRow.id), eq(sensitiveCaseNotes.isQuarantined, false)));
+        await tx.insert(sensitiveAccessLogs).values({ organizationId: org, caseId: caseRow.id, userId: actor.userId,
+          action: "view_decrypted", accessReason: value.accessReason });
+        noteText = notes.map(note => decryptNarrative(note.encryptedCiphertext, note.ivHex, note.authTagHex));
+        entityId = caseRow.id;
+        break;
+      }
+      case "sensitive_case_status": {
+        const caseRow = found((await tx.select().from(sensitiveCases).where(and(eq(sensitiveCases.id, value.caseId), eq(sensitiveCases.organizationId, org))))[0], "Case");
+        await tx.update(sensitiveCases).set({ status: value.status, closedAt: value.status === "closed" ? new Date() : null,
+          closedReason: value.status === "closed" ? value.reason : null, updatedAt: new Date() }).where(and(eq(sensitiveCases.id, caseRow.id), eq(sensitiveCases.organizationId, org)));
+        entityId = caseRow.id;
+        break;
+      }
+      case "need_to_know": {
+        const caseRow = found((await tx.select().from(sensitiveCases).where(and(eq(sensitiveCases.id, value.caseId), eq(sensitiveCases.organizationId, org))))[0], "Case");
+        if (caseRow.studentId !== value.studentId) throw new SchoolAdminError("The directive student must match the case student.");
+        const [row] = await tx.insert(needToKnowAlerts).values({ organizationId: org, studentId: value.studentId, caseId: caseRow.id,
+          category: value.category, severity: value.severity, directiveSummary: value.directiveSummary,
+          actionRequired: value.actionRequired, authorSpecialistId: actor.userId }).returning();
+        entityId = row.id;
+        break;
+      }
+      case "need_to_know_resolve": {
+        const alert = found((await tx.select().from(needToKnowAlerts).where(and(eq(needToKnowAlerts.id, value.alertId), eq(needToKnowAlerts.organizationId, org))))[0], "Directive");
+        await tx.update(needToKnowAlerts).set({ isActive: false, updatedAt: new Date() }).where(and(eq(needToKnowAlerts.id, alert.id), eq(needToKnowAlerts.organizationId, org)));
+        entityId = alert.id;
+        break;
+      }
+      case "court_restriction": {
+        found((await tx.select({ id: students.id }).from(students).where(and(eq(students.id, value.studentId), eq(students.organizationId, org))))[0], "Student");
+        if (value.expirationDate && value.expirationDate < value.effectiveDate) throw new SchoolAdminError("Expiration date must follow the effective date.");
+        const [row] = await tx.insert(courtRestrictions).values({ organizationId: org, studentId: value.studentId,
+          restrictedPersonName: value.restrictedPersonName, orderType: value.orderType, docketNumber: value.docketNumber,
+          issuingCourt: value.issuingCourt, summary: value.summary, effectiveDate: value.effectiveDate,
+          expirationDate: value.expirationDate || null, prohibitPickup: value.prohibitPickup,
+          prohibitDisclosure: value.prohibitDisclosure, prohibitDirectContact: value.prohibitDirectContact }).returning();
+        entityId = row.id;
+        break;
+      }
+      case "court_restriction_status": {
+        const restriction = found((await tx.select().from(courtRestrictions).where(and(eq(courtRestrictions.id, value.restrictionId), eq(courtRestrictions.organizationId, org))))[0], "Court restriction");
+        await tx.update(courtRestrictions).set({ isEnforced: value.isEnforced, updatedAt: new Date() }).where(and(eq(courtRestrictions.id, restriction.id), eq(courtRestrictions.organizationId, org)));
+        entityId = restriction.id;
+        break;
+      }
+    }
+    await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action: `${value.kind}.saved`,
+      entityType: value.kind, entityId, metadata: "reason" in value ? { reason: value.reason } : {} }, tx);
+    return { entityId, notes: noteText };
+  });
+}

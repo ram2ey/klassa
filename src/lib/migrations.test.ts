@@ -33,7 +33,9 @@ describe("deployment and action boundaries", () => {
       for (const node of ast.statements) {
         if (!ts.isFunctionDeclaration(node) || !node.body || !node.modifiers?.some(m => m.kind === ts.SyntaxKind.ExportKeyword)) continue;
         const first = node.body.statements[0].getText(ast);
-        if (file === "roster-actions.ts" && ["createStudentAction", "updateStudentStatusAction"].includes(node.name!.text)) {
+        if (file === "school-admin-actions.ts") {
+          expect(first).toBe('const actor = await requireStaff(["school_admin"]);');
+        } else if (file === "roster-actions.ts" && ["createStudentAction", "updateStudentStatusAction"].includes(node.name!.text)) {
           expect(first).toMatch(/^if \(!isDemoMode\(\)\) return (createLiveStudent|updateLiveStudentStatus)/);
         } else expect(first, `${file}:${node.name?.text}`).toBe("await requireDemoAction();");
       }

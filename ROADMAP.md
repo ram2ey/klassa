@@ -4,7 +4,13 @@ This document tracks architectural decisions, phase deliverables, completed feat
 
 ---
 
-## Current Status: Phase 3 Completed ✅ ➔ Phase 4 Next 🚀
+## Current live delivery status
+
+The school administrator workspace connects school directories, setup, roll call, gradebook, report cards, in-app announcements, encrypted case notes, settings and audit history to PostgreSQL. Platform administrators manage tenants separately. MFA is required only for platform administrators.
+
+Guardian access, SMS and emergency delivery, delivery of specialist directives, operational enforcement of court restrictions, and GDPR still need production integration. The historical phase checklists below describe the demo implementation and must not be read as production completion. See README.md for current live boundaries.
+
+### Historical demo roadmap
 
 - **Active Phase**: Preparing for **Phase 4 — School Communications**
 - **Completed Phases**:
@@ -300,5 +306,3 @@ npm run build       # Verify Next.js production build
 | `scripts/restore-drill.sh` | Automated disaster recovery restore drill execution script |
 | `docs/design-system.md` | Klasso UI/UX design tokens and component standards |
 | `docs/backup-and-restore.md` | Disaster recovery runbook and Coolify setup |
-
-
