@@ -4,6 +4,7 @@ import { isDemoMode } from "@/lib/runtime-config";
 import { db } from "@/db";
 import { guardians, organizationMemberships, users } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
+import { isSchoolSuspended, isSchoolSuspendedForUser } from "@/lib/school-access-state";
 
 export type StaffRole = typeof users.$inferSelect.role;
 
@@ -14,6 +15,9 @@ export async function requireAccount() {
   const [user] = await db.select().from(users).where(eq(users.id, session.user.id)).limit(1);
   if (!user) throw new Error("Access denied.");
   if (user.suspendedAt) throw new Error("This account is suspended. Contact your administrator.");
+  if (await isSchoolSuspendedForUser(user, session.session?.activeOrganizationId)) {
+    throw new Error("This school is suspended. Contact the platform administrator.");
+  }
   if (user.mustChangePassword) throw new Error("Password change required before accessing school data.");
   if (user.isPlatformAdmin && !user.twoFactorEnabled) throw new Error("Platform administrator two-factor authentication is required.");
   return { session, user };
@@ -34,6 +38,9 @@ export async function requireStaff(roles: NonNullable<StaffRole>[]) {
   const { session, user } = await requireAccount();
   const organizationId = session.session?.activeOrganizationId ?? user.organizationId;
   if (!organizationId) throw new Error("Access denied. Select a school first.");
+  if (user.isPlatformAdmin && await isSchoolSuspended(organizationId)) {
+    throw new Error("This school is suspended. Contact the platform administrator.");
+  }
   const [membership] = await db.select().from(organizationMemberships)
     .where(and(eq(organizationMemberships.userId, user.id), eq(organizationMemberships.organizationId, organizationId))).limit(1);
   if (!membership || !roles.includes(membership.role)) throw new Error("Access denied.");

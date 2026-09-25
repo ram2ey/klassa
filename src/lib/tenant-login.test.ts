@@ -8,12 +8,16 @@ vi.mock("better-auth/adapters/drizzle", async () => {
   const { memoryAdapter } = await import("better-auth/adapters/memory");
   return { drizzleAdapter: () => memoryAdapter(state.data) };
 });
-vi.mock("@/db", () => ({ db: {
-  select: () => ({ from: () => ({ where: () => ({ limit: async () => {
+vi.mock("@/db", async () => {
+  const { getTableName } = await import("drizzle-orm");
+  return { db: { select: () => ({ from: (table: Parameters<typeof getTableName>[0]) => ({ where: () => {
     const user = state.data.user?.find(row => row.username === state.signInUsername);
-    return user ? [{ suspendedAt: user.suspendedAt ?? null }] : [];
-  } }) }) }),
-} }));
+    const rows = getTableName(table) === "users" ? (user ? [user] : [])
+      : getTableName(table) === "organizations" ? state.data.organization.filter(row => row.id === user?.organizationId)
+      : [];
+    return Object.assign(Promise.resolve(rows), { limit: async () => rows });
+  } }) }) } };
+});
 vi.mock("@/lib/runtime-config", () => ({
   getAuthBaseURL: () => "http://localhost:3000",
   requireSecret: () => "test-only-auth-secret-with-at-least-32-characters",
@@ -27,8 +31,9 @@ beforeEach(() => {
   state.data.user = ["northfield", "southfield", "platform"].map((tenant, i) => ({
     id: `user-${i}`, name: "Alex", email: `${i}@accounts.klassa.invalid`, emailVerified: false,
     username: `${tenant}:alex`, displayUsername: "alex", twoFactorEnabled: i === 2, isPlatformAdmin: i === 2,
-    mustChangePassword: true, createdAt: new Date(), updatedAt: new Date(),
+    mustChangePassword: true, organizationId: i === 2 ? null : `school-${i}`, createdAt: new Date(), updatedAt: new Date(),
   }));
+  state.data.organization = [0, 1].map(i => ({ id: `school-${i}`, suspendedAt: null }));
   state.data.account = state.data.user.map(user => ({
     id: `credential-${user.id}`, userId: user.id, accountId: user.id,
     providerId: "credential", password: passwordHash, createdAt: new Date(), updatedAt: new Date(),
@@ -82,6 +87,15 @@ describe("tenant username authentication", () => {
 
   it("rejects a suspended school account before a session is created", async () => {
     state.data.user[1].suspendedAt = new Date();
+    const response = await request("/sign-in/username", {
+      username: loginUsername("southfield", "alex"), password: "tenant-test-password",
+    });
+    expect(response.status).toBe(403);
+    expect(state.data.session).toHaveLength(0);
+  });
+
+  it("rejects sign-in while the school is suspended", async () => {
+    state.data.organization[1].suspendedAt = new Date();
     const response = await request("/sign-in/username", {
       username: loginUsername("southfield", "alex"), password: "tenant-test-password",
     });

@@ -37,6 +37,7 @@ export const organizations = pgTable("organizations", {
   name: varchar("name", { length: 180 }).notNull(),
   slug: varchar("slug", { length: 80 }).notNull(),
   timezone: varchar("timezone", { length: 80 }).default("Atlantic/Reykjavik").notNull(),
+  suspendedAt: timestamp("suspended_at", { withTimezone: true }),
   ...timestamps,
 }, (table) => [uniqueIndex("organizations_slug_unique").on(table.slug)]);
 

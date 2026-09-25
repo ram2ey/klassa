@@ -7,6 +7,7 @@ import { schema, sessions, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getAuthBaseURL, requireSecret } from "@/lib/runtime-config";
 import { isLoginUsername } from "@/lib/login-identity";
+import { isSchoolSuspendedForUser } from "@/lib/school-access-state";
 
 function createAuth() {
   return betterAuth({
@@ -33,9 +34,12 @@ function createAuth() {
   }) },
   session: { additionalFields: { activeOrganizationId: { type: "string", required: false, input: false } } },
   databaseHooks: { session: { create: { before: async session => {
-    const [user] = await db.select({ suspendedAt: users.suspendedAt }).from(users)
+    const [user] = await db.select({ id: users.id, suspendedAt: users.suspendedAt,
+      isPlatformAdmin: users.isPlatformAdmin, organizationId: users.organizationId }).from(users)
       .where(eq(users.id, session.userId)).limit(1);
-    if (!user || user.suspendedAt) throw new APIError("FORBIDDEN", { message: "This account is suspended." });
+    if (!user || user.suspendedAt || await isSchoolSuspendedForUser(user)) {
+      throw new APIError("FORBIDDEN", { message: "This account is suspended." });
+    }
   } } }, user: { update: { after: async (user, context) => {
     // Initial TOTP verification creates a fresh session after this hook. Remove
     // every pre-enrollment session so none gains access merely when MFA becomes enabled.

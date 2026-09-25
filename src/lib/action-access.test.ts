@@ -1,12 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-const mocks = vi.hoisted(() => ({ session: vi.fn(), user: vi.fn() }));
+const mocks = vi.hoisted(() => ({ session: vi.fn(), user: vi.fn(), schoolSuspended: vi.fn(), selectedSchoolSuspended: vi.fn() }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 vi.mock("@/lib/auth", () => ({ getAuth: () => ({ api: { getSession: mocks.session } }) }));
 vi.mock("@/db", () => ({ db: { select: () => ({ from: () => ({ where: () => ({ limit: mocks.user }) }) }) } }));
+vi.mock("@/lib/school-access-state", () => ({ isSchoolSuspendedForUser: mocks.schoolSuspended, isSchoolSuspended: mocks.selectedSchoolSuspended }));
 import { requireDemoAction, requireStaff, requirePlatformAdmin } from "./action-access";
 
-beforeEach(() => { vi.stubEnv("KLASSO_DEMO_MODE", "false"); mocks.session.mockReset(); mocks.user.mockReset(); });
+beforeEach(() => { vi.stubEnv("KLASSO_DEMO_MODE", "false"); mocks.session.mockReset(); mocks.user.mockReset(); mocks.schoolSuspended.mockReset().mockResolvedValue(false); mocks.selectedSchoolSuspended.mockReset().mockResolvedValue(false); });
 afterEach(() => vi.unstubAllEnvs());
 
 describe("server action authorization", () => {
@@ -40,6 +41,19 @@ describe("server action authorization", () => {
     mocks.user.mockResolvedValueOnce([{ id: "admin", organizationId: "school-a", role: "school_admin", twoFactorEnabled: false, isPlatformAdmin: false }])
       .mockResolvedValueOnce([{ role: "school_admin" }]);
     await expect(requireStaff(["school_admin"])).resolves.toMatchObject({ userId: "admin", organizationId: "school-a" });
+  });
+  it("rejects protected access when the school is suspended", async () => {
+    mocks.session.mockResolvedValue({ user: { id: "admin" }, session: { activeOrganizationId: "school-a" } });
+    mocks.user.mockResolvedValue([{ id: "admin", organizationId: "school-a", role: "school_admin", twoFactorEnabled: false }]);
+    mocks.schoolSuspended.mockResolvedValue(true);
+    await expect(requireStaff(["school_admin"])).rejects.toThrow("school is suspended");
+  });
+  it("keeps platform console access while blocking a platform admin's school membership", async () => {
+    mocks.session.mockResolvedValue({ user: { id: "platform" }, session: { activeOrganizationId: "school-a" } });
+    mocks.user.mockResolvedValue([{ id: "platform", organizationId: null, isPlatformAdmin: true, twoFactorEnabled: true }]);
+    mocks.selectedSchoolSuspended.mockResolvedValue(true);
+    await expect(requirePlatformAdmin()).resolves.toMatchObject({ id: "platform" });
+    await expect(requireStaff(["school_admin"])).rejects.toThrow("school is suspended");
   });
   it("requires MFA for platform administrators and membership for school access", async () => {
     mocks.session.mockResolvedValue({ user: { id: "admin" } });

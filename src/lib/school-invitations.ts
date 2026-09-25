@@ -148,7 +148,7 @@ export async function getPlatformInvitationData() {
   await requirePlatformAdmin();
   const loadedAt = Date.now();
   const [schools, invitations, memberships, activeSessions, audit, securityEvents, platformAdmins, years, studentCounts, auditActions] = await Promise.all([
-    db.select({ id: organizations.id, name: organizations.name, slug: organizations.slug, timezone: organizations.timezone,
+    db.select({ id: organizations.id, name: organizations.name, slug: organizations.slug, timezone: organizations.timezone, suspendedAt: organizations.suspendedAt,
       createdAt: organizations.createdAt }).from(organizations).orderBy(organizations.name),
     db.select({ id: smsInvitations.id, organizationId: smsInvitations.organizationId,
       phoneNumber: smsInvitations.phoneNumber, role: smsInvitations.role, expiresAt: smsInvitations.expiresAt,
@@ -183,9 +183,9 @@ export async function getPlatformInvitationData() {
       return {
         ...school,
         setup: {
-          schoolAdmin: schoolMemberships.some(membership => membership.role === "school_admin"),
+          schoolAdmin: schoolMemberships.some(membership => membership.role === "school_admin" && !membership.suspendedAt),
           academicYear: yearOrganizations.has(school.id),
-          safeguardingLead: schoolMemberships.some(membership => membership.role === "safeguarding_lead"),
+          safeguardingLead: schoolMemberships.some(membership => membership.role === "safeguarding_lead" && !membership.suspendedAt),
           roster: (rosterCounts.get(school.id) ?? 0) > 0,
         },
       };
