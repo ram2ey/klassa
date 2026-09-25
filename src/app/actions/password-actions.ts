@@ -50,7 +50,7 @@ export async function changeTemporaryPasswordAction(raw: z.input<typeof password
   await db.transaction(async tx => {
     await tx.update(users).set({ mustChangePassword: false, updatedAt: new Date() })
       .where(and(eq(users.id, user.id), eq(users.mustChangePassword, true)));
-    if (user.organizationId) {
+    if (user.organizationId || user.isPlatformAdmin) {
       await logAuditEvent({
         organizationId: user.organizationId,
         actorUserId: user.id,

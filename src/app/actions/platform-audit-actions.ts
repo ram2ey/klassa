@@ -52,10 +52,10 @@ export async function getPlatformAuditPageAction(input: z.input<typeof auditFilt
   const where = filtersFor(parsed);
   const [totals, rows] = await Promise.all([
     db.select({ total: count() }).from(auditEvents)
-      .innerJoin(organizations, eq(auditEvents.organizationId, organizations.id))
+      .leftJoin(organizations, eq(auditEvents.organizationId, organizations.id))
       .leftJoin(users, eq(auditEvents.actorUserId, users.id)).where(where),
     db.select(auditProjection).from(auditEvents)
-      .innerJoin(organizations, eq(auditEvents.organizationId, organizations.id))
+      .leftJoin(organizations, eq(auditEvents.organizationId, organizations.id))
       .leftJoin(users, eq(auditEvents.actorUserId, users.id)).where(where)
       .orderBy(desc(auditEvents.createdAt), desc(auditEvents.id)).limit(25).offset((parsed.page - 1) * 25),
   ]);
@@ -73,14 +73,14 @@ export async function exportPlatformAuditAction(input: Omit<z.input<typeof audit
   const parsed = auditFilterSchema.parse({ ...input, page: 1 });
   const where = filtersFor(parsed);
   const rows = await db.select(auditProjection).from(auditEvents)
-    .innerJoin(organizations, eq(auditEvents.organizationId, organizations.id))
+    .leftJoin(organizations, eq(auditEvents.organizationId, organizations.id))
     .leftJoin(users, eq(auditEvents.actorUserId, users.id)).where(where)
     .orderBy(desc(auditEvents.createdAt), desc(auditEvents.id)).limit(10_001);
   const truncated = rows.length > 10_000;
   const exportedRows = rows.slice(0, 10_000);
-  const header = ["Event", "Actor", "School", "Resource type", "Resource ID", "Timestamp"];
+  const header = ["Event", "Actor", "Scope", "Resource type", "Resource ID", "Timestamp"];
   const lines = [header, ...exportedRows.map(row => [
-    row.action, row.actorName, row.schoolName, row.entityType, row.entityId, row.createdAt.toISOString(),
+    row.action, row.actorName, row.schoolName ?? "Platform", row.entityType, row.entityId, row.createdAt.toISOString(),
   ])].map(columns => columns.map(csvCell).join(","));
   return { csv: lines.join("\r\n"), rowCount: exportedRows.length, truncated };
 }

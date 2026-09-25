@@ -70,6 +70,25 @@ describe("tenant username authentication", () => {
     expect(state.data.session).toHaveLength(0);
   });
 
+  it("lets a newly provisioned platform administrator sign in to set up MFA", async () => {
+    state.data.user[2].twoFactorEnabled = false;
+    const response = await request("/sign-in/username", {
+      username: loginUsername("platform", "alex"), password: "tenant-test-password",
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ user: { id: "user-2", mustChangePassword: true } });
+    expect(state.data.session).toHaveLength(1);
+  });
+
+  it("rejects a suspended platform administrator before a session is created", async () => {
+    state.data.user[2].suspendedAt = new Date();
+    const response = await request("/sign-in/username", {
+      username: loginUsername("platform", "alex"), password: "tenant-test-password",
+    });
+    expect(response.status).toBe(403);
+    expect(state.data.session).toHaveLength(0);
+  });
+
   it("signs school staff in without MFA and blocks authenticator enrollment", async () => {
     const response = await request("/sign-in/username", {
       username: loginUsername("southfield", "alex"), password: "tenant-test-password",

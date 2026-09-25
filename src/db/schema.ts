@@ -251,7 +251,7 @@ export const importJobs = pgTable("import_jobs", {
 
 export const auditEvents = pgTable("audit_events", {
   id: uuid("id").defaultRandom().primaryKey(),
-  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "restrict" }),
+  organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "restrict" }),
   actorUserId: text("actor_user_id").references(() => users.id, { onDelete: "set null" }),
   action: varchar("action", { length: 120 }).notNull(),
   entityType: varchar("entity_type", { length: 80 }).notNull(),

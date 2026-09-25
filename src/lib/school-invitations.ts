@@ -164,12 +164,14 @@ export async function getPlatformInvitationData() {
     db.select({ id: auditEvents.id, organizationId: auditEvents.organizationId, schoolName: organizations.name,
       actorName: users.name, action: auditEvents.action, entityType: auditEvents.entityType,
       entityId: auditEvents.entityId, createdAt: auditEvents.createdAt }).from(auditEvents)
-      .innerJoin(organizations, eq(auditEvents.organizationId, organizations.id))
+      .leftJoin(organizations, eq(auditEvents.organizationId, organizations.id))
       .leftJoin(users, eq(auditEvents.actorUserId, users.id)).orderBy(desc(auditEvents.createdAt)).limit(80),
     db.select({ id: rateLimitLogs.id, organizationId: rateLimitLogs.organizationId, tier: rateLimitLogs.tier,
       endpoint: rateLimitLogs.endpoint, requestCount: rateLimitLogs.requestCount, limit: rateLimitLogs.limit,
       blockedAt: rateLimitLogs.blockedAt }).from(rateLimitLogs).orderBy(desc(rateLimitLogs.blockedAt)).limit(50),
-    db.select({ id: users.id, twoFactorEnabled: users.twoFactorEnabled }).from(users).where(eq(users.isPlatformAdmin, true)),
+    db.select({ id: users.id, name: users.name, username: users.username, twoFactorEnabled: users.twoFactorEnabled,
+      mustChangePassword: users.mustChangePassword, suspendedAt: users.suspendedAt, createdAt: users.createdAt })
+      .from(users).where(eq(users.isPlatformAdmin, true)).orderBy(users.createdAt),
     db.select({ organizationId: academicYears.organizationId }).from(academicYears),
     db.select({ organizationId: students.organizationId, count: count() }).from(students).groupBy(students.organizationId),
     db.selectDistinct({ action: auditEvents.action }).from(auditEvents).orderBy(asc(auditEvents.action)),
@@ -195,7 +197,7 @@ export async function getPlatformInvitationData() {
     audit,
     auditActions: auditActions.map(row => row.action),
     securityEvents,
-    platformAdmins,
+    platformAdmins: platformAdmins.map(admin => ({ ...admin, hasActiveSession: sessionUserIds.has(admin.id) })),
     loadedAt,
   };
 }

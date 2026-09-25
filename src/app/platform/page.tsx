@@ -20,5 +20,5 @@ export default async function PlatformPage() {
   const data = await getPlatformInvitationData();
   const health = await getLiveSystemHealthReport();
   const incidents = await getPlatformIncidentData();
-  return <PlatformInvitations data={data} health={health} incidents={incidents} />;
+  return <PlatformInvitations data={data} health={health} incidents={incidents} currentUserId={session.user.id} />;
 }

@@ -44,7 +44,7 @@ export const AuditActions = {
 export type AuditAction = (typeof AuditActions)[keyof typeof AuditActions] | string;
 
 export interface LogAuditParams {
-  organizationId: string;
+  organizationId: string | null;
   actorUserId?: string | null;
   action: AuditAction;
   entityType: string;
@@ -55,7 +55,7 @@ export interface LogAuditParams {
 
 export interface AuditRecord {
   id: string;
-  organizationId: string;
+  organizationId: string | null;
   actorUserId: string | null;
   action: string;
   entityType: string;
