@@ -2,8 +2,9 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { academicYears, assessmentCategories, assessmentGrades, assessments, attendanceRecords, attendanceSessions,
   classes, enrollments, gradeLevels, organizations, reportCards, reportCardSubjectGrades, students, subjects,
-  teacherClassAssignments, terms } from "@/db/schema";
+  teacherClassAssignments, terms, needToKnowAlerts, courtRestrictions } from "@/db/schema";
 import { requireStaff } from "@/lib/action-access";
+import { buildTeacherSafetyNotices } from "@/lib/teacher-safety";
 
 export async function getTeacherData(section: string, sessionDate: string) {
   const actor = await requireStaff(["teacher"]);
@@ -29,6 +30,18 @@ export async function getTeacherData(section: string, sessionDate: string) {
   const studentRows = studentIds.length ? await db.select({ id: students.id, studentNumber: students.studentNumber,
     firstName: students.firstName, lastName: students.lastName, preferredName: students.preferredName, status: students.status })
     .from(students).where(and(eq(students.organizationId, org), inArray(students.id, studentIds))).orderBy(students.lastName, students.firstName) : [];
+  const [alertRows, restrictionRows] = studentIds.length ? await Promise.all([
+    db.select({ id: needToKnowAlerts.id, studentId: needToKnowAlerts.studentId, category: needToKnowAlerts.category,
+      severity: needToKnowAlerts.severity, directiveSummary: needToKnowAlerts.directiveSummary,
+      actionRequired: needToKnowAlerts.actionRequired, isActive: needToKnowAlerts.isActive, expiresAt: needToKnowAlerts.expiresAt })
+      .from(needToKnowAlerts).where(and(eq(needToKnowAlerts.organizationId, org), inArray(needToKnowAlerts.studentId, studentIds), eq(needToKnowAlerts.isActive, true))),
+    db.select({ studentId: courtRestrictions.studentId, prohibitPickup: courtRestrictions.prohibitPickup,
+      isEnforced: courtRestrictions.isEnforced, effectiveDate: courtRestrictions.effectiveDate,
+      expirationDate: courtRestrictions.expirationDate })
+      .from(courtRestrictions).where(and(eq(courtRestrictions.organizationId, org), inArray(courtRestrictions.studentId, studentIds),
+        eq(courtRestrictions.isEnforced, true), eq(courtRestrictions.prohibitPickup, true))),
+  ]) : [[], []];
+  const safety = buildTeacherSafetyNotices(studentIds, alertRows, restrictionRows);
   const termRows = currentYear ? await db.select().from(terms).where(and(eq(terms.organizationId, org), eq(terms.academicYearId, currentYear.id))) : [];
   const assessmentRows = classIds.length && ["overview", "gradebook", "reports"].includes(section) ? await db.select().from(assessments)
     .where(and(eq(assessments.organizationId, org), inArray(assessments.classId, classIds))).orderBy(desc(assessments.dateDue)) : [];
@@ -53,7 +66,7 @@ export async function getTeacherData(section: string, sessionDate: string) {
   return { actor, school, currentYear, classes: classRows, assignments, homeroomClassIds: homeIds, gradeLevels: gradeLevelsRows,
     subjects: subjectsRows, terms: termRows, enrollments: enrollmentRows, students: studentRows,
     assessments: permittedAssessments, grades: gradeRows, categories: categoryRows, reports: reportRows, reportSubjects,
-    sessions: sessionRows, records: recordRows };
+    sessions: sessionRows, records: recordRows, safety };
 }
 
 export type TeacherData = Awaited<ReturnType<typeof getTeacherData>>;

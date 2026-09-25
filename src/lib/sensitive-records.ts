@@ -165,7 +165,10 @@ export function sanitizeTeacherAlert(directive: string, actionPlan: string): {
   let flagged = false;
 
   for (const pattern of FORBIDDEN_LEAK_PATTERNS) {
-    if (pattern.test(directive) || pattern.test(actionPlan)) {
+    pattern.lastIndex = 0;
+    const directiveLeaks = pattern.test(directive);
+    pattern.lastIndex = 0;
+    if (directiveLeaks || pattern.test(actionPlan)) {
       flagged = true;
     }
   }
@@ -519,4 +522,3 @@ export const INITIAL_SENSITIVE_ACCESS_LOGS: SensitiveAccessLogRecord[] = [
     accessedAt: "2026-09-10T15:58:22Z",
   },
 ];
-
