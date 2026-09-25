@@ -36,7 +36,7 @@ School administrators land on the school overview at `/`. Navigation links use `
 - Communications: draft and publish school, grade and class in-app announcements. Staff see published notices relevant to their role and class assignment.
 - Sensitive records: create cases, store encrypted notes, require an access reason for decryption, maintain case status and access history, and record staff directives and court restrictions.
 - Audit history: search the latest 100 events for this school.
-- School settings: edit the school's display name and timezone. The sign-in tenant ID remains managed separately.
+- School settings: edit the school's display name. The sign-in tenant ID remains managed separately; the timezone is fixed at GMT.
 
 For a new school, create the academic year and mark it current, add grades and classes, then enroll students and link guardians. Every mutation checks the authenticated school and commits its audit entry in the same transaction. Guardian delivery, emergency two-party broadcasts, operational enforcement of court restrictions at pickup, delivery of specialist directives to other roles, and GDPR requests are not connected to the live administrator workspace.
 
@@ -102,7 +102,7 @@ The staff access review lists each account's school and role, last recorded sign
 
 In **Security**, platform administrators can add another platform administrator with a temporary password. The new administrator signs in with tenant ID `platform`, changes the password, and enrolls an authenticator before entering the console. Existing administrators can have their sessions revoked, be suspended with an audited reason and all sessions revoked, then be reactivated. Self-suspension and suspension of the last active platform administrator are blocked. Apply migration `0017_flippant_preak` before using these controls; platform-level audit events have no school ID.
 
-The platform **Schools** directory links to a detail page for each school. Platform administrators can update the display name and timezone, review setup and staff status, and suspend or reactivate the school with an audit trail. School suspension signs out its accounts and blocks new sign-ins and protected actions. It refuses to proceed if an account has a membership in another school. Apply migration `0015_rich_krista_starr` before using school suspension in a live deployment.
+The platform **Schools** directory links to a detail page for each school. Platform administrators can update the display name, review setup and staff status, and suspend or reactivate the school with an audit trail. School suspension signs out its accounts and blocks new sign-ins and protected actions. It refuses to proceed if an account has a membership in another school. Apply migration `0015_rich_krista_starr` before using school suspension in a live deployment. School time is fixed at GMT; migration `0019_gigantic_rocket_raccoon` updates existing school timezone values and the default.
 
 **System health** records high application error rates and failed cryptography self-tests as persistent platform incidents. Administrators can acknowledge or resolve an incident with a recorded history; recovered metrics resolve their incidents automatically. Apply migration `0016_public_roulette` before using this view. The database health endpoint reports an outage immediately, but an unavailable database cannot persist that outage as an incident; use an external uptime check for database-outage notifications.
 

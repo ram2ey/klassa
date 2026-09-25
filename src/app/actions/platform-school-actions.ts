@@ -7,14 +7,12 @@ import { db } from "@/db";
 import { organizationMemberships, organizations, sessions, users } from "@/db/schema";
 import { requirePlatformAdmin } from "@/lib/action-access";
 import { logAuditEvent } from "@/lib/audit";
+import { SCHOOL_TIME_ZONE } from "@/lib/timezone";
 
 const schoolIdSchema = z.uuid();
 const detailsSchema = z.object({
   organizationId: schoolIdSchema,
   name: z.string().trim().min(2).max(180),
-  timezone: z.string().refine(value => {
-    try { new Intl.DateTimeFormat("en", { timeZone: value }); return true; } catch { return false; }
-  }, "Invalid timezone"),
 });
 const suspensionSchema = z.object({ organizationId: schoolIdSchema, reason: z.string().trim().min(8).max(500) });
 
@@ -30,12 +28,12 @@ export async function updatePlatformSchoolAction(input: z.input<typeof detailsSc
     const [school] = await tx.select({ id: organizations.id, name: organizations.name, timezone: organizations.timezone })
       .from(organizations).where(eq(organizations.id, data.organizationId)).limit(1).for("update");
     if (!school) throw new Error("School not found.");
-    if (school.name === data.name && school.timezone === data.timezone) return;
-    await tx.update(organizations).set({ name: data.name, timezone: data.timezone, updatedAt: new Date() })
+    if (school.name === data.name && school.timezone === SCHOOL_TIME_ZONE) return;
+    await tx.update(organizations).set({ name: data.name, timezone: SCHOOL_TIME_ZONE, updatedAt: new Date() })
       .where(eq(organizations.id, school.id));
     await logAuditEvent({ organizationId: school.id, actorUserId: actor.id,
       action: "organization.updated_by_platform", entityType: "organization", entityId: school.id,
-      metadata: { previousName: school.name, name: data.name, previousTimezone: school.timezone, timezone: data.timezone } }, tx);
+      metadata: { previousName: school.name, name: data.name, previousTimezone: school.timezone, timezone: SCHOOL_TIME_ZONE } }, tx);
   });
   refreshSchool(data.organizationId);
 }

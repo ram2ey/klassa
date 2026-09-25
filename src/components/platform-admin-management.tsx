@@ -4,6 +4,7 @@ import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
 import { createPlatformAdminAction, reactivatePlatformAdminAction, revokePlatformAdminSessionsAction, suspendPlatformAdminAction } from "@/app/actions/platform-admin-actions";
 import type { getPlatformInvitationData } from "@/lib/school-invitations";
+import { formatGMTDate } from "@/lib/timezone";
 
 type Admin = Awaited<ReturnType<typeof getPlatformInvitationData>>["platformAdmins"][number];
 type Props = { admins: Admin[]; currentUserId: string };
@@ -86,7 +87,7 @@ export function PlatformAdminManagement({ admins, currentUserId }: Props) {
     {error && <p role="alert" className="mx-5 mt-4 border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
     <div className="divide-y divide-slate-100">{admins.map(admin => <div key={admin.id} className="flex flex-wrap items-center gap-3 px-5 py-4">
       <div className="min-w-0 flex-1"><p className="text-sm font-semibold">{admin.name}{admin.id === currentUserId ? " (you)" : ""}</p>
-        <p className="mt-1 text-xs text-slate-500">Login: {admin.username?.replace(":", " / ") ?? "Unavailable"} · Added {new Date(admin.createdAt).toLocaleDateString()}</p></div>
+        <p className="mt-1 text-xs text-slate-500">Login: {admin.username?.replace(":", " / ") ?? "Unavailable"} · Added {formatGMTDate(admin.createdAt)}</p></div>
       <span className={`px-2 py-1 text-xs font-semibold ${admin.suspendedAt ? "bg-red-50 text-red-700" : admin.mustChangePassword || !admin.twoFactorEnabled ? "bg-amber-50 text-amber-700" : "bg-emerald-50 text-emerald-700"}`}>
         {admin.suspendedAt ? "Suspended" : admin.mustChangePassword ? "Password change due" : admin.twoFactorEnabled ? "MFA ready" : "MFA setup due"}</span>
       <button type="button" disabled={pending || !admin.hasActiveSession || admin.id === currentUserId} onClick={() => revoke(admin.id, admin.name)}

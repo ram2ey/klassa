@@ -9,6 +9,7 @@ import { requireDemoAction } from "@/lib/action-access";
 import { AuditActions, logAuditEvent } from "@/lib/audit";
 import { validateStudentCsv } from "@/lib/csv";
 import { studentInputSchema, type StudentInput } from "@/lib/validation/student";
+import { SCHOOL_TIME_ZONE } from "@/lib/timezone";
 
 const DEFAULT_ORG_ID = "00000000-0000-0000-0000-000000000001";
 const DEFAULT_USER_ID = "usr-admin-olivia";
@@ -247,7 +248,7 @@ export async function inviteStaffAction(phone: string, role: "school_admin" | "o
     phoneNumber,
     role,
     token,
-    expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric" }),
+    expiresAt: new Date(Date.now() + 48 * 60 * 60 * 1000).toLocaleDateString("en-GB", { day: "2-digit", month: "short", year: "numeric", timeZone: SCHOOL_TIME_ZONE }),
     status: "Simulated",
   };
 

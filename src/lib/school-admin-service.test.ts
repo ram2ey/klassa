@@ -34,7 +34,7 @@ afterEach(() => vi.unstubAllEnvs());
 
 describe("live school administration boundaries", () => {
   it("rejects a non-administrator before any database operation", async () => {
-    await expect(saveSchoolRecord({ ...actor, role: "teacher" }, { kind: "settings", name: "School", timezone: "UTC" })).rejects.toThrow("cannot change");
+    await expect(saveSchoolRecord({ ...actor, role: "teacher" }, { kind: "settings", name: "School" })).rejects.toThrow("cannot change");
     expect(mocks.execute).not.toHaveBeenCalled();
   });
   it("requires school administrator authorization and scopes every dashboard query", async () => {

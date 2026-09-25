@@ -12,6 +12,7 @@ import {
 } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { formatGMTDateTime, formatGMTTime } from "@/lib/timezone";
 import type {
   SensitiveCaseRecord,
   EncryptedCaseNote,
@@ -66,7 +67,7 @@ export function ViewCaseDetailModal({
       } else {
         setDecryptedNotes(res.notes || []);
         if (res.accessLogRecord) {
-          setAuditNotice(`Access permanently recorded as log #${res.accessLogRecord.id} at ${new Date(res.accessLogRecord.accessedAt).toLocaleTimeString()}`);
+          setAuditNotice(`Access permanently recorded as log #${res.accessLogRecord.id} at ${formatGMTTime(res.accessLogRecord.accessedAt)}`);
           if (onAccessAudited) {
             onAccessAudited(res.accessLogRecord);
           }
@@ -231,7 +232,7 @@ export function ViewCaseDetailModal({
                         <span className="capitalize text-slate-500">{note.noteType.replace(/_/g, " ")}</span>
                       </div>
                       <span className="text-slate-400">
-                        {new Date(note.createdAt).toLocaleString()}
+                        {formatGMTDateTime(note.createdAt)}
                       </span>
                     </div>
 

@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { SCHOOL_TIME_ZONE } from "@/lib/timezone";
 
 export interface OrganizationRecord {
   id: string;
@@ -27,7 +28,6 @@ export const provisionSchoolSchema = z.object({
   name: z.string().min(3, "School name must be at least 3 characters"),
   slug: z.string().min(2, "School slug must be at least 2 characters").regex(/^[a-z0-9-]+$/, "Slug must be lowercase alphanumeric with hyphens"),
   domain: z.string().min(4, "Domain is required"),
-  timezone: z.string().default("Atlantic/Reykjavik"),
   gradingScheme: z.enum(["letter", "standards_based"]).default("letter"),
   adminEmail: z.email("Valid administrator email is required"),
   adminName: z.string().min(2, "Administrator name is required"),
@@ -41,7 +41,7 @@ export const INITIAL_ORGANIZATIONS: OrganizationRecord[] = [
     name: "Northfield Academy",
     slug: "northfield",
     domain: "northfield.edu.is",
-    timezone: "Atlantic/Reykjavik",
+    timezone: SCHOOL_TIME_ZONE,
     gradingScheme: "letter",
     status: "active",
     studentCount: 412,
@@ -54,7 +54,7 @@ export const INITIAL_ORGANIZATIONS: OrganizationRecord[] = [
     name: "St. Jude Preparatory",
     slug: "st-jude",
     domain: "stjude.edu.is",
-    timezone: "Atlantic/Reykjavik",
+    timezone: SCHOOL_TIME_ZONE,
     gradingScheme: "standards_based",
     status: "active",
     studentCount: 280,
@@ -67,7 +67,7 @@ export const INITIAL_ORGANIZATIONS: OrganizationRecord[] = [
     name: "Riverdale High School",
     slug: "riverdale",
     domain: "riverdale.edu.is",
-    timezone: "Europe/London",
+    timezone: SCHOOL_TIME_ZONE,
     gradingScheme: "letter",
     status: "provisioning",
     studentCount: 520,
@@ -142,7 +142,7 @@ export function provisionSchoolOrganization(input: ProvisionSchoolInput): {
     name: input.name,
     slug: input.slug,
     domain: input.domain,
-    timezone: input.timezone,
+    timezone: SCHOOL_TIME_ZONE,
     gradingScheme: input.gradingScheme,
     status: "provisioning",
     studentCount: 0,
@@ -162,4 +162,3 @@ export function provisionSchoolOrganization(input: ProvisionSchoolInput): {
 
   return { organization: newOrg, checklist };
 }
-

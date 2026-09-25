@@ -1,6 +1,7 @@
 import { AccountSignOut } from "@/components/account-sign-out";
 import { GuardianAbsenceNoteForm } from "@/components/guardian-absence-note-form";
 import type { GuardianPortalData } from "@/lib/guardian-portal-data";
+import { formatGMTDate } from "@/lib/timezone";
 
 export function GuardianPortalWorkspace({ data }: { data: GuardianPortalData }) {
   const schoolCount = new Set(data.students.map(student => student.schoolId)).size;
@@ -16,7 +17,7 @@ export function GuardianPortalWorkspace({ data }: { data: GuardianPortalData }) 
           <section className="mt-4 border-t border-slate-100 pt-4"><h3 className="text-sm font-semibold">Absence notes</h3><ul className="mt-2 space-y-2 text-xs">{student.absenceNotes.slice(0, 5).map(note => <li key={note.id} className="flex justify-between gap-2"><span>{new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: "UTC" }).format(new Date(`${note.absenceDate}T00:00:00Z`))} · {note.reasonCategory.replaceAll("_", " ")}</span><span className="font-medium capitalize">{note.status}</span></li>)}{student.absenceNotes.length === 0 && <li className="text-slate-500">No absence notes submitted.</li>}</ul></section>
          </article>)}</div>
         <GuardianAbsenceNoteForm students={data.students} />
-        <section className="border border-slate-200 bg-white"><div className="border-b border-slate-200 p-5"><h2 className="font-bold">School notices</h2><p className="mt-1 text-sm text-slate-500">Published notices for your students{schoolCount > 1 ? " across their schools" : ""}.</p></div><div className="divide-y divide-slate-100">{data.announcements.map(notice => <article key={notice.id} className="p-5"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">{notice.title}</h3><span className="text-xs text-slate-500">{notice.schoolName} · {notice.publishedAt ? new Intl.DateTimeFormat("en-GB", { dateStyle: "medium" }).format(notice.publishedAt) : ""}</span></div><p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{notice.content}</p></article>)}{data.announcements.length === 0 && <p className="p-8 text-center text-sm text-slate-500">No published notices yet.</p>}</div></section>
+        <section className="border border-slate-200 bg-white"><div className="border-b border-slate-200 p-5"><h2 className="font-bold">School notices</h2><p className="mt-1 text-sm text-slate-500">Published notices for your students{schoolCount > 1 ? " across their schools" : ""}.</p></div><div className="divide-y divide-slate-100">{data.announcements.map(notice => <article key={notice.id} className="p-5"><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">{notice.title}</h3><span className="text-xs text-slate-500">{notice.schoolName} · {notice.publishedAt ? formatGMTDate(notice.publishedAt) : ""}</span></div><p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{notice.content}</p></article>)}{data.announcements.length === 0 && <p className="p-8 text-center text-sm text-slate-500">No published notices yet.</p>}</div></section>
       </>}
       <p className="text-center text-xs text-slate-500">This portal shows published school information only. Contact your school for corrections or access support.</p>
     </div>

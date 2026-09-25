@@ -1,6 +1,7 @@
 "use client";
 
 import { useMemo, useState, useTransition } from "react";
+import { formatGMTDate } from "@/lib/timezone";
 import {
   Archive, Bell, Buildings, CalendarBlank, CalendarCheck, CaretLeft, CaretRight,
   ChatTeardropText, CheckCircle, ClockCounterClockwise,
@@ -456,7 +457,7 @@ export function KlassoWorkspace({ roster }: { roster: Awaited<ReturnType<typeof 
     name: "Northfield Academy",
     slug: "northfield",
     domain: "northfield.edu.is",
-    timezone: "Atlantic/Reykjavik",
+    timezone: "Etc/GMT",
     gradingScheme: "letter",
     status: "active",
     studentCount: 412,
@@ -2319,7 +2320,7 @@ function GuardianPortalView({
                         </span>
                       </div>
                       <span className="font-mono text-[11px] text-slate-500">
-                        {new Date(ann.createdAt).toLocaleDateString()}
+                        {formatGMTDate(ann.createdAt)}
                       </span>
                     </div>
 

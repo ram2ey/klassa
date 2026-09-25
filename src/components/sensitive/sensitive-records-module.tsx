@@ -13,6 +13,7 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { formatGMTDateTime } from "@/lib/timezone";
 import type {
   SensitiveCaseRecord,
   NeedToKnowAlertRecord,
@@ -587,7 +588,7 @@ export function SensitiveRecordsModule({
                 {localLogs.map((log) => (
                   <tr key={log.id} className="hover:bg-slate-50/70">
                     <td className="px-4 py-3 text-slate-500 font-sans">
-                      {new Date(log.accessedAt).toLocaleString()}
+                      {formatGMTDateTime(log.accessedAt)}
                     </td>
                     <td className="px-4 py-3 font-semibold text-slate-900 font-sans">
                       {log.userName}

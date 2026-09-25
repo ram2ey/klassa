@@ -10,6 +10,7 @@ import { requireAccount, requireLiveMode, requirePlatformAdmin, requireStaff } f
 import { logAuditEvent } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
 import { loginUsername, schoolTenantIdSchema, usernameSchema } from "@/lib/login-identity";
+import { SCHOOL_TIME_ZONE } from "@/lib/timezone";
 
 const accountSchema = z.object({
   administratorName: z.string().trim().min(2).max(180),
@@ -19,7 +20,6 @@ const accountSchema = z.object({
 const schoolSchema = z.object({
   name: z.string().trim().min(2).max(180),
   slug: schoolTenantIdSchema,
-  timezone: z.string().refine(value => { try { new Intl.DateTimeFormat("en", { timeZone: value }); return true; } catch { return false; } }, "Invalid timezone"),
 }).and(accountSchema);
 const schoolStaffSchema = accountSchema.extend({ role: z.enum(staffRole.enumValues) });
 const staffSchema = schoolStaffSchema.extend({ organizationId: z.uuid() });
@@ -49,7 +49,7 @@ export async function createSchoolWithAdminAction(input: z.input<typeof schoolSc
   const actor = await requirePlatformAdmin();
   const data = schoolSchema.parse(input);
   const result = await db.transaction(async tx => {
-    const [school] = await tx.insert(organizations).values({ name: data.name, slug: data.slug, timezone: data.timezone }).returning();
+    const [school] = await tx.insert(organizations).values({ name: data.name, slug: data.slug, timezone: SCHOOL_TIME_ZONE }).returning();
     const userId = await createStaffAccount(tx, school, { ...data, role: "school_admin" });
     await logAuditEvent({ organizationId: school.id, actorUserId: actor.id, action: "organization.created",
       entityType: "organization", entityId: school.id, metadata: { initialAdministratorId: userId } }, tx);

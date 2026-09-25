@@ -18,9 +18,7 @@ export const schoolCommandSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("subject"), id: id.optional(), code: z.string().trim().min(1).max(30), name: name.max(100), department: z.string().trim().max(80) }),
   z.object({ kind: z.literal("year"), id: id.optional(), name: name.max(50), ...dates, isCurrent: z.boolean() }),
   z.object({ kind: z.literal("term"), id: id.optional(), academicYearId: id, name: name.max(80), ...dates, position: z.number().int().min(1).max(20) }),
-  z.object({ kind: z.literal("settings"), name: z.string().trim().min(2).max(180), timezone: z.string().refine(value => {
-    try { new Intl.DateTimeFormat("en", { timeZone: value }); return true; } catch { return false; }
-  }, "Enter a valid timezone, such as Atlantic/Reykjavik.") }),
+  z.object({ kind: z.literal("settings"), name: z.string().trim().min(2).max(180) }),
   z.object({ kind: z.literal("staff_role"), membershipId: id, role: z.enum(["school_admin", "office_staff", "teacher", "safeguarding_lead", "senco", "health_nurse"]) }),
 ]).superRefine((value, context) => {
   if ((value.kind === "year" || value.kind === "term") && value.endsOn < value.startsOn) {

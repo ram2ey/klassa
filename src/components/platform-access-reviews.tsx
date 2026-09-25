@@ -6,6 +6,7 @@ import { recordPlatformAccessReviewAction } from "@/app/actions/platform-access-
 import { PlatformAccountControls } from "@/components/platform-account-controls";
 import type { getPlatformInvitationData } from "@/lib/school-invitations";
 import { accessReviewState } from "@/lib/access-review-policy";
+import { formatGMTDate } from "@/lib/timezone";
 
 type Data = Awaited<ReturnType<typeof getPlatformInvitationData>>;
 type Member = Data["memberships"][number];
@@ -94,13 +95,13 @@ export function PlatformAccessReviews({ data }: { data: Data }) {
       {filtered.slice((safePage - 1) * PAGE_SIZE, safePage * PAGE_SIZE).map(({ member, state }) => <tr key={member.id} className="border-t border-slate-100 align-top">
         <td className="px-4 py-4"><p className="font-semibold">{member.name}</p><p className="mt-1 text-xs text-slate-500">{member.username?.replace(":", " / ") ?? "No login assigned"}</p></td>
         <td className="px-4 py-4"><p>{schoolNames.get(member.organizationId) ?? "Unknown school"}</p><p className="mt-1 text-xs text-slate-500">{member.role.replaceAll("_", " ")}</p></td>
-        <td className="px-4 py-4">{member.lastSignedInAt ? <><time dateTime={new Date(member.lastSignedInAt).toISOString()}>{new Date(member.lastSignedInAt).toLocaleDateString()}</time>
+        <td className="px-4 py-4">{member.lastSignedInAt ? <><time dateTime={new Date(member.lastSignedInAt).toISOString()}>{formatGMTDate(member.lastSignedInAt)}</time>
           {state.dormant && <p className="mt-1 text-xs font-semibold text-amber-700">Dormant</p>}</> : <span className="text-slate-500">No recorded sign-in</span>}</td>
         <td className="px-4 py-4"><p>{member.suspendedAt ? "Suspended" : member.mustChangePassword ? "Password change due" : "Password ready"}</p>
           <p className="mt-1 text-xs text-slate-500">{member.hasActiveSession ? "Active session" : "No active session"}</p></td>
         <td className="px-4 py-4"><p className={state.reviewDue ? "font-semibold text-amber-700" : member.accessReviewDecision === "follow_up" ? "font-semibold text-red-700" : "font-semibold text-emerald-700"}>
           {state.reviewDue ? "Review due" : member.accessReviewDecision === "follow_up" ? "Follow-up" : "Retained"}</p>
-          {member.accessReviewedAt && <p className="mt-1 text-xs text-slate-500">{new Date(member.accessReviewedAt).toLocaleDateString()} · {reviewerNames.get(member.accessReviewedBy ?? "") ?? "Former admin"}</p>}</td>
+          {member.accessReviewedAt && <p className="mt-1 text-xs text-slate-500">{formatGMTDate(member.accessReviewedAt)} · {reviewerNames.get(member.accessReviewedBy ?? "") ?? "Former admin"}</p>}</td>
         <td className="px-4 py-4"><div className="flex flex-wrap gap-2"><ReviewControl member={member} />
           <PlatformAccountControls userId={member.userId} organizationId={member.organizationId} name={member.name} hasActiveSession={member.hasActiveSession} suspended={!!member.suspendedAt} /></div></td>
       </tr>)}</tbody></table></div>

@@ -43,7 +43,6 @@ export function MultiSchoolPanel({
   const [schoolName, setSchoolName] = useState("");
   const [schoolSlug, setSchoolSlug] = useState("");
   const [schoolDomain, setSchoolDomain] = useState("");
-  const [schoolTimezone, setSchoolTimezone] = useState("Atlantic/Reykjavik");
   const [schoolGradingScheme, setSchoolGradingScheme] = useState<"letter" | "standards_based">("letter");
   const [adminName, setAdminName] = useState("");
   const [adminEmail, setAdminEmail] = useState("");
@@ -62,7 +61,6 @@ export function MultiSchoolPanel({
         name: schoolName,
         slug: schoolSlug,
         domain: schoolDomain,
-        timezone: schoolTimezone,
         gradingScheme: schoolGradingScheme,
         adminName,
         adminEmail,
@@ -367,16 +365,7 @@ export function MultiSchoolPanel({
                 </div>
                 <div>
                   <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Timezone</label>
-                  <select
-                    value={schoolTimezone}
-                    onChange={(e) => setSchoolTimezone(e.target.value)}
-                    className="w-full border border-slate-300 bg-white px-3 py-2 text-xs focus:outline-hidden"
-                  >
-                    <option value="Atlantic/Reykjavik">Atlantic/Reykjavik (UTC+0)</option>
-                    <option value="Europe/London">Europe/London (UTC+0/+1)</option>
-                    <option value="Europe/Berlin">Europe/Berlin (UTC+1)</option>
-                    <option value="America/New_York">America/New York (UTC-5)</option>
-                  </select>
+                  <p className="border border-slate-300 bg-slate-50 px-3 py-2 text-xs">GMT</p>
                 </div>
               </div>
 

@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useTransition, useMemo } from "react";
+import { formatGMTDate, formatGMTDateTime, formatGMTTime } from "@/lib/timezone";
 import {
   Bell,
   CheckCircle,
@@ -452,7 +453,7 @@ export function CommunicationsModule({
                             </span>
                           )}
                           <span>
-                            Published: <span className="font-mono">{new Date(ann.createdAt).toLocaleDateString()}</span>
+                            Published: <span className="font-mono">{formatGMTDate(ann.createdAt)}</span>
                           </span>
                         </div>
 
@@ -525,7 +526,7 @@ export function CommunicationsModule({
                             EXECUTIVE EMERGENCY DISPATCH
                           </span>
                           <span className="font-mono text-xs text-slate-500">
-                            {new Date(em.createdAt).toLocaleString()}
+                            {formatGMTDateTime(em.createdAt)}
                           </span>
                         </div>
 
@@ -721,7 +722,7 @@ export function CommunicationsModule({
                       <td className="p-3 font-mono text-slate-600 text-[11px]">
                         <span className="inline-flex items-center gap-1">
                           <ClockCounterClockwise className="h-3 w-3 text-slate-400" />
-                          {new Date(item.sentAt).toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" })}
+                          {formatGMTTime(item.sentAt)}
                         </span>
                       </td>
                       <td className="p-3 font-semibold text-slate-900">{item.recipientName}</td>

@@ -3,6 +3,7 @@ import { db } from "@/db";
 import { academicYears, classes, enrollments, gradeLevels, guardians, organizationMemberships, organizations,
   studentGuardians, students, subjects, teacherClassAssignments, terms } from "@/db/schema";
 import { logAuditEvent } from "@/lib/audit";
+import { SCHOOL_TIME_ZONE } from "@/lib/timezone";
 import { bulkStudentUpdateSchema, schoolCommandSchema, SchoolAdminError, type BulkStudentUpdate, type SchoolCommand } from "@/lib/school-admin-policy";
 import type { requireStaff } from "@/lib/action-access";
 import { allocateStudentNumbers } from "@/lib/student-number";
@@ -143,7 +144,7 @@ export async function saveSchoolRecord(actor: Actor, raw: SchoolCommand) {
         break;
       }
       case "settings": {
-        await tx.update(organizations).set({ name: value.name, timezone: value.timezone, updatedAt: new Date() }).where(eq(organizations.id, org));
+        await tx.update(organizations).set({ name: value.name, timezone: SCHOOL_TIME_ZONE, updatedAt: new Date() }).where(eq(organizations.id, org));
         entityId = org;
         break;
       }

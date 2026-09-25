@@ -2,6 +2,7 @@
 
 import { Printer, ShieldCheck, X, FileText } from "@phosphor-icons/react";
 import { Button } from "@/components/ui/button";
+import { formatGMTDate } from "@/lib/timezone";
 import type { DisclosurePackageResult } from "@/lib/sensitive-records";
 
 interface DisclosurePackageModalProps {
@@ -70,7 +71,7 @@ export function DisclosurePackageModal({ packageData, onClose }: DisclosurePacka
             </div>
             <div>
               <span className="block text-slate-500 font-medium">Date of Certification:</span>
-              <span className="text-slate-800">{new Date(packageData.generatedAt).toLocaleDateString()}</span>
+              <span className="text-slate-800">{formatGMTDate(packageData.generatedAt)}</span>
             </div>
             <div>
               <span className="block text-slate-500 font-medium">Statutory Safeguarding Withholdings:</span>
@@ -100,7 +101,7 @@ export function DisclosurePackageModal({ packageData, onClose }: DisclosurePacka
                   <div key={idx} className="border border-slate-200 p-3 space-y-1.5">
                     <div className="flex items-center justify-between text-xs">
                       <span className="font-bold text-slate-900 capitalize">{item.area.replace(/_/g, " ")}: {item.title}</span>
-                      <span className="font-mono text-[11px] text-slate-500">{new Date(item.date).toLocaleDateString()}</span>
+                      <span className="font-mono text-[11px] text-slate-500">{formatGMTDate(item.date)}</span>
                     </div>
                     <p className="font-mono text-xs text-slate-700 bg-slate-50 p-2 rounded-xs border border-slate-100">
                       {item.redactedNotes}

@@ -3,6 +3,7 @@ import {
   primaryKey, timestamp, uniqueIndex, uuid, varchar,
 } from "drizzle-orm/pg-core";
 import { isNull } from "drizzle-orm";
+import { SCHOOL_TIME_ZONE } from "@/lib/timezone";
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -38,7 +39,7 @@ export const organizations = pgTable("organizations", {
   id: uuid("id").defaultRandom().primaryKey(),
   name: varchar("name", { length: 180 }).notNull(),
   slug: varchar("slug", { length: 80 }).notNull(),
-  timezone: varchar("timezone", { length: 80 }).default("Atlantic/Reykjavik").notNull(),
+  timezone: varchar("timezone", { length: 80 }).default(SCHOOL_TIME_ZONE).notNull(),
   suspendedAt: timestamp("suspended_at", { withTimezone: true }),
   ...timestamps,
 }, (table) => [uniqueIndex("organizations_slug_unique").on(table.slug)]);

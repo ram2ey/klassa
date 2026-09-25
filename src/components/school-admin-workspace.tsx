@@ -7,6 +7,7 @@ import { BookOpen, CalendarDays, Check, ChevronRight, ClipboardList, FileClock, 
   LayoutDashboard, Menu, Plus, Search, Settings, Users, UsersRound, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AccountSignOut } from "@/components/account-sign-out";
+import { formatGMTDateTime, SCHOOL_TIME_ZONE, SCHOOL_TIME_ZONE_LABEL } from "@/lib/timezone";
 import { removeSchoolStaffAccessAction, saveSchoolRecordAction } from "@/app/actions/school-admin-actions";
 import { provisionStaffForCurrentSchoolAction } from "@/app/actions/school-access-actions";
 import type { SchoolAdminData } from "@/lib/school-admin-data";
@@ -50,7 +51,7 @@ export function SchoolAdminWorkspace({ data, workflow, section, date: selectedDa
   const [showEnrollment, setShowEnrollment] = useState(false);
   const [notice, setNotice] = useState("");
   const currentYear = data.years.find(year => year.isCurrent);
-  const date = (value: string | Date) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? "UTC" : data.school.timezone }).format(new Date(value));
+  const date = (value: string | Date) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: SCHOOL_TIME_ZONE }).format(new Date(value));
   const matches = (...values: unknown[]) => values.join(" ").toLowerCase().includes(query.toLowerCase());
   const yearName = (id: string) => data.years.find(year => year.id === id)?.name ?? "Unknown year";
   const gradeName = (id: string) => data.grades.find(grade => grade.id === id)?.name ?? "Unknown grade";
@@ -143,11 +144,11 @@ export function SchoolAdminWorkspace({ data, workflow, section, date: selectedDa
         </section></div>}
 
         {current.id === "audit" && <section className={panelStyle}><PanelHeading title="School audit history" description="The latest 100 recorded events for this school, newest first." />
-          <DataTable caption="School audit history" headers={["Event", "Actor", "Record type", "Record ID", "Time"]} rows={data.audit.filter(event => matches(event.action, event.actorName, event.entityType, event.entityId)).map(event => ({ key: event.id, cells: [event.action, event.actorName ?? "System", words(event.entityType), <span key="id" className="break-all font-mono text-xs">{event.entityId}</span>, new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeStyle: "short", timeZone: data.school.timezone }).format(new Date(event.createdAt))] }))} empty="No audit events match this view." />
+          <DataTable caption="School audit history" headers={["Event", "Actor", "Record type", "Record ID", "Time"]} rows={data.audit.filter(event => matches(event.action, event.actorName, event.entityType, event.entityId)).map(event => ({ key: event.id, cells: [event.action, event.actorName ?? "System", words(event.entityType), <span key="id" className="break-all font-mono text-xs">{event.entityId}</span>, formatGMTDateTime(event.createdAt)] }))} empty="No audit events match this view." />
         </section>}
 
-        {current.id === "settings" && <section className={`${panelStyle} max-w-3xl`}><PanelHeading title="School details" description="Manage your school's name and local timezone." action={<Button variant="secondary" className="min-h-11" onClick={() => edit("settings", "Edit school settings", { name: data.school.name, timezone: data.school.timezone })}>Edit settings</Button>} />
-          <dl className="grid gap-6 p-5 sm:grid-cols-2">{[["School name", data.school.name], ["Tenant ID", data.school.slug], ["Timezone", data.school.timezone], ["Current academic year", currentYear?.name ?? "Not set"]].map(([label, value]) => <div key={label}><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</dt><dd className="mt-2 font-medium">{value}</dd></div>)}</dl>
+        {current.id === "settings" && <section className={`${panelStyle} max-w-3xl`}><PanelHeading title="School details" description="Manage your school's name. The timezone is fixed at GMT." action={<Button variant="secondary" className="min-h-11" onClick={() => edit("settings", "Edit school settings", { name: data.school.name })}>Edit settings</Button>} />
+          <dl className="grid gap-6 p-5 sm:grid-cols-2">{[["School name", data.school.name], ["Tenant ID", data.school.slug], ["Timezone", SCHOOL_TIME_ZONE_LABEL], ["Current academic year", currentYear?.name ?? "Not set"]].map(([label, value]) => <div key={label}><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</dt><dd className="mt-2 font-medium">{value}</dd></div>)}</dl>
           <p className="border-t border-slate-200 px-5 py-4 text-sm text-slate-500">Your tenant ID is used to sign in. Contact your platform administrator if it needs to change.</p>
         </section>}
       </main>
@@ -210,7 +211,7 @@ function RecordEditor({ editor, data, onClose, onSaved }: { editor: Editor; data
     subject: [{ name: "code", label: "Subject code", required: true, max: 30 }, { name: "name", label: "Subject name", required: true, max: 100 }, { name: "department", label: "Department (optional)", max: 80 }],
     year: [{ name: "name", label: "Academic year name", required: true, max: 50 }, { name: "startsOn", label: "Start date", type: "date", required: true }, { name: "endsOn", label: "End date", type: "date", required: true }, { name: "isCurrent", label: "Use as the current academic year", type: "checkbox", hint: "Only one academic year can be current. Existing enrollments stay in their original year." }],
     term: [{ name: "name", label: "Term name", required: true, max: 80 }, { name: "academicYearId", label: "Academic year", required: true, disabled: !!editor.values?.id, options: yearOptions }, { name: "startsOn", label: "Start date", type: "date", required: true }, { name: "endsOn", label: "End date", type: "date", required: true }, { name: "position", label: "Term order", type: "number", required: true, min: 1, max: 20 }],
-    settings: [{ name: "name", label: "School name", required: true, max: 180 }, { name: "timezone", label: "Timezone", required: true, hint: "For example: Atlantic/Reykjavik or Europe/London." }],
+    settings: [{ name: "name", label: "School name", required: true, max: 180 }],
     staff_role: [{ name: "role", label: "School role", options: roles.map(role => ({ value: role, label: words(role) })), hint: "This changes access within this school immediately." }],
     staff: [{ name: "administratorName", label: "Full name", required: true, min: 2, max: 180 }, { name: "username", label: "Username", required: true, min: 3, max: 64, hint: `The sign-in tenant ID is ${data.school.slug}.` }, { name: "role", label: "School role", options: roles.map(role => ({ value: role, label: words(role) })) }, { name: "temporaryPassword", label: "Temporary password", type: "password", required: true, min: 12, max: 128, hint: "Share securely. The user must change it at first sign-in." }],
   };

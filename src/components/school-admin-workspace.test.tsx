@@ -10,7 +10,7 @@ vi.mock("@/app/actions/school-admin-actions", () => ({ saveSchoolRecordAction: m
 vi.mock("@/app/actions/school-access-actions", () => ({ provisionStaffForCurrentSchoolAction: mocks.provision }));
 
 const data: SchoolAdminData = {
-  school: { id: "school-1", name: "Northfield School", slug: "northfield", timezone: "Atlantic/Reykjavik" },
+  school: { id: "school-1", name: "Northfield School", slug: "northfield", timezone: "Etc/GMT" },
   actor: { organizationId: "school-1", userId: "admin-1", name: "School Admin", role: "school_admin" },
   students: [], guardians: [], links: [], staff: [], classes: [], grades: [], years: [], terms: [], subjects: [], enrollments: [], audit: [],
   attendanceSummary: [], publishedReports: [], activeAlerts: [], activeRestrictions: [],

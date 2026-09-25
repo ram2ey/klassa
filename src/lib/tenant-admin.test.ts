@@ -12,7 +12,6 @@ describe("Phase 6 Multi-School Tenant Administration", () => {
       name: "Westford Grammar School",
       slug: "westford",
       domain: "westford.edu.is",
-      timezone: "Atlantic/Reykjavik",
       gradingScheme: "letter" as const,
       adminName: "Margaret Evans",
       adminEmail: "m.evans@westford.edu.is",
@@ -24,6 +23,7 @@ describe("Phase 6 Multi-School Tenant Administration", () => {
     expect(organization.name).toBe("Westford Grammar School");
     expect(organization.status).toBe("provisioning");
     expect(organization.mfaEnforced).toBe(true);
+    expect(organization.timezone).toBe("Etc/GMT");
     expect(checklist.domainVerified).toBe(false);
     expect(checklist.initialAdminInvited).toBe(true);
   });
@@ -80,4 +80,3 @@ describe("Phase 6 Multi-School Tenant Administration", () => {
     expect(invalidSlug.success).toBe(false);
   });
 });
-
