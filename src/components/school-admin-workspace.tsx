@@ -13,6 +13,7 @@ import type { SchoolAdminData } from "@/lib/school-admin-data";
 import type { SchoolWorkflowData } from "@/lib/school-workflow-data";
 import { SchoolAdminWorkflows } from "@/components/school-admin-workflows";
 import { StudentCsvImport } from "@/components/student-csv-import";
+import { StudentEnrollmentFlow } from "@/components/student-enrollment-flow";
 import type { SchoolCommand } from "@/lib/school-admin-policy";
 
 const sections = [
@@ -44,6 +45,7 @@ export function SchoolAdminWorkspace({ data, workflow, section, date: selectedDa
   const [query, setQuery] = useState("");
   const [mobileNav, setMobileNav] = useState(false);
   const [editor, setEditor] = useState<Editor | null>(null);
+  const [showEnrollment, setShowEnrollment] = useState(false);
   const [notice, setNotice] = useState("");
   const currentYear = data.years.find(year => year.isCurrent);
   const date = (value: string | Date) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: typeof value === "string" && /^\d{4}-\d{2}-\d{2}$/.test(value) ? "UTC" : data.school.timezone }).format(new Date(value));
@@ -107,7 +109,7 @@ export function SchoolAdminWorkspace({ data, workflow, section, date: selectedDa
         </>}
 
         {current.id === "students" && <div className="space-y-6"><section className={panelStyle}>
-          <PanelHeading title="Student directory" description="Enrollment, class placement and student details." action={add("student", "Enroll student")} />
+          <PanelHeading title="Student directory" description="Enrollment, class placement and student details." action={<Button className="min-h-11" onClick={() => setShowEnrollment(true)}><Plus size={16} />Enroll student</Button>} />
           {!currentYear && <p className="border-b border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-800">Set a current year in <Link href="/?section=academic" className="underline">Academic years</Link>, then add classes before enrolling students.</p>}
           <DataTable caption="Student directory" headers={["Student", "Student number", "Current class", "Guardians", "Status", "Actions"]} rows={data.students.filter(student => matches(student.firstName, student.lastName, student.studentNumber, student.externalReference)).map(student => {
             const enrollment = data.enrollments.find(item => item.studentId === student.id && item.academicYearId === currentYear?.id);
@@ -155,6 +157,9 @@ export function SchoolAdminWorkspace({ data, workflow, section, date: selectedDa
       </main>
     </div>
     {editor && <RecordEditor editor={editor} data={data} onClose={() => setEditor(null)} onSaved={message => { setNotice(message); setEditor(null); }} />}
+    {showEnrollment && <StudentEnrollmentFlow classes={data.classes.filter(item => item.academicYearId === currentYear?.id).map(item => ({ id: item.id, label: `${gradeName(item.gradeLevelId)} / ${item.name}` }))}
+      existingGuardians={data.guardians.map(item => ({ id: item.id, label: `${item.firstName} ${item.lastName}${item.email ? ` · ${item.email}` : ""}` }))}
+      onClose={() => setShowEnrollment(false)} onSaved={message => { setNotice(message); setShowEnrollment(false); }} />}
   </div>;
 }
 

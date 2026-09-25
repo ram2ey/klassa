@@ -24,7 +24,7 @@ The older demo action routes for attendance, assessments, communications and sen
 School administrators land on the school overview at `/`. Navigation links use `?section=` so sections can be bookmarked. The workspace includes:
 
 - Overview: real student, staff, class and guardian counts, school setup checklist, and recent activity.
-- Students: search, enroll, edit details and status, assign a class in the current academic year, and import validated CSV files. Klassa assigns a permanent school-specific number such as `ST-000001` when a student is created.
+- Students: search, enroll, edit details and status, assign a class in the current academic year, and import validated CSV files. The enrollment wizard captures the student, class, new or existing guardian contacts, and optional category-only sensitive referrals in one transaction. Klassa assigns a permanent school-specific number such as `ST-000001` when a student is created.
 - Guardians: create and edit optional contact details, link students, and maintain primary-contact and legal-responsibility flags.
 - Staff & access: create tenant username accounts, list staff, and change school roles. Administrators cannot change their own role.
 - Classes & grades: create and edit grade levels and classes, assign a homeroom teacher, and see enrollment counts.
@@ -44,7 +44,9 @@ Student numbers are assigned from a per-school counter inside the enrollment tra
 
 ### Live school office workspace
 
-Office staff land on their own overview at `/`. They can enroll and update students, change current-year class placement and status, maintain guardian contacts and relationships, import validated student CSV files, and correct a submitted roll call with a written reason. Student numbers are assigned automatically for both individual enrollment and CSV import. The student directory flags active pickup or disclosure restrictions for office follow-up. Staff can read published school notices. Server actions reject attempts to manage staff roles, academic setup, grades, report publication, or sensitive cases.
+Office staff land on their own overview at `/`. They can enroll and update students, change current-year class placement and status, maintain guardian contacts and relationships, import validated student CSV files, and correct a submitted roll call with a written reason. Student numbers are assigned automatically for both individual enrollment and CSV import. The student directory flags active pickup or disclosure restrictions for office follow-up. Staff can read published school notices. Server actions reject attempts to manage staff roles, academic setup, grades, report publication, or direct sensitive case editing.
+
+The shared enrollment wizard lets office staff flag safeguarding, health, learning support, or behaviour concerns. These create restricted cases with only a generic title and category; no sensitive narrative is collected on the enrollment form. School administrators review them under Sensitive records and add protected notes through that workflow. A safeguarding referral does not itself create or enforce a pickup or court restriction.
 
 ### Live teacher workspace
 
