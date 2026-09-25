@@ -3,12 +3,17 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from "vitest";
 import { hashPassword } from "better-auth/crypto";
 import { loginUsername, schoolTenantIdSchema } from "./login-identity";
 
-const state = vi.hoisted(() => ({ data: {} as Record<string, Record<string, unknown>[]> }));
+const state = vi.hoisted(() => ({ data: {} as Record<string, Record<string, unknown>[]>, signInUsername: "" }));
 vi.mock("better-auth/adapters/drizzle", async () => {
   const { memoryAdapter } = await import("better-auth/adapters/memory");
   return { drizzleAdapter: () => memoryAdapter(state.data) };
 });
-vi.mock("@/db", () => ({ db: {} }));
+vi.mock("@/db", () => ({ db: {
+  select: () => ({ from: () => ({ where: () => ({ limit: async () => {
+    const user = state.data.user?.find(row => row.username === state.signInUsername);
+    return user ? [{ suspendedAt: user.suspendedAt ?? null }] : [];
+  } }) }) }),
+} }));
 vi.mock("@/lib/runtime-config", () => ({
   getAuthBaseURL: () => "http://localhost:3000",
   requireSecret: () => "test-only-auth-secret-with-at-least-32-characters",
@@ -29,9 +34,11 @@ beforeEach(() => {
     providerId: "credential", password: passwordHash, createdAt: new Date(), updatedAt: new Date(),
   }));
   state.data.session = []; state.data.verification = []; state.data.twoFactor = [];
+  state.signInUsername = "";
 });
 
 function request(path: string, body: Record<string, unknown>) {
+  if (path === "/sign-in/username") state.signInUsername = String(body.username ?? "");
   return getAuth().handler(new Request(`http://localhost:3000/api/auth${path}`, {
     method: "POST", headers: { "Content-Type": "application/json", Origin: "http://localhost:3000" },
     body: JSON.stringify(body),
@@ -71,6 +78,15 @@ describe("tenant username authentication", () => {
     }));
     expect(enrollment.status).toBe(403);
     expect(state.data.twoFactor).toHaveLength(0);
+  });
+
+  it("rejects a suspended school account before a session is created", async () => {
+    state.data.user[1].suspendedAt = new Date();
+    const response = await request("/sign-in/username", {
+      username: loginUsername("southfield", "alex"), password: "tenant-test-password",
+    });
+    expect(response.status).toBe(403);
+    expect(state.data.session).toHaveLength(0);
   });
 
   it.each([

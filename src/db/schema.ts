@@ -51,6 +51,7 @@ export const users = pgTable("users", {
   phoneNumberVerified: boolean("phone_number_verified").default(false).notNull(),
   isPlatformAdmin: boolean("is_platform_admin").default(false).notNull(),
   mustChangePassword: boolean("must_change_password").default(false).notNull(),
+  suspendedAt: timestamp("suspended_at", { withTimezone: true }),
   image: text("image"),
   twoFactorEnabled: boolean("two_factor_enabled").default(false),
   organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "restrict" }),

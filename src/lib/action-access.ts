@@ -13,6 +13,7 @@ export async function requireAccount() {
   if (!session) throw new Error("Authentication required.");
   const [user] = await db.select().from(users).where(eq(users.id, session.user.id)).limit(1);
   if (!user) throw new Error("Access denied.");
+  if (user.suspendedAt) throw new Error("This account is suspended. Contact your administrator.");
   if (user.mustChangePassword) throw new Error("Password change required before accessing school data.");
   if (user.isPlatformAdmin && !user.twoFactorEnabled) throw new Error("Platform administrator two-factor authentication is required.");
   return { session, user };

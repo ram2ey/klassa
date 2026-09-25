@@ -3,7 +3,7 @@ import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/a
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { username, twoFactor } from "better-auth/plugins";
 import { db } from "@/db";
-import { schema, sessions } from "@/db/schema";
+import { schema, sessions, users } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getAuthBaseURL, requireSecret } from "@/lib/runtime-config";
 import { isLoginUsername } from "@/lib/login-identity";
@@ -32,7 +32,11 @@ function createAuth() {
     }
   }) },
   session: { additionalFields: { activeOrganizationId: { type: "string", required: false, input: false } } },
-  databaseHooks: { user: { update: { after: async (user, context) => {
+  databaseHooks: { session: { create: { before: async session => {
+    const [user] = await db.select({ suspendedAt: users.suspendedAt }).from(users)
+      .where(eq(users.id, session.userId)).limit(1);
+    if (!user || user.suspendedAt) throw new APIError("FORBIDDEN", { message: "This account is suspended." });
+  } } }, user: { update: { after: async (user, context) => {
     // Initial TOTP verification creates a fresh session after this hook. Remove
     // every pre-enrollment session so none gains access merely when MFA becomes enabled.
     if (context?.path === "/two-factor/verify-totp" && user.twoFactorEnabled === true) {
@@ -46,6 +50,7 @@ function createAuth() {
       role: { type: "string", required: false, input: false },
       isPlatformAdmin: { type: "boolean", required: false, input: false },
       mustChangePassword: { type: "boolean", required: false, input: false },
+      suspendedAt: { type: "date", required: false, input: false },
     },
   },
   plugins: [username({

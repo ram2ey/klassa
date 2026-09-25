@@ -157,7 +157,7 @@ export async function getPlatformInvitationData() {
     db.select({ id: organizationMemberships.id, organizationId: organizationMemberships.organizationId,
       userId: organizationMemberships.userId, role: organizationMemberships.role, joinedAt: organizationMemberships.createdAt,
       name: users.name, username: users.username, isPlatformAdmin: users.isPlatformAdmin, phoneNumber: users.phoneNumber, phoneNumberVerified: users.phoneNumberVerified,
-      twoFactorEnabled: users.twoFactorEnabled, mustChangePassword: users.mustChangePassword }).from(organizationMemberships)
+      twoFactorEnabled: users.twoFactorEnabled, mustChangePassword: users.mustChangePassword, suspendedAt: users.suspendedAt }).from(organizationMemberships)
       .innerJoin(users, eq(organizationMemberships.userId, users.id)).orderBy(users.name),
     db.select({ userId: sessions.userId, expiresAt: sessions.expiresAt }).from(sessions)
       .where(sql`${sessions.expiresAt} > now()`),
