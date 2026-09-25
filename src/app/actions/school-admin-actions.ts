@@ -20,7 +20,7 @@ export async function saveSchoolRecordAction(input: SchoolCommand) {
     const cause = error instanceof Error ? error.cause : undefined;
     if ((cause && typeof cause === "object" && "code" in cause && cause.code === "23505") ||
       (typeof error === "object" && error && "code" in error && error.code === "23505")) {
-      return { success: false as const, error: "This student number, subject code or record already exists in your school." };
+      return { success: false as const, error: "This subject code or record already exists in your school." };
     }
     return { success: false as const, error: "The change could not be saved. Check your connection and try again." };
   }

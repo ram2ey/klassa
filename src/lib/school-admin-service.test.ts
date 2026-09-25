@@ -34,7 +34,7 @@ afterEach(() => vi.unstubAllEnvs());
 
 describe("live school administration boundaries", () => {
   it("rejects a non-administrator before any database operation", async () => {
-    await expect(saveSchoolRecord({ ...actor, role: "teacher" }, { kind: "settings", name: "School", timezone: "UTC" })).rejects.toThrow("administrator");
+    await expect(saveSchoolRecord({ ...actor, role: "teacher" }, { kind: "settings", name: "School", timezone: "UTC" })).rejects.toThrow("cannot change");
     expect(mocks.execute).not.toHaveBeenCalled();
   });
   it("requires school administrator authorization and scopes every dashboard query", async () => {
@@ -102,7 +102,7 @@ describe("live school administration boundaries", () => {
       if (query.startsWith('insert into "audit_events"')) return [[record, org, actor.userId, "student.saved", "student", record, null, {}, now]];
       return [];
     });
-    await expect(saveSchoolRecord(actor, { kind: "student", id: record, studentNumber: "S-01", firstName: "Ada", lastName: "Lovelace",
+    await expect(saveSchoolRecord(actor, { kind: "student", id: record, firstName: "Ada", lastName: "Lovelace",
       dateOfBirth: "2014-01-01", status: "active", classId: record })).resolves.toEqual({ entityId: record });
     const enrollment = mocks.execute.mock.calls.find(([query]) => query.startsWith('insert into "enrollments"'))!;
     expect(enrollment[0]).toContain("on conflict");

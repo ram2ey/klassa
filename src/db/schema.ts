@@ -1,5 +1,5 @@
 import {
-  boolean, date, index, integer, jsonb, numeric, pgEnum, pgTable, text,
+  bigint, boolean, date, index, integer, jsonb, numeric, pgEnum, pgTable, text,
   timestamp, uniqueIndex, uuid, varchar,
 } from "drizzle-orm/pg-core";
 
@@ -180,6 +180,7 @@ export const students = pgTable("students", {
   id: uuid("id").defaultRandom().primaryKey(),
   organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "restrict" }),
   studentNumber: varchar("student_number", { length: 50 }).notNull(),
+  externalReference: varchar("external_reference", { length: 100 }),
   firstName: varchar("first_name", { length: 100 }).notNull(),
   middleName: varchar("middle_name", { length: 100 }),
   lastName: varchar("last_name", { length: 100 }).notNull(),
@@ -187,7 +188,14 @@ export const students = pgTable("students", {
   dateOfBirth: date("date_of_birth").notNull(),
   status: enrollmentStatus("status").default("pending").notNull(),
   ...timestamps,
-}, (table) => [uniqueIndex("students_organization_number_unique").on(table.organizationId, table.studentNumber), index("students_name_idx").on(table.organizationId, table.lastName, table.firstName)]);
+}, (table) => [uniqueIndex("students_organization_number_unique").on(table.organizationId, table.studentNumber),
+  uniqueIndex("students_organization_external_reference_unique").on(table.organizationId, table.externalReference),
+  index("students_name_idx").on(table.organizationId, table.lastName, table.firstName)]);
+
+export const studentNumberCounters = pgTable("student_number_counters", {
+  organizationId: uuid("organization_id").primaryKey().references(() => organizations.id, { onDelete: "cascade" }),
+  nextValue: bigint("next_value", { mode: "number" }).default(1).notNull(),
+});
 
 export const guardians = pgTable("guardians", {
   id: uuid("id").defaultRandom().primaryKey(),

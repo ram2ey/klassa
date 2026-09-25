@@ -62,7 +62,7 @@ describe("live roster SQL and transaction boundaries", () => {
   });
   it("does not insert a student without an unambiguous enrollment in the authenticated school", async () => {
     mocks.execute.mockResolvedValue([]);
-    await expect(createLiveStudent({ studentNumber: "S-1", firstName: "Ada", lastName: "Lovelace",
+    await expect(createLiveStudent({ firstName: "Ada", lastName: "Lovelace",
       dateOfBirth: "2014-01-01", gradeLevel: "Grade 7", className: "7B" })).rejects.toThrow("existing class");
     expect(mocks.execute).toHaveBeenCalledOnce();
     expect(mocks.execute.mock.calls[0][1].filter(value => value === organizationId)).toHaveLength(3);

@@ -1,4 +1,4 @@
-import { studentCsvHeaders, studentInputSchema, type StudentInput } from "./validation/student";
+import { studentCsvHeaders, studentCsvInputSchema, type StudentCsvInput } from "./validation/student";
 
 export interface CsvRowError {
   row: number;
@@ -14,7 +14,7 @@ export interface CsvValidationResult {
   invalidCount: number;
   headers: string[];
   missingHeaders: string[];
-  validRecords: StudentInput[];
+  validRecords: StudentCsvInput[];
   invalidRecords: Array<{
     row: number;
     data: Record<string, string>;
@@ -82,7 +82,7 @@ export function validateStudentCsv(csvText: string): CsvValidationResult {
       validCount: 0,
       invalidCount: 0,
       headers: [],
-      missingHeaders: [...studentCsvHeaders],
+      missingHeaders: ["firstName", "lastName", "dateOfBirth", "gradeLevel", "className"],
       validRecords: [],
       invalidRecords: [],
     };
@@ -94,7 +94,7 @@ export function validateStudentCsv(csvText: string): CsvValidationResult {
     headerMap.set(h, idx);
   });
 
-  const requiredHeaders = ["studentNumber", "firstName", "lastName", "dateOfBirth", "gradeLevel", "className"];
+  const requiredHeaders = ["firstName", "lastName", "dateOfBirth", "gradeLevel", "className"];
   const missingHeaders = requiredHeaders.filter((req) => !headerMap.has(req));
 
   if (missingHeaders.length > 0) {
@@ -110,8 +110,9 @@ export function validateStudentCsv(csvText: string): CsvValidationResult {
     };
   }
 
-  const validRecords: StudentInput[] = [];
+  const validRecords: StudentCsvInput[] = [];
   const invalidRecords: Array<{ row: number; data: Record<string, string>; errors: CsvRowError[] }> = [];
+  const seenReferences = new Set<string>();
 
   for (let rowIndex = 1; rowIndex < rows.length; rowIndex++) {
     const row = rows[rowIndex];
@@ -122,7 +123,7 @@ export function validateStudentCsv(csvText: string): CsvValidationResult {
     });
 
     const parsedCandidate: Record<string, unknown> = {
-      studentNumber: rowData.studentNumber || undefined,
+      externalReference: rowData.externalReference || rowData.studentNumber || undefined,
       firstName: rowData.firstName || undefined,
       middleName: rowData.middleName || undefined,
       lastName: rowData.lastName || undefined,
@@ -132,17 +133,22 @@ export function validateStudentCsv(csvText: string): CsvValidationResult {
       className: rowData.className || undefined,
     };
 
-    const parseResult = studentInputSchema.safeParse(parsedCandidate);
+    const parseResult = studentCsvInputSchema.safeParse(parsedCandidate);
 
-    if (parseResult.success) {
+    const reference = parseResult.success ? parseResult.data.externalReference : undefined;
+    const referenceConflict = !!rowData.externalReference && !!rowData.studentNumber && rowData.externalReference !== rowData.studentNumber;
+    if (parseResult.success && !referenceConflict && (!reference || !seenReferences.has(reference))) {
       validRecords.push(parseResult.data);
+      if (reference) seenReferences.add(reference);
     } else {
-      const errors: CsvRowError[] = parseResult.error.issues.map((issue) => ({
+      const errors: CsvRowError[] = (parseResult.success ? [] : parseResult.error.issues.map((issue) => ({
         row: rowIndex + 1, // 1-based, accounting for header row
         field: issue.path.join("."),
         message: issue.message,
         value: String(rowData[issue.path[0] as string] ?? ""),
-      }));
+      })));
+      if (referenceConflict) errors.push({ row: rowIndex + 1, field: "externalReference", message: "Use either externalReference or legacy studentNumber, not conflicting values." });
+      if (reference && seenReferences.has(reference)) errors.push({ row: rowIndex + 1, field: "externalReference", message: "Duplicate external reference in file.", value: reference });
 
       invalidRecords.push({
         row: rowIndex + 1,
@@ -166,8 +172,7 @@ export function validateStudentCsv(csvText: string): CsvValidationResult {
 
 export function generateStudentCsvTemplate(): string {
   const headerLine = studentCsvHeaders.join(",");
-  const sample1 = "ST-2026-0201,Emma,Grace,Watson,Emma,2014-04-15,Grade 7,7A";
-  const sample2 = "ST-2026-0202,Lucas,,Mendoza,,2015-09-22,Grade 6,6B";
+  const sample1 = "OLD-0201,Emma,Grace,Watson,Emma,2014-04-15,Grade 7,7A";
+  const sample2 = ",Lucas,,Mendoza,,2015-09-22,Grade 6,6B";
   return `${headerLine}\n${sample1}\n${sample2}\n`;
 }
-

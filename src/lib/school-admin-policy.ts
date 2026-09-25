@@ -6,7 +6,7 @@ const optionalId = z.union([id, z.literal("")]).optional();
 const dates = { startsOn: z.iso.date(), endsOn: z.iso.date() };
 
 export const schoolCommandSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("student"), id: id.optional(), studentNumber: z.string().trim().min(1).max(50),
+  z.object({ kind: z.literal("student"), id: id.optional(),
     firstName: name, lastName: name, dateOfBirth: z.iso.date(),
     status: z.enum(["pending", "active", "withdrawn", "graduated"]), classId: optionalId }),
   z.object({ kind: z.literal("guardian"), id: id.optional(), firstName: name, lastName: name,

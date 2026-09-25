@@ -5,6 +5,7 @@ import { academicYears, classes, enrollments, gradeLevels, students } from "@/db
 import { requireStaff } from "@/lib/action-access";
 import { AuditActions, logAuditEvent } from "@/lib/audit";
 import { studentInputSchema, type StudentInput } from "@/lib/validation/student";
+import { allocateStudentNumbers } from "@/lib/student-number";
 
 const rosterRoles = ["school_admin", "office_staff"] as const;
 
@@ -30,8 +31,9 @@ export async function createLiveStudent(input: StudentInput) {
       .where(and(eq(classes.organizationId, actor.organizationId), eq(classes.name, value.className),
         eq(gradeLevels.name, value.gradeLevel), eq(academicYears.isCurrent, true)));
     if (matches.length !== 1) throw new Error("Select an existing class and grade in the school's current academic year.");
+    const [studentNumber] = await allocateStudentNumbers(tx, actor.organizationId, 1);
     const [student] = await tx.insert(students).values({
-      organizationId: actor.organizationId, studentNumber: value.studentNumber,
+      organizationId: actor.organizationId, studentNumber,
       firstName: value.firstName, middleName: value.middleName, lastName: value.lastName,
       preferredName: value.preferredName, dateOfBirth: value.dateOfBirth, status: "pending",
     }).returning();

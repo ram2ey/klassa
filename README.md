@@ -24,7 +24,7 @@ The older demo action routes for attendance, assessments, communications and sen
 School administrators land on the school overview at `/`. Navigation links use `?section=` so sections can be bookmarked. The workspace includes:
 
 - Overview: real student, staff, class and guardian counts, school setup checklist, and recent activity.
-- Students: search, enroll, edit details and status, assign a class in the current academic year, and import validated CSV files.
+- Students: search, enroll, edit details and status, assign a class in the current academic year, and import validated CSV files. Klassa assigns a permanent school-specific number such as `ST-000001` when a student is created.
 - Guardians: create and edit optional contact details, link students, and maintain primary-contact and legal-responsibility flags.
 - Staff & access: create tenant username accounts, list staff, and change school roles. Administrators cannot change their own role.
 - Classes & grades: create and edit grade levels and classes, assign a homeroom teacher, and see enrollment counts.
@@ -38,11 +38,13 @@ School administrators land on the school overview at `/`. Navigation links use `
 - Audit history: search the latest 100 events for this school.
 - School settings: edit the school's display name and timezone. The sign-in tenant ID remains managed separately.
 
-For a new school, create the academic year and mark it current, add grades and classes, then enroll students and link guardians. These workflows use the existing schema and require no additional database migration. Every mutation checks the authenticated school and commits its audit entry in the same transaction. Specialist and guardian dashboards remain future work. Guardian delivery, emergency two-party broadcasts, operational enforcement of court restrictions at pickup, delivery of specialist directives to other roles, and GDPR requests are not connected to the live administrator workspace.
+For a new school, create the academic year and mark it current, add grades and classes, then enroll students and link guardians. Every mutation checks the authenticated school and commits its audit entry in the same transaction. Specialist and guardian dashboards remain future work. Guardian delivery, emergency two-party broadcasts, operational enforcement of court restrictions at pickup, delivery of specialist directives to other roles, and GDPR requests are not connected to the live administrator workspace.
+
+Student numbers are assigned from a per-school counter inside the enrollment transaction, including CSV imports. Existing student numbers stay unchanged, and staff cannot edit assigned numbers. The CSV template does not require a student number; `externalReference` is optional for a school's old ID. Older CSVs with a `studentNumber` column are accepted and that value is stored as the external reference. A repeated external reference in the same school is rejected. After import, download the row-by-row mapping of old IDs and assigned numbers; both are searchable in the student directory. Apply migration `0011_student_number_counters` with `npm run db:migrate` before using live enrollment or import.
 
 ### Live school office workspace
 
-Office staff land on their own overview at `/`. They can enroll and update students, change current-year class placement and status, maintain guardian contacts and relationships, import validated student CSV files, and correct a submitted roll call with a written reason. The student directory flags active pickup or disclosure restrictions for office follow-up. Staff can read published school notices. Server actions reject attempts to manage staff roles, academic setup, grades, report publication, or sensitive cases.
+Office staff land on their own overview at `/`. They can enroll and update students, change current-year class placement and status, maintain guardian contacts and relationships, import validated student CSV files, and correct a submitted roll call with a written reason. Student numbers are assigned automatically for both individual enrollment and CSV import. The student directory flags active pickup or disclosure restrictions for office follow-up. Staff can read published school notices. Server actions reject attempts to manage staff roles, academic setup, grades, report publication, or sensitive cases.
 
 ### Live teacher workspace
 

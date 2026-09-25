@@ -5,6 +5,7 @@ import { validateStudentCsv } from "@/lib/csv";
 import { logAuditEvent } from "@/lib/audit";
 import { SchoolAdminError } from "@/lib/school-admin-policy";
 import type { requireStaff } from "@/lib/action-access";
+import { allocateStudentNumbers } from "@/lib/student-number";
 
 type Actor = Awaited<ReturnType<typeof requireStaff>>;
 
@@ -15,33 +16,37 @@ export async function importSchoolStudents(actor: Actor, csvText: string) {
   if (!validation.isValid || validation.validRecords.length > 1000) throw new SchoolAdminError(
     validation.missingHeaders.length ? `Missing headers: ${validation.missingHeaders.join(", ")}.` :
     validation.invalidRecords.length ? `Fix ${validation.invalidRecords.length} invalid rows before importing.` : "Import up to 1,000 valid students at a time.");
-  const numbers = validation.validRecords.map(row => row.studentNumber.toLowerCase());
-  if (new Set(numbers).size !== numbers.length) throw new SchoolAdminError("The file contains duplicate student numbers.");
   const org = actor.organizationId;
   return db.transaction(async tx => {
     const [school] = await tx.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, org)).for("update");
     if (!school) throw new SchoolAdminError("School not found.");
     const [year] = await tx.select().from(academicYears).where(and(eq(academicYears.organizationId, org), eq(academicYears.isCurrent, true)));
     if (!year) throw new SchoolAdminError("Set a current academic year first.");
+    const references = validation.validRecords.map(row => row.externalReference).filter((value): value is string => !!value);
     const [grades, classRows, existing] = await Promise.all([
       tx.select().from(gradeLevels).where(eq(gradeLevels.organizationId, org)),
       tx.select().from(classes).where(and(eq(classes.organizationId, org), eq(classes.academicYearId, year.id))),
-      tx.select({ studentNumber: students.studentNumber }).from(students).where(and(eq(students.organizationId, org), inArray(students.studentNumber, validation.validRecords.map(row => row.studentNumber)))),
+      references.length ? tx.select({ externalReference: students.externalReference }).from(students)
+        .where(and(eq(students.organizationId, org), inArray(students.externalReference, references))) : Promise.resolve([]),
     ]);
-    if (existing.length) throw new SchoolAdminError(`Student number ${existing[0].studentNumber} already exists.`);
+    if (existing.length) throw new SchoolAdminError(`External reference ${existing[0].externalReference} already exists.`);
     const placement = validation.validRecords.map((row, index) => {
       const grade = grades.find(item => item.name.toLowerCase() === row.gradeLevel.toLowerCase());
       const schoolClass = classRows.find(item => item.gradeLevelId === grade?.id && item.name.toLowerCase() === row.className.toLowerCase());
       if (!schoolClass) throw new SchoolAdminError(`Row ${index + 2}: create class ${row.className} in ${row.gradeLevel} before importing.`);
       return { row, classId: schoolClass.id };
     });
-    const inserted = await tx.insert(students).values(placement.map(({ row }) => ({ organizationId: org, studentNumber: row.studentNumber,
+    const numbers = await allocateStudentNumbers(tx, org, placement.length);
+    const inserted = await tx.insert(students).values(placement.map(({ row }, index) => ({ organizationId: org, studentNumber: numbers[index],
+      externalReference: row.externalReference ?? null,
       firstName: row.firstName, middleName: row.middleName ?? null, lastName: row.lastName,
       preferredName: row.preferredName ?? null, dateOfBirth: row.dateOfBirth, status: "active" as const }))).returning({ id: students.id });
     await tx.insert(enrollments).values(inserted.map((student, index) => ({ organizationId: org, studentId: student.id,
       academicYearId: year.id, classId: placement[index].classId, status: "active" as const, startsOn: new Date().toISOString().slice(0, 10) })));
     await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action: "import.executed", entityType: "student_import",
-      entityId: year.id, metadata: { rowCount: inserted.length } }, tx);
-    return { count: inserted.length };
+      entityId: year.id, metadata: { rowCount: inserted.length, firstStudentNumber: numbers[0], lastStudentNumber: numbers[numbers.length - 1] } }, tx);
+    return { count: inserted.length, firstStudentNumber: numbers[0], lastStudentNumber: numbers[numbers.length - 1],
+      assigned: placement.map(({ row }, index) => ({ csvRow: index + 2, externalReference: row.externalReference ?? "",
+        firstName: row.firstName, lastName: row.lastName, studentNumber: numbers[index] })) };
   });
 }

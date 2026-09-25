@@ -47,10 +47,10 @@ export function LiveRoster({ students, canManageStaff }: { students: Awaited<Ret
       <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={event => {
         event.preventDefault(); const form = event.currentTarget; const data = new FormData(form);
         const field = (name: string) => String(data.get(name) ?? "");
-        run(async () => { await createStudentAction({ studentNumber: field("studentNumber"), firstName: field("firstName"),
+        run(async () => { await createStudentAction({ firstName: field("firstName"),
           lastName: field("lastName"), dateOfBirth: field("dateOfBirth"), gradeLevel: field("gradeLevel"), className: field("className") }); form.reset(); }, "Student enrolled.");
       }}>
-        {[["studentNumber", "Student number"], ["firstName", "First name"], ["lastName", "Last name"],
+        {[["firstName", "First name"], ["lastName", "Last name"],
           ["dateOfBirth", "Date of birth"], ["gradeLevel", "Grade"], ["className", "Class"]].map(([name, label]) =>
           <label key={name} className="text-sm">{label}<input name={name} required type={name === "dateOfBirth" ? "date" : "text"}
             className="mt-1 block w-full rounded border border-slate-300 px-3 py-2" /></label>)}

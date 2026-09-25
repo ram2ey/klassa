@@ -78,6 +78,13 @@
       "when": 1790292079520,
       "tag": "0010_platform_admin_mfa",
       "breakpoints": true
+    },
+    {
+      "idx": 11,
+      "version": "7",
+      "when": 1790292079521,
+      "tag": "0011_student_number_counters",
+      "breakpoints": true
     }
   ]
 }

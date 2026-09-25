@@ -5,6 +5,7 @@ import { academicYears, classes, enrollments, gradeLevels, guardians, organizati
 import { logAuditEvent } from "@/lib/audit";
 import { schoolCommandSchema, SchoolAdminError, type SchoolCommand } from "@/lib/school-admin-policy";
 import type { requireStaff } from "@/lib/action-access";
+import { allocateStudentNumbers } from "@/lib/student-number";
 
 type Actor = Awaited<ReturnType<typeof requireStaff>>;
 function found<T>(row: T | undefined, label: string): T {
@@ -26,8 +27,8 @@ export async function saveSchoolRecord(actor: Actor, raw: SchoolCommand) {
     switch (value.kind) {
       case "student": {
         const { id, classId } = value;
-        const fields = { studentNumber: value.studentNumber, firstName: value.firstName,
-          lastName: value.lastName, dateOfBirth: value.dateOfBirth, status: value.status };
+        const fields = { firstName: value.firstName, lastName: value.lastName,
+          dateOfBirth: value.dateOfBirth, status: value.status };
         if (id) found((await tx.select({ id: students.id }).from(students).where(and(eq(students.id, id), eq(students.organizationId, org))))[0], "Student");
         const [currentYear] = await tx.select().from(academicYears).where(and(eq(academicYears.organizationId, org), eq(academicYears.isCurrent, true)));
         if (!id && !classId) throw new SchoolAdminError("Create a current academic year and class before enrolling a student.");
@@ -37,7 +38,8 @@ export async function saveSchoolRecord(actor: Actor, raw: SchoolCommand) {
         }
         const [saved] = id
           ? await tx.update(students).set({ ...fields, updatedAt: new Date() }).where(and(eq(students.id, id), eq(students.organizationId, org))).returning({ id: students.id })
-          : await tx.insert(students).values({ ...fields, organizationId: org }).returning({ id: students.id });
+          : await tx.insert(students).values({ ...fields, organizationId: org,
+              studentNumber: (await allocateStudentNumbers(tx, org, 1))[0] }).returning({ id: students.id });
         entityId = found(saved, "Student").id;
         if (classId && currentYear) {
           await tx.insert(enrollments).values({ organizationId: org, studentId: entityId, academicYearId: currentYear.id,

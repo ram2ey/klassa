@@ -82,12 +82,14 @@ export async function getWorkspaceData() {
 export async function createStudentAction(input: StudentInput) {
   if (!isDemoMode()) return createLiveStudent(input);
   const validated = studentInputSchema.parse(input);
-  if (localStudents.some((student) => student.id === validated.studentNumber)) throw new Error("Student number already exists.");
+  let nextDemoNumber = 1;
+  while (localStudents.some(student => student.id === `ST-${String(nextDemoNumber).padStart(6, "0")}`)) nextDemoNumber++;
+  const studentNumber = `ST-${String(nextDemoNumber).padStart(6, "0")}`;
   const fullName = `${validated.firstName} ${validated.lastName}`;
   const initials = `${validated.firstName[0]}${validated.lastName[0]}`.toUpperCase();
 
   const newRecord = {
-    id: validated.studentNumber,
+    id: studentNumber,
     firstName: validated.firstName,
     lastName: validated.lastName,
     initials,
@@ -107,7 +109,7 @@ export async function createStudentAction(input: StudentInput) {
     actorUserId: DEFAULT_USER_ID,
     action: AuditActions.STUDENT_CREATED,
     entityType: "student",
-    entityId: validated.studentNumber,
+    entityId: studentNumber,
     metadata: { name: fullName, grade: validated.gradeLevel, className: validated.className },
   });
 
@@ -196,10 +198,11 @@ export async function processCsvImportAction(filename: string, csvContent: strin
 
   if (validation.validRecords.length > 0) {
     for (const record of validation.validRecords) {
-      const existing = localStudents.find((s) => s.id === record.studentNumber);
-      if (!existing) {
+        let nextDemoNumber = 1;
+        while (localStudents.some(student => student.id === `ST-${String(nextDemoNumber).padStart(6, "0")}`)) nextDemoNumber++;
+        const studentNumber = `ST-${String(nextDemoNumber).padStart(6, "0")}`;
         localStudents.push({
-          id: record.studentNumber,
+          id: studentNumber,
           firstName: record.firstName,
           lastName: record.lastName,
           initials: `${record.firstName[0]}${record.lastName[0]}`.toUpperCase(),
@@ -210,7 +213,6 @@ export async function processCsvImportAction(filename: string, csvContent: strin
           updated: "Imported today",
           dateOfBirth: record.dateOfBirth,
         });
-      }
     }
   }
 

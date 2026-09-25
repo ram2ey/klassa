@@ -717,7 +717,9 @@ export function KlassoWorkspace({ roster }: { roster: Awaited<ReturnType<typeof 
     const gradeLevel = String(formData.get("gradeLevel") || "Grade 7");
     const className = String(formData.get("className") || "7A");
     const dateOfBirth = String(formData.get("dateOfBirth") || "2014-01-01");
-    const studentNumber = String(formData.get("studentNumber") || `ST-2026-${String(150 + students.length).padStart(4, "0")}`);
+    let nextStudentNumber = 1;
+    while (students.some(student => student.id === `ST-${String(nextStudentNumber).padStart(6, "0")}`)) nextStudentNumber++;
+    const studentNumber = `ST-${String(nextStudentNumber).padStart(6, "0")}`;
 
     const newRecord: StudentRecord = {
       id: studentNumber,
@@ -734,7 +736,7 @@ export function KlassoWorkspace({ roster }: { roster: Awaited<ReturnType<typeof 
 
     setStudents((curr) => [newRecord, ...curr]);
     startTransition(async () => {
-      await createStudentAction({ studentNumber, firstName, lastName, dateOfBirth, gradeLevel, className });
+      await createStudentAction({ firstName, lastName, dateOfBirth, gradeLevel, className });
     });
     setModal(null);
   }
@@ -817,23 +819,30 @@ export function KlassoWorkspace({ roster }: { roster: Awaited<ReturnType<typeof 
     });
   }
 
-  function handleApplyImport(filename: string, result: CsvValidationResult) {
-    const newStudents: StudentRecord[] = result.validRecords.map((r) => ({
-      id: r.studentNumber,
-      firstName: r.firstName,
-      lastName: r.lastName,
-      initials: `${r.firstName[0]}${r.lastName[0]}`.toUpperCase(),
-      grade: r.gradeLevel,
-      className: r.className,
-      guardians: 0,
-      status: "Active",
-      updated: "Imported today",
-      dateOfBirth: r.dateOfBirth,
-    }));
+  function handleApplyImport(filename: string, csvContent: string, result: CsvValidationResult) {
+    const usedNumbers = new Set(students.map(student => student.id));
+    let nextStudentNumber = 1;
+    const newStudents: StudentRecord[] = result.validRecords.map((r) => {
+      while (usedNumbers.has(`ST-${String(nextStudentNumber).padStart(6, "0")}`)) nextStudentNumber++;
+      const studentNumber = `ST-${String(nextStudentNumber++).padStart(6, "0")}`;
+      usedNumbers.add(studentNumber);
+      return {
+        id: studentNumber,
+        firstName: r.firstName,
+        lastName: r.lastName,
+        initials: `${r.firstName[0]}${r.lastName[0]}`.toUpperCase(),
+        grade: r.gradeLevel,
+        className: r.className,
+        guardians: 0,
+        status: "Active",
+        updated: "Imported today",
+        dateOfBirth: r.dateOfBirth,
+      };
+    });
     setStudents((curr) => [...newStudents, ...curr]);
     const newJob: ImportJobRecord = { id: `imp-${Date.now().toString().slice(-4)}`, sourceFilename: filename, rowCount: result.totalRows, validRowCount: result.validCount, invalidRowCount: result.invalidCount, status: result.isValid ? "completed" : "completed_with_errors", createdAt: "Just now" };
     setImportJobs((curr) => [newJob, ...curr]);
-    startTransition(async () => { await processCsvImportAction(filename, ""); });
+    startTransition(async () => { await processCsvImportAction(filename, csvContent); });
     setModal(null);
     setActive("Students");
   }
@@ -3140,7 +3149,7 @@ function AddStudentDialog({ onClose, onSubmit }: { onClose: () => void; onSubmit
         <div className="grid gap-3 p-4 sm:grid-cols-2 text-xs">
           <label><span className="block mb-1 font-semibold">First Name</span><input required name="firstName" className="h-9 w-full border border-slate-300 px-3" /></label>
           <label><span className="block mb-1 font-semibold">Last Name</span><input required name="lastName" className="h-9 w-full border border-slate-300 px-3" /></label>
-          <label><span className="block mb-1 font-semibold">Student ID</span><input name="studentNumber" className="h-9 w-full border border-slate-300 px-3 font-mono" placeholder="ST-2026-0150" /></label>
+          <p className="self-end text-xs text-slate-500">A student number is assigned automatically.</p>
           <label><span className="block mb-1 font-semibold">DOB</span><input required type="date" name="dateOfBirth" defaultValue="2014-06-15" className="h-9 w-full border border-slate-300 px-3" /></label>
         </div>
         <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 p-3">
@@ -3241,9 +3250,10 @@ function ImportCsvModal({
   onClose, onApplyImport,
 }: {
   onClose: () => void;
-  onApplyImport: (filename: string, result: CsvValidationResult) => void;
+  onApplyImport: (filename: string, csvContent: string, result: CsvValidationResult) => void;
 }) {
   const [file, setFile] = useState<File | null>(null);
+  const [csvContent, setCsvContent] = useState("");
   const [validationResult, setValidationResult] = useState<CsvValidationResult | null>(null);
 
   function handleFileChange(selectedFile: File) {
@@ -3251,6 +3261,7 @@ function ImportCsvModal({
     const reader = new FileReader();
     reader.onload = (e) => {
       const text = String(e.target?.result || "");
+      setCsvContent(text);
       const result = validateStudentCsv(text);
       setValidationResult(result);
     };
@@ -3279,7 +3290,7 @@ function ImportCsvModal({
       </div>
       <div className="flex justify-end gap-2 border-t border-slate-200 bg-slate-50 p-3">
         <Button variant="secondary" onClick={onClose}>Cancel</Button>
-        <Button disabled={!validationResult || validationResult.validCount === 0} onClick={() => { if (validationResult && file) onApplyImport(file.name, validationResult); }}>Commit Import</Button>
+        <Button disabled={!validationResult || validationResult.validCount === 0} onClick={() => { if (validationResult && file) onApplyImport(file.name, csvContent, validationResult); }}>Commit Import</Button>
       </div>
     </DialogFrame>
   );

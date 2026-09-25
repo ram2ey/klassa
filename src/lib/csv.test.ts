@@ -16,23 +16,22 @@ describe("CSV parsing and validation", () => {
     expect(result.isValid).toBe(true);
     expect(result.validCount).toBe(2);
     expect(result.invalidCount).toBe(0);
-    expect(result.validRecords[0].studentNumber).toBe("ST-2026-0201");
+    expect(result.validRecords[0].externalReference).toBe("OLD-0201");
   });
 
   it("identifies missing required headers", () => {
     const badHeaders = "firstName,lastName,dateOfBirth\nJohn,Doe,2014-01-01";
     const result = validateStudentCsv(badHeaders);
     expect(result.isValid).toBe(false);
-    expect(result.missingHeaders).toContain("studentNumber");
     expect(result.missingHeaders).toContain("gradeLevel");
     expect(result.missingHeaders).toContain("className");
   });
 
-  it("reports detailed row errors for malformed dates and empty IDs", () => {
+  it("reports detailed row errors for malformed dates and conflicting legacy references", () => {
     const testCsv = [
-      "studentNumber,firstName,middleName,lastName,preferredName,dateOfBirth,gradeLevel,className",
-      ",Alice,,Walker,,2015-05-10,Grade 6,6A", // missing studentNumber
-      "ST-003,Bob,,Ross,,not-a-date,Grade 7,7B", // invalid date format
+      "externalReference,studentNumber,firstName,middleName,lastName,preferredName,dateOfBirth,gradeLevel,className",
+      "OLD-1,OLD-2,Alice,,Walker,,2015-05-10,Grade 6,6A",
+      "OLD-3,,Bob,,Ross,,not-a-date,Grade 7,7B",
     ].join("\n");
 
     const result = validateStudentCsv(testCsv);
@@ -41,10 +40,9 @@ describe("CSV parsing and validation", () => {
     expect(result.invalidCount).toBe(2);
 
     const firstRowErrors = result.invalidRecords.find((r) => r.row === 2);
-    expect(firstRowErrors?.errors[0].field).toBe("studentNumber");
+    expect(firstRowErrors?.errors[0].field).toBe("externalReference");
 
     const secondRowErrors = result.invalidRecords.find((r) => r.row === 3);
     expect(secondRowErrors?.errors[0].field).toBe("dateOfBirth");
   });
 });
-
