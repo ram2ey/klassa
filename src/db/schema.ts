@@ -2,6 +2,7 @@ import {
   bigint, boolean, date, index, integer, jsonb, numeric, pgEnum, pgTable, text,
   primaryKey, timestamp, uniqueIndex, uuid, varchar,
 } from "drizzle-orm/pg-core";
+import { isNull } from "drizzle-orm";
 
 const timestamps = {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
@@ -31,6 +32,7 @@ export const courtOrderType = pgEnum("court_order_type", ["restraining_order", "
 export const gdprRequestType = pgEnum("gdpr_request_type", ["export", "rectify", "anonymize", "restrict"]);
 export const gdprRequestStatus = pgEnum("gdpr_request_status", ["pending", "in_review", "completed", "rejected"]);
 export const drillStatus = pgEnum("drill_status", ["passed", "failed", "partial"]);
+export const platformIncidentSeverity = pgEnum("platform_incident_severity", ["warning", "critical"]);
 
 export const organizations = pgTable("organizations", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -702,6 +704,33 @@ export const platformRequestMetrics = pgTable("platform_request_metrics", {
   primaryKey({ columns: [table.minute, table.instanceId] }),
 ]);
 
+export const platformIncidents = pgTable("platform_incidents", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  code: varchar("code", { length: 80 }).notNull(),
+  title: varchar("title", { length: 180 }).notNull(),
+  severity: platformIncidentSeverity("severity").notNull(),
+  details: text("details").notNull(),
+  triggeredAt: timestamp("triggered_at", { withTimezone: true }).defaultNow().notNull(),
+  lastObservedAt: timestamp("last_observed_at", { withTimezone: true }).defaultNow().notNull(),
+  acknowledgedAt: timestamp("acknowledged_at", { withTimezone: true }),
+  acknowledgedBy: text("acknowledged_by").references(() => users.id, { onDelete: "set null" }),
+  resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+  resolvedBy: text("resolved_by").references(() => users.id, { onDelete: "set null" }),
+  resolutionNote: text("resolution_note"),
+}, table => [
+  uniqueIndex("platform_incidents_active_code_unique").on(table.code).where(isNull(table.resolvedAt)),
+  index("platform_incidents_triggered_idx").on(table.triggeredAt),
+]);
+
+export const platformIncidentEvents = pgTable("platform_incident_events", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  incidentId: uuid("incident_id").notNull().references(() => platformIncidents.id, { onDelete: "cascade" }),
+  action: varchar("action", { length: 40 }).notNull(),
+  actorUserId: text("actor_user_id").references(() => users.id, { onDelete: "set null" }),
+  note: text("note"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, table => [index("platform_incident_events_incident_idx").on(table.incidentId, table.createdAt)]);
+
 export const schema = {
   organizationMemberships,
   smsInvitations,
@@ -751,4 +780,6 @@ export const schema = {
   restoreDrills,
   rateLimitLogs,
   platformRequestMetrics,
+  platformIncidents,
+  platformIncidentEvents,
 };
