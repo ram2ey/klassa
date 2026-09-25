@@ -207,10 +207,30 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
         entityId = row.id;
         break;
       }
+      case "announcement_update": {
+        const announcement = found((await tx.select().from(announcements).where(and(eq(announcements.id, value.announcementId), eq(announcements.organizationId, org))))[0], "Announcement");
+        if (announcement.status !== "draft") throw new SchoolAdminError("Only drafts can be edited.");
+        if (value.targetType === "school" && value.targetId !== "all") throw new SchoolAdminError("Choose the whole school target.");
+        if (value.targetType === "grade") found((await tx.select({ id: gradeLevels.id }).from(gradeLevels).where(and(eq(gradeLevels.id, value.targetId), eq(gradeLevels.organizationId, org))))[0], "Grade");
+        if (value.targetType === "class") found((await tx.select({ id: classes.id }).from(classes).where(and(eq(classes.id, value.targetId), eq(classes.organizationId, org))))[0], "Class");
+        await tx.update(announcements).set({ title: value.title, content: value.content, targetType: value.targetType,
+          targetId: value.targetId, priority: value.priority, updatedAt: new Date() })
+          .where(and(eq(announcements.id, announcement.id), eq(announcements.organizationId, org), eq(announcements.status, "draft")));
+        entityId = announcement.id;
+        break;
+      }
       case "announcement_publish": {
         const announcement = found((await tx.select().from(announcements).where(and(eq(announcements.id, value.announcementId), eq(announcements.organizationId, org))))[0], "Announcement");
         if (announcement.status !== "draft") throw new SchoolAdminError("Only drafts can be published.");
         await tx.update(announcements).set({ status: "published", publishedAt: new Date(), updatedAt: new Date() }).where(and(eq(announcements.id, announcement.id), eq(announcements.organizationId, org)));
+        entityId = announcement.id;
+        break;
+      }
+      case "announcement_archive": {
+        const announcement = found((await tx.select().from(announcements).where(and(eq(announcements.id, value.announcementId), eq(announcements.organizationId, org))))[0], "Announcement");
+        if (announcement.status === "archived") throw new SchoolAdminError("This announcement is already archived.");
+        await tx.update(announcements).set({ status: "archived", updatedAt: new Date() })
+          .where(and(eq(announcements.id, announcement.id), eq(announcements.organizationId, org)));
         entityId = announcement.id;
         break;
       }

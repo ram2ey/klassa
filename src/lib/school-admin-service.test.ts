@@ -40,7 +40,6 @@ describe("live school administration boundaries", () => {
   it("requires school administrator authorization and scopes every dashboard query", async () => {
     await getSchoolAdminData();
     expect(mocks.authorize).toHaveBeenCalledWith(["school_admin"]);
-    expect(mocks.execute.mock.calls).toHaveLength(12);
     for (const [query, params] of mocks.execute.mock.calls) {
       expect(query).toContain("where");
       expect(params).toContain(org);

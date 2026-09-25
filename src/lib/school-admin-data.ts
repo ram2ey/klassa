@@ -15,7 +15,8 @@ export async function getSchoolAdminData() {
     db.select().from(guardians).where(eq(guardians.organizationId, org)).orderBy(guardians.lastName, guardians.firstName),
     db.select().from(studentGuardians).where(eq(studentGuardians.organizationId, org)),
     db.select({ id: organizationMemberships.id, userId: users.id, name: users.name, username: users.username,
-      role: organizationMemberships.role, mustChangePassword: users.mustChangePassword, joinedAt: organizationMemberships.createdAt })
+      role: organizationMemberships.role, mustChangePassword: users.mustChangePassword, twoFactorEnabled: users.twoFactorEnabled,
+      joinedAt: organizationMemberships.createdAt })
       .from(organizationMemberships).innerJoin(users, eq(users.id, organizationMemberships.userId))
       .where(eq(organizationMemberships.organizationId, org)).orderBy(users.name),
     db.select().from(classes).where(eq(classes.organizationId, org)).orderBy(classes.name),

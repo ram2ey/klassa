@@ -1,4 +1,4 @@
-import { and, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, count, eq, inArray, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { academicYears, classes, enrollments, gradeLevels, guardians, organizationMemberships, organizations,
   studentGuardians, students, subjects, teacherClassAssignments, terms } from "@/db/schema";
@@ -150,6 +150,11 @@ export async function saveSchoolRecord(actor: Actor, raw: SchoolCommand) {
       case "staff_role": {
         const member = found((await tx.select().from(organizationMemberships).where(and(eq(organizationMemberships.id, value.membershipId), eq(organizationMemberships.organizationId, org))))[0], "Staff member");
         if (member.userId === actor.userId) throw new SchoolAdminError("Ask another school administrator to change your role.");
+        if (member.role === "school_admin" && value.role !== "school_admin") {
+          const [admins] = await tx.select({ total: count() }).from(organizationMemberships)
+            .where(and(eq(organizationMemberships.organizationId, org), eq(organizationMemberships.role, "school_admin")));
+          if ((admins?.total ?? 0) <= 1) throw new SchoolAdminError("This is the last school administrator. Add another administrator before changing this role.");
+        }
         await tx.update(organizationMemberships).set({ role: value.role, updatedAt: new Date() }).where(and(eq(organizationMemberships.id, member.id), eq(organizationMemberships.organizationId, org)));
         if (value.role !== "teacher" && value.role !== "school_admin") {
           await tx.update(classes).set({ homeroomTeacherId: null, updatedAt: new Date() }).where(and(eq(classes.organizationId, org), eq(classes.homeroomTeacherId, member.userId)));

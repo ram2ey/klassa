@@ -7,7 +7,7 @@ import { BookOpen, CalendarDays, Check, ChevronRight, ClipboardList, FileClock, 
   LayoutDashboard, Menu, Plus, Search, Settings, Users, UsersRound, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AccountSignOut } from "@/components/account-sign-out";
-import { saveSchoolRecordAction } from "@/app/actions/school-admin-actions";
+import { removeSchoolStaffAccessAction, saveSchoolRecordAction } from "@/app/actions/school-admin-actions";
 import { provisionStaffForCurrentSchoolAction } from "@/app/actions/school-access-actions";
 import type { SchoolAdminData } from "@/lib/school-admin-data";
 import type { SchoolWorkflowData } from "@/lib/school-workflow-data";
@@ -57,7 +57,7 @@ export function SchoolAdminWorkspace({ data, workflow, section, date: selectedDa
   const studentName = (id: string) => { const student = data.students.find(student => student.id === id); return student ? `${student.firstName} ${student.lastName}` : "Unknown student"; };
   const guardianName = (id: string) => { const guardian = data.guardians.find(guardian => guardian.id === id); return guardian ? `${guardian.firstName} ${guardian.lastName}` : "Unknown guardian"; };
   const edit = (kind: Editor["kind"], title: string, values?: Editor["values"]) => setEditor({ kind, title, values });
-  const add = (kind: Editor["kind"], title: string) => <Button className="min-h-11" onClick={() => edit(kind, title)}><Plus size={16} />{title}</Button>;
+  const add = (kind: Editor["kind"], title: string) => <Button aria-label={title} className="min-h-11" onClick={() => edit(kind, title)}><Plus size={16} />{title}</Button>;
   const editButton = (kind: Editor["kind"], title: string, values: NonNullable<Editor["values"]>) => <Button variant="secondary" className="min-h-11" onClick={() => edit(kind, title, values)}>Edit<span className="sr-only"> {title}</span></Button>;
 
   return <div className="min-h-screen bg-slate-50 text-slate-900 lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">
@@ -122,8 +122,8 @@ export function SchoolAdminWorkspace({ data, workflow, section, date: selectedDa
           <DataTable caption="Student guardian relationships" headers={["Student", "Guardian", "Relationship", "Primary contact", "Legal responsibility", "Actions"]} rows={data.links.filter(link => matches(studentName(link.studentId), guardianName(link.guardianId))).map(link => ({ key: link.id, cells: [studentName(link.studentId), guardianName(link.guardianId), words(link.relationship), link.isPrimary ? "Yes" : "No", link.hasLegalResponsibility ? "Yes" : "No", editButton("guardian_link", "Edit relationship", { studentId: link.studentId, guardianId: link.guardianId, relationship: link.relationship, isPrimary: link.isPrimary, hasLegalResponsibility: link.hasLegalResponsibility })] }))} empty="Add a student and a guardian, then link them here." />
         </section></div>}
 
-        {current.id === "staff" && <section className={panelStyle}><PanelHeading title="Staff directory" description="Create accounts and manage access within this school." action={add("staff", "Create staff account")} />
-          <DataTable caption="School staff" headers={["Name", "Login tenant / username", "School role", "Account setup", "Actions"]} rows={data.staff.filter(member => matches(member.name, member.username, member.role)).map(member => ({ key: member.id, cells: [<strong key="name">{member.name}{member.userId === data.actor.userId && <span className="ml-2 text-xs font-normal text-slate-500">You</span>}</strong>, member.username?.replace(":", " / ") ?? "Not assigned", words(member.role), <Status key="setup" value={member.mustChangePassword ? "password change due" : "ready"} />, member.userId === data.actor.userId ? <span key="own" className="text-xs text-slate-500">Your account</span> : editButton("staff_role", `Change role for ${member.name}`, { membershipId: member.id, role: member.role })] }))} empty="No staff match your search." />
+        {current.id === "staff" && <section className={panelStyle}><PanelHeading title="Staff directory" description="Create accounts, review sign-in security, and manage school access." action={add("staff", "Create staff account")} />
+          <DataTable caption="School staff" headers={["Name", "Login tenant / username", "School role", "Account setup", "Two-factor", "Actions"]} rows={data.staff.filter(member => matches(member.name, member.username, member.role)).map(member => ({ key: member.id, cells: [<strong key="name">{member.name}{member.userId === data.actor.userId && <span className="ml-2 text-xs font-normal text-slate-500">You</span>}</strong>, member.username?.replace(":", " / ") ?? "Not assigned", words(member.role), <Status key="setup" value={member.mustChangePassword ? "password change due" : "ready"} />, <Status key="mfa" value={member.twoFactorEnabled ? "enabled" : "not enabled"} />, member.userId === data.actor.userId ? <span key="own" className="text-xs text-slate-500">Your account</span> : <div key="actions" className="flex flex-wrap gap-2">{editButton("staff_role", `Change role for ${member.name}`, { membershipId: member.id, role: member.role })}<StaffAccessAction membershipId={member.id} staffName={member.name} /></div>] }))} empty="No staff match your search." />
         </section>}
 
         {current.id === "classes" && <div className="space-y-6"><section className={panelStyle}><PanelHeading title="Classes" description="Organize classes by year and grade, and assign homeroom teachers." action={add("class", "Add class")} />
@@ -157,6 +157,23 @@ export function SchoolAdminWorkspace({ data, workflow, section, date: selectedDa
       existingGuardians={data.guardians.map(item => ({ id: item.id, label: `${item.firstName} ${item.lastName}${item.email ? ` · ${item.email}` : ""}` }))}
       onClose={() => setShowEnrollment(false)} onSaved={message => { setNotice(message); setShowEnrollment(false); }} />}
   </div>;
+}
+
+function StaffAccessAction({ membershipId, staffName }: { membershipId: string; staffName: string }) {
+  const [pending, startTransition] = useTransition();
+  const [message, setMessage] = useState("");
+  const router = useRouter();
+  return <span className="inline-flex flex-col items-start gap-1"><Button variant="secondary" className="min-h-11 border-red-200 text-red-800 hover:bg-red-50" disabled={pending}
+    onClick={() => {
+      if (!window.confirm(`Remove ${staffName}'s access to this school? Their school session will end. Their account and access to any other school will remain.`)) return;
+      setMessage("");
+      startTransition(async () => {
+        const result = await removeSchoolStaffAccessAction(membershipId);
+        if (!result.success) { setMessage(result.error); return; }
+        setMessage("School access removed.");
+        router.refresh();
+      });
+    }}>{pending ? "Removing…" : "Remove access"}</Button>{message && <span role="status" className="max-w-48 text-xs text-slate-600">{message}</span>}</span>;
 }
 
 function Metric({ label, value, detail, icon }: { label: string; value: number; detail: string; icon: ReactNode }) {

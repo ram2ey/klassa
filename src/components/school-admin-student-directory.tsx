@@ -102,7 +102,7 @@ export function SchoolAdminStudentDirectory({ data, query, currentYearId, onEnro
     <section className="border border-slate-200 bg-white">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 p-4">
         <div><h2 className="font-bold">Student directory</h2><p className="mt-1 text-sm text-slate-500">Enrollment, class placement and student details.</p></div>
-        <div className="flex flex-wrap gap-2"><Button variant="secondary" className="min-h-11" disabled={!students.length} onClick={() => exportCsv(students)}>Export CSV</Button><Button className="min-h-11" onClick={onEnroll}>+ Enroll student</Button></div>
+        <div className="flex flex-wrap gap-2"><Button variant="secondary" className="min-h-11" disabled={!students.length} onClick={() => exportCsv(students)}>Export CSV</Button><Button aria-label="Enroll student" className="min-h-11" onClick={onEnroll}>+ Enroll student</Button></div>
       </div>
       {!currentYearId && <p className="border-b border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-800">Set a current year in Academic years, then add classes before enrolling students.</p>}
       <div className="flex flex-wrap gap-2 border-b border-slate-200 p-3" aria-label="Student quick filters">

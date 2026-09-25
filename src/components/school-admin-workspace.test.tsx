@@ -37,8 +37,8 @@ describe("school administration workspace", () => {
   it("prevents enrollment until school setup supplies a current class", () => {
     render(<SchoolAdminWorkspace data={data} section="students" />);
     fireEvent.click(screen.getByRole("button", { name: "Enroll student" }));
-    expect((screen.getByRole("button", { name: "Save changes" }) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText("Add the required school records first, then return to this form.")).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Continue" }) as HTMLButtonElement).disabled).toBe(true);
+    expect(screen.getByText("Create the current academic year and a class before enrolling a student.")).toBeTruthy();
   });
   it("saves a guardian without requiring a phone number and refreshes live data", async () => {
     render(<SchoolAdminWorkspace data={data} section="guardians" />);
