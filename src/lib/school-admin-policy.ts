@@ -31,5 +31,12 @@ export const schoolCommandSchema = z.discriminatedUnion("kind", [
   }
 });
 
+export const bulkStudentUpdateSchema = z.object({
+  studentIds: z.array(id).min(1, "Select at least one student.").max(100, "Update at most 100 students at a time.").refine(ids => new Set(ids).size === ids.length, "A student was selected more than once."),
+  status: z.enum(["pending", "active", "withdrawn", "graduated"]).optional(),
+  classId: id.optional(),
+}).refine(value => value.status !== undefined || value.classId !== undefined, "Choose a status or class change.");
+
 export type SchoolCommand = z.input<typeof schoolCommandSchema>;
+export type BulkStudentUpdate = z.input<typeof bulkStudentUpdateSchema>;
 export class SchoolAdminError extends Error {}

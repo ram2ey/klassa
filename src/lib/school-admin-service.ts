@@ -1,9 +1,9 @@
-import { and, eq, ne, sql } from "drizzle-orm";
+import { and, eq, inArray, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { academicYears, classes, enrollments, gradeLevels, guardians, organizationMemberships, organizations,
   studentGuardians, students, subjects, teacherClassAssignments, terms } from "@/db/schema";
 import { logAuditEvent } from "@/lib/audit";
-import { schoolCommandSchema, SchoolAdminError, type SchoolCommand } from "@/lib/school-admin-policy";
+import { bulkStudentUpdateSchema, schoolCommandSchema, SchoolAdminError, type BulkStudentUpdate, type SchoolCommand } from "@/lib/school-admin-policy";
 import type { requireStaff } from "@/lib/action-access";
 import { allocateStudentNumbers } from "@/lib/student-number";
 
@@ -162,5 +162,42 @@ export async function saveSchoolRecord(actor: Actor, raw: SchoolCommand) {
     await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action: `${value.kind}.saved`,
       entityType: value.kind, entityId, metadata: value.kind === "staff_role" ? { role: value.role } : {} }, tx);
     return { entityId };
+  });
+}
+
+export async function bulkUpdateSchoolStudents(actor: Actor, raw: BulkStudentUpdate) {
+  const value = bulkStudentUpdateSchema.parse(raw);
+  if (actor.role !== "school_admin") throw new SchoolAdminError("Only a school administrator can run bulk student updates.");
+  const org = actor.organizationId;
+  return db.transaction(async tx => {
+    found((await tx.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, org)).for("update"))[0], "School");
+    const selected = await tx.select({ id: students.id, status: students.status }).from(students)
+      .where(and(eq(students.organizationId, org), inArray(students.id, value.studentIds)));
+    if (selected.length !== value.studentIds.length) throw new SchoolAdminError("One or more selected students could not be found in this school. Refresh the directory and try again.");
+    const [currentYear] = await tx.select().from(academicYears).where(and(eq(academicYears.organizationId, org), eq(academicYears.isCurrent, true)));
+    if (value.classId) {
+      if (!currentYear) throw new SchoolAdminError("Choose a current academic year before assigning a class.");
+      found((await tx.select({ id: classes.id }).from(classes).where(and(eq(classes.id, value.classId), eq(classes.organizationId, org), eq(classes.academicYearId, currentYear.id))))[0], "Class in the current academic year");
+    }
+    if (value.status) {
+      await tx.update(students).set({ status: value.status, updatedAt: new Date() })
+        .where(and(eq(students.organizationId, org), inArray(students.id, value.studentIds)));
+    }
+    if (currentYear && value.classId) {
+      for (const item of selected) {
+        await tx.insert(enrollments).values({ organizationId: org, studentId: item.id, academicYearId: currentYear.id,
+          classId: value.classId ?? null, status: value.status ?? item.status, startsOn: new Date().toISOString().slice(0, 10) })
+          .onConflictDoUpdate({ target: [enrollments.studentId, enrollments.academicYearId],
+            set: { ...(value.classId ? { classId: value.classId } : {}), ...(value.status ? { status: value.status } : {}), updatedAt: new Date() },
+            setWhere: eq(enrollments.organizationId, org) });
+      }
+    } else if (currentYear && value.status) {
+      await tx.update(enrollments).set({ status: value.status, updatedAt: new Date() })
+        .where(and(eq(enrollments.organizationId, org), eq(enrollments.academicYearId, currentYear.id), inArray(enrollments.studentId, value.studentIds)));
+    }
+    for (const id of value.studentIds) await logAuditEvent({ organizationId: org, actorUserId: actor.userId,
+      action: "student.bulk_updated", entityType: "student", entityId: id,
+      metadata: { ...(value.status ? { status: value.status } : {}), ...(value.classId ? { classId: value.classId } : {}) } }, tx);
+    return { updatedCount: value.studentIds.length };
   });
 }

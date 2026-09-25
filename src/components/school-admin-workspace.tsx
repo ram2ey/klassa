@@ -14,6 +14,7 @@ import type { SchoolWorkflowData } from "@/lib/school-workflow-data";
 import { SchoolAdminWorkflows } from "@/components/school-admin-workflows";
 import { StudentCsvImport } from "@/components/student-csv-import";
 import { StudentEnrollmentFlow } from "@/components/student-enrollment-flow";
+import { SchoolAdminStudentDirectory } from "@/components/school-admin-student-directory";
 import type { SchoolCommand } from "@/lib/school-admin-policy";
 
 const sections = [
@@ -108,17 +109,11 @@ export function SchoolAdminWorkspace({ data, workflow, section, date: selectedDa
           <section className={`${panelStyle} flex flex-wrap items-center justify-between gap-4 p-5`}><div><h2 className="font-bold">Ready for the next school day</h2><p className="mt-1 text-sm text-slate-500">Keep your student directory, class assignments and contact records up to date.</p></div><Link href="/?section=students" className="inline-flex min-h-11 items-center gap-2 bg-blue-700 px-4 text-sm font-semibold text-white">Open student directory <ChevronRight size={16} /></Link></section>
         </>}
 
-        {current.id === "students" && <div className="space-y-6"><section className={panelStyle}>
-          <PanelHeading title="Student directory" description="Enrollment, class placement and student details." action={<Button className="min-h-11" onClick={() => setShowEnrollment(true)}><Plus size={16} />Enroll student</Button>} />
-          {!currentYear && <p className="border-b border-amber-200 bg-amber-50 px-5 py-3 text-sm text-amber-800">Set a current year in <Link href="/?section=academic" className="underline">Academic years</Link>, then add classes before enrolling students.</p>}
-          <DataTable caption="Student directory" headers={["Student", "Student number", "Current class", "Guardians", "Status", "Actions"]} rows={data.students.filter(student => matches(student.firstName, student.lastName, student.studentNumber, student.externalReference)).map(student => {
-            const enrollment = data.enrollments.find(item => item.studentId === student.id && item.academicYearId === currentYear?.id);
-            const studentClass = data.classes.find(item => item.id === enrollment?.classId);
-            return { key: student.id, cells: [<strong key="name">{student.firstName} {student.lastName}</strong>, <span key="number">{student.studentNumber}{student.externalReference && <small className="block text-slate-500">Old ID: {student.externalReference}</small>}</span>, studentClass ? `${gradeName(studentClass.gradeLevelId)} / ${studentClass.name}` : "Not assigned",
-              data.links.filter(link => link.studentId === student.id).map(link => guardianName(link.guardianId)).join(", ") || "None linked", <Status key="status" value={student.status} />,
-              editButton("student", `Edit ${student.firstName} ${student.lastName}`, { id: student.id, firstName: student.firstName, lastName: student.lastName, dateOfBirth: student.dateOfBirth, status: student.status, classId: enrollment?.classId ?? "" })] };
-          })} empty="No students match this view. Enroll a student to start your directory." />
-        </section><StudentCsvImport /></div>}
+        {current.id === "students" && <div className="space-y-6">
+          <SchoolAdminStudentDirectory data={data} query={query} currentYearId={currentYear?.id} onEnroll={() => setShowEnrollment(true)}
+            onEdit={(student, classId) => edit("student", `Edit ${student.firstName} ${student.lastName}`, { id: student.id, firstName: student.firstName, lastName: student.lastName, dateOfBirth: student.dateOfBirth, status: student.status, classId })} />
+          <StudentCsvImport />
+        </div>}
 
         {current.id === "guardians" && <div className="space-y-6"><section className={panelStyle}><PanelHeading title="Guardian contacts" description="Contact records for parents and guardians." action={add("guardian", "Add guardian")} />
           <DataTable caption="Guardian contacts" headers={["Name", "Email", "Phone", "Linked students", "Actions"]} rows={data.guardians.filter(guardian => matches(guardian.firstName, guardian.lastName, guardian.email, guardian.phone)).map(guardian => ({ key: guardian.id, cells: [<strong key="name">{guardian.firstName} {guardian.lastName}</strong>, guardian.email ?? "Not provided", guardian.phone ?? "Not provided", data.links.filter(link => link.guardianId === guardian.id).map(link => studentName(link.studentId)).join(", ") || "None linked", editButton("guardian", `Edit ${guardian.firstName} ${guardian.lastName}`, { id: guardian.id, firstName: guardian.firstName, lastName: guardian.lastName, email: guardian.email, phone: guardian.phone })] }))} empty="No guardian contacts match this view." />
