@@ -32,6 +32,7 @@ export function AcceptInvitation() {
     {!invitation && !error && <p role="status">Checking your invitation…</p>}
     {activated ? <p role="status">Your account is ready. <Link href="/login" className="text-blue-700 underline">Sign in to continue.</Link></p> : invitation && <>
       <div className="rounded border border-slate-200 bg-white p-4"><h2 className="font-bold">{invitation.schoolName}</h2>
+        <p className="mt-1 text-sm text-slate-600">Tenant ID: {invitation.tenantId}</p>
         <p className="mt-1 text-sm text-slate-600">{invitation.role.replaceAll("_", " ")} · Invitation for {invitation.phoneHint}</p></div>
       {invitation.mode === "sign-in" ? <p className="text-sm">You already have a Klassa account. <Link href="/login" className="text-blue-700 underline">Sign in</Link>, then reopen this SMS link to add the school. Your existing password and authenticator will stay the same.</p> :
         <form className="space-y-4" onSubmit={async event => {
@@ -42,11 +43,12 @@ export function AcceptInvitation() {
           const password = invitation.mode === "new" ? String(data.get("password")) : undefined;
           try {
             const result = await acceptSchoolInvitationAction({ token: token.current ?? "", phoneNumber: phone.data,
-              name: invitation.mode === "new" ? String(data.get("name")) : "Existing account", password });
+              name: invitation.mode === "new" ? String(data.get("name")) : "Existing account",
+              username: invitation.mode === "new" ? String(data.get("username")) : undefined, password });
             if (!result.success) { setError(result.error); return; }
             setActivated(true); token.current = null;
-            if (!result.existingAccount && password) {
-              const login = await authClient.signIn.phoneNumber({ phoneNumber: phone.data, password });
+            if (!result.existingAccount && password && result.username) {
+              const login = await authClient.signIn.username({ username: result.username, password });
               if (login.error) { setError("Account created. Sign in to finish authenticator setup."); return; }
               router.replace("/setup-mfa");
             } else router.replace("/schools");
@@ -56,6 +58,7 @@ export function AcceptInvitation() {
         }}>
           <label className="block text-sm">Your mobile number<input name="phone" type="tel" autoComplete="tel" placeholder="+354 555 1234" required className="mt-1 block w-full rounded border border-slate-300 px-3 py-2" /></label>
           {invitation.mode === "new" && <>
+            <label className="block text-sm">Username<input name="username" autoComplete="username" autoCapitalize="none" required minLength={3} maxLength={64} className="mt-1 block w-full rounded border border-slate-300 px-3 py-2" /></label>
             <label className="block text-sm">Your name<input name="name" autoComplete="name" required minLength={2} maxLength={180} className="mt-1 block w-full rounded border border-slate-300 px-3 py-2" /></label>
             <label className="block text-sm">Choose a password<input name="password" type="password" autoComplete="new-password" required minLength={12} maxLength={128} className="mt-1 block w-full rounded border border-slate-300 px-3 py-2" /><span className="mt-1 block text-xs text-slate-500">At least 12 characters. Next, you’ll set up an authenticator app.</span></label>
           </>}

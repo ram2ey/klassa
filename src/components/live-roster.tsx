@@ -64,22 +64,20 @@ export function LiveRoster({ students, canManageStaff }: { students: Awaited<Ret
         run(async () => {
           const result = await provisionStaffForCurrentSchoolAction({
             administratorName: String(data.get("staffName") ?? ""),
-            administratorPhone: String(data.get("staffPhone") ?? ""),
+            username: String(data.get("staffUsername") ?? ""),
             temporaryPassword: String(data.get("temporaryPassword") ?? ""),
             role: String(data.get("staffRole") ?? "office_staff") as typeof staffRoles[number],
           });
           form.reset();
           return result;
-        }, result => (result as { accountCreated: boolean }).accountCreated
-          ? "Staff account created. Share the login phone and temporary password securely."
-          : "The existing Klassa account was added to this school. Their existing password was not changed.",
-        "The staff account could not be created. Check the phone number and whether this person already belongs to the school.");
+        }, result => { const account = result as { tenantId: string; username: string }; return `Staff account created. Login: ${account.tenantId} / ${account.username}. Share the temporary password securely.`; },
+        "The staff account could not be created. Check the username is valid and not already in use at this school.");
       }}>
         <label className="text-sm sm:col-span-2">Full name<input name="staffName" required minLength={2} maxLength={180} className="mt-1 block w-full rounded border border-slate-300 px-3 py-2" /></label>
-        <label className="text-sm">Login phone<input name="staffPhone" type="tel" required placeholder="+3545551234" className="mt-1 block w-full rounded border border-slate-300 px-3 py-2" /></label>
+        <label className="text-sm">Username<input name="staffUsername" type="text" required minLength={3} maxLength={64} autoCapitalize="none" spellCheck={false} placeholder="j.smith" className="mt-1 block w-full rounded border border-slate-300 px-3 py-2" /></label>
         <label className="text-sm">Role<select name="staffRole" defaultValue="office_staff" className="mt-1 block w-full rounded border border-slate-300 px-3 py-2">{staffRoles.map(role => <option key={role} value={role}>{roleLabel(role)}</option>)}</select></label>
         <label className="text-sm sm:col-span-2">Temporary password<input name="temporaryPassword" type="password" required minLength={12} maxLength={128} autoComplete="new-password" className="mt-1 block w-full rounded border border-slate-300 px-3 py-2" /></label>
-        <p className="text-xs text-slate-500 sm:col-span-2">Share the phone and password through a secure channel. Klassa never displays the temporary password again.</p>
+        <p className="text-xs text-slate-500 sm:col-span-2">Share the tenant ID, username and password through a secure channel. Klassa never displays the temporary password again.</p>
         <Button type="submit" disabled={pending}>Create staff account</Button>
       </form>
     </section>}

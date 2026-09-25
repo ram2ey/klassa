@@ -1,11 +1,11 @@
 import { betterAuth } from "better-auth";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
-import { phoneNumber, twoFactor } from "better-auth/plugins";
+import { username, twoFactor } from "better-auth/plugins";
 import { db } from "@/db";
 import { schema, sessions } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getAuthBaseURL, requireSecret } from "@/lib/runtime-config";
-import { phoneNumberSchema } from "@/lib/phone";
+import { isLoginUsername } from "@/lib/login-identity";
 
 function createAuth() {
   return betterAuth({
@@ -16,12 +16,13 @@ function createAuth() {
   emailAndPassword: {
     enabled: true,
     disableSignUp: true,
-    requireEmailVerification: true,
+    requireEmailVerification: false,
+    minPasswordLength: 12,
+    maxPasswordLength: 128,
     revokeSessionsOnPasswordReset: true,
   },
-  // Phone ownership is established only through a superuser-issued invitation.
-  // Public OTP sign-up, phone changes and SMS password reset remain disabled.
-  disabledPaths: ["/phone-number/send-otp", "/phone-number/verify", "/phone-number/request-password-reset", "/phone-number/reset-password"],
+  // Accounts and tenant-scoped login names are assigned by administrators.
+  disabledPaths: ["/sign-in/email", "/sign-up/email", "/update-user", "/is-username-available"],
   session: { additionalFields: { activeOrganizationId: { type: "string", required: false, input: false } } },
   databaseHooks: { user: { update: { after: async (user, context) => {
     // Initial TOTP verification creates a fresh session after this hook. Remove
@@ -39,10 +40,10 @@ function createAuth() {
       mustChangePassword: { type: "boolean", required: false, input: false },
     },
   },
-  plugins: [phoneNumber({
-    requireVerification: true,
-    phoneNumberValidator: number => /^\+[1-9]\d{7,14}$/.test(number) && phoneNumberSchema.safeParse(number).success,
-    sendOTP: async () => { throw new Error("Use a school invitation to activate your phone number."); },
+  plugins: [username({
+    minUsernameLength: 5,
+    maxUsernameLength: 145,
+    usernameValidator: isLoginUsername,
   }), twoFactor({ issuer: "Klassa" })],
   advanced: { useSecureCookies: process.env.NODE_ENV === "production" },
 });

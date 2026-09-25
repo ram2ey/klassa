@@ -93,16 +93,17 @@ describe("SMS invitation lifecycle", () => {
     const invalid = { ...record, expiresAt: condition === "expired" ? new Date(0) : record.expiresAt,
       acceptedAt: condition === "accepted" ? new Date() : null, revokedAt: condition === "revoked" ? new Date() : null };
     mocks.reads.push([invalid]);
-    await expect(acceptSchoolInvitation({ token: newInvitationToken().token, phoneNumber: condition === "phone-mismatch" ? "+3545559999" : phone, name: "New Admin", password: "long-test-password" })).rejects.toThrow("invalid, expired or already used");
+    await expect(acceptSchoolInvitation({ token: newInvitationToken().token, phoneNumber: condition === "phone-mismatch" ? "+3545559999" : phone, name: "New Admin", username: "new.admin", password: "long-test-password" })).rejects.toThrow("invalid, expired or already used");
     expect(mocks.writes).toHaveLength(0);
   });
   it("creates a credential account and membership using only the invitation's role and school", async () => {
-    mocks.reads.push([invitation()], []);
-    await acceptSchoolInvitation({ token: newInvitationToken().token, phoneNumber: phone, name: "New Admin", password: "long-test-password" });
+    mocks.reads.push([invitation()], [], [{ id: org, slug: "northfield" }]);
+    await acceptSchoolInvitation({ token: newInvitationToken().token, phoneNumber: phone, name: "New Admin", username: "new.admin", password: "long-test-password" });
     const account = mocks.writes.find(write => write.table === accounts)!.data;
     expect(account.providerId).toBe("credential"); expect(account.password).not.toBe("long-test-password");
     expect(mocks.writes.find(write => write.table === organizationMemberships)?.data).toMatchObject({ organizationId: org, role: "school_admin" });
     expect(mocks.writes.find(write => write.table === users)?.data.isPlatformAdmin).toBeUndefined();
+    expect(mocks.writes.find(write => write.table === users)?.data.username).toBe("northfield:new.admin");
     expect(mocks.commit).toHaveBeenCalledOnce();
   });
   it("cannot replace an existing account's password with an invitation", async () => {

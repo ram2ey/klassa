@@ -20,9 +20,9 @@ Have the following ready:
    - **Custom public domain** (e.g. `klassa.example.com`) with an `A` or `AAAA` DNS record pointing to your Coolify server.
    - **Coolify generated domain** (if wildcard domains are configured in your Coolify instance).
    - **Free wildcard IP domain (`sslip.io`)** if you do not own a domain yet (e.g. `https://<YOUR_SERVER_IP>.sslip.io:3000`), which requires zero DNS configuration and automatically supports Let's Encrypt SSL.
-4. The phone number, display name, and a new password for the first platform administrator.
+4. The username, display name, and a new password for the first platform administrator.
 
-Use an international E.164 phone number, for example `+3545551234`. The initial password must contain 12–128 characters. Use a unique password; do not reuse a personal password.
+Use a username such as `admin` (3-64 letters, numbers, dots, underscores or hyphens). The initial password must contain 12–128 characters. Use a unique password; do not reuse a personal password.
 
 ## 1. Create the application
 
@@ -96,7 +96,7 @@ Under **Environment Variables**, set the following values.
 ### Initial administrator
 
 ```text
-KLASSO_BOOTSTRAP_PHONE=+3545551234
+KLASSO_BOOTSTRAP_USERNAME=admin
 KLASSO_BOOTSTRAP_NAME=Your Name
 KLASSO_BOOTSTRAP_PASSWORD=<a unique 12–128 character password>
 ```
@@ -156,7 +156,7 @@ A healthy response should include:
 Then verify the user flow:
 
 1. Open `/login`.
-2. Sign in with `KLASSO_BOOTSTRAP_PHONE` and `KLASSO_BOOTSTRAP_PASSWORD`.
+2. Sign in with tenant ID `platform`, `KLASSO_BOOTSTRAP_USERNAME`, and `KLASSO_BOOTSTRAP_PASSWORD`.
 3. Complete authenticator enrollment at `/setup-mfa`.
 4. Store the one-use recovery codes offline.
 5. Open `/platform`.
@@ -164,7 +164,7 @@ Then verify the user flow:
 7. In a private browser session, sign in as that administrator and confirm Klassa requires a new password before authenticator enrollment.
 8. Complete authenticator enrollment, confirm the new administrator can open their school, and create a test staff account from the school workspace.
 
-Share login phone numbers and temporary passwords through a secure, separate channel. Never send them together in ordinary email or store them in tickets. Klassa never displays the temporary password again.
+Share tenant IDs, usernames and temporary passwords through a secure, separate channel. Never send them together in ordinary email or store them in tickets. Klassa never displays the temporary password again.
 
 After this test succeeds, remove the bootstrap variables and redeploy once. Confirm that the migration log says an administrator already exists and that the application remains healthy.
 
@@ -223,7 +223,7 @@ Confirm the domain is assigned to `web`, includes the internal `:3000` target, D
 
 ### A new account cannot sign in
 
-Confirm the login phone uses international E.164 format and that the temporary password was copied exactly. A new account must replace its temporary password before it can enroll an authenticator or access school data. If the phone already belonged to a Klassa user, provisioning adds a school membership and deliberately keeps that user's existing password.
+Confirm the tenant ID and username match the account, and that the password was copied exactly. A new account must replace its temporary password before MFA enrollment or school access. Usernames are unique within a school. Existing installations receive migrated login names as described in the README; passwords remain unchanged.
 
 ## Production-readiness boundary
 

@@ -1,5 +1,5 @@
 "use client";
 import { createAuthClient } from "better-auth/react";
-import { phoneNumberClient, twoFactorClient } from "better-auth/client/plugins";
+import { usernameClient, twoFactorClient } from "better-auth/client/plugins";
 
-export const authClient = createAuthClient({ plugins: [phoneNumberClient(), twoFactorClient()] });
+export const authClient = createAuthClient({ plugins: [usernameClient(), twoFactorClient()] });

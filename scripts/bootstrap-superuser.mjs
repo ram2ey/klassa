@@ -24,7 +24,7 @@ if (!databaseUrl) {
   process.exit(0);
 }
 
-const phone = (process.env.KLASSO_BOOTSTRAP_PHONE ?? "").trim().replace(/[\s().-]/g, "");
+const username = (process.env.KLASSO_BOOTSTRAP_USERNAME ?? "").trim().toLowerCase();
 const name = (process.env.KLASSO_BOOTSTRAP_NAME ?? "").trim();
 const password = process.env.KLASSO_BOOTSTRAP_PASSWORD ?? "";
 
@@ -38,13 +38,13 @@ try {
 
   if (existingAdmins.length > 0) {
     console.log("[bootstrap] A platform administrator already exists; bootstrap skipped.");
-  } else if (!phone && !name && !password) {
+  } else if (!username && !name && !password) {
     console.log("[bootstrap] No platform administrator exists yet.");
-    console.log("[bootstrap] KLASSO_BOOTSTRAP_PHONE / PASSWORD not set in environment. Skipping creation.");
+    console.log("[bootstrap] KLASSO_BOOTSTRAP_USERNAME / PASSWORD not set in environment. Skipping creation.");
     console.log("[bootstrap] You can configure them in Coolify Environment Variables and redeploy anytime to bootstrap an administrator.");
   } else {
-    if (!/^\+[1-9]\d{7,14}$/.test(phone)) {
-      console.warn(`[bootstrap] Warning: KLASSO_BOOTSTRAP_PHONE (${phone}) must be in international E.164 format (e.g. +3545551234). Admin creation skipped.`);
+    if (!/^[a-z0-9][a-z0-9._-]{2,63}$/.test(username)) {
+      console.warn(`[bootstrap] Warning: KLASSO_BOOTSTRAP_USERNAME must contain 3-64 lowercase letters, numbers, dots, underscores or hyphens. Admin creation skipped.`);
     } else if (name.length < 2 || name.length > 180) {
       console.warn("[bootstrap] Warning: KLASSO_BOOTSTRAP_NAME must be between 2 and 180 characters. Admin creation skipped.");
     } else if (password.length < 12 || password.length > 128) {
@@ -58,11 +58,11 @@ try {
       await client.begin(async (sql) => {
         await sql`
           INSERT INTO users (
-            id, name, email, email_verified, phone_number, phone_number_verified,
+            id, name, email, email_verified, username, display_username,
             is_platform_admin, must_change_password
           )
           VALUES (
-            ${userId}, ${name}, ${email}, false, ${phone}, true,
+            ${userId}, ${name}, ${email}, false, ${"platform:" + username}, ${username},
             true, false
           )
         `;
@@ -76,8 +76,8 @@ try {
         `;
       });
 
-      console.log(`[bootstrap] Platform administrator (${name}, ${phone}) created successfully!`);
-      console.log("[bootstrap] Sign in with the configured phone and password, then enroll your authenticator.");
+      console.log(`[bootstrap] Platform administrator (${name}, platform / ${username}) created successfully!`);
+      console.log("[bootstrap] Sign in with the tenant ID platform, configured username and password, then enroll your authenticator.");
     }
   }
 } catch (error) {

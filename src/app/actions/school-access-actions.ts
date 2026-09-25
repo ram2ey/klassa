@@ -9,106 +9,68 @@ import { accounts, organizationMemberships, organizations, sessions, staffRole, 
 import { requireAccount, requireLiveMode, requirePlatformAdmin, requireStaff } from "@/lib/action-access";
 import { logAuditEvent } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
-import { phoneNumberSchema } from "@/lib/phone";
+import { loginUsername, schoolTenantIdSchema, usernameSchema } from "@/lib/login-identity";
 
 const accountSchema = z.object({
   administratorName: z.string().trim().min(2).max(180),
-  administratorPhone: phoneNumberSchema,
+  username: usernameSchema,
   temporaryPassword: z.string().min(12).max(128),
 });
-
 const schoolSchema = z.object({
   name: z.string().trim().min(2).max(180),
-  slug: z.string().trim().regex(/^[a-z0-9]+(?:-[a-z0-9]+)*$/).max(80),
+  slug: schoolTenantIdSchema,
   timezone: z.string().refine(value => { try { new Intl.DateTimeFormat("en", { timeZone: value }); return true; } catch { return false; } }, "Invalid timezone"),
 }).and(accountSchema);
+const schoolStaffSchema = accountSchema.extend({ role: z.enum(staffRole.enumValues) });
+const staffSchema = schoolStaffSchema.extend({ organizationId: z.uuid() });
+type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
+
+async function createStaffAccount(tx: Transaction, school: { id: string; slug: string }, data: z.output<typeof schoolStaffSchema>) {
+  const username = loginUsername(school.slug, data.username);
+  const [existing] = await tx.select({ id: users.id }).from(users).where(eq(users.username, username)).limit(1);
+  if (existing) throw new Error("This username is already in use at this school.");
+  const userId = randomUUID();
+  // Never link accounts by username across schools or change an existing password.
+  // The unique database index also rejects concurrent requests for the same login.
+  await tx.insert(users).values({
+    id: userId, name: data.administratorName, email: userId + "@accounts.klassa.invalid",
+    username, displayUsername: data.username, organizationId: school.id,
+    role: data.role, mustChangePassword: true,
+  });
+  await tx.insert(accounts).values({
+    id: randomUUID(), userId, accountId: userId, providerId: "credential",
+    password: await hashPassword(data.temporaryPassword),
+  });
+  await tx.insert(organizationMemberships).values({ organizationId: school.id, userId, role: data.role });
+  return userId;
+}
 
 export async function createSchoolWithAdminAction(input: z.input<typeof schoolSchema>) {
   const actor = await requirePlatformAdmin();
   const data = schoolSchema.parse(input);
   const result = await db.transaction(async tx => {
-    const [created] = await tx.insert(organizations).values({ name: data.name, slug: data.slug, timezone: data.timezone }).returning();
-    const [existing] = await tx.select().from(users).where(eq(users.phoneNumber, data.administratorPhone)).limit(1);
-    const userId = existing?.id ?? randomUUID();
-
-    if (!existing) {
-      await tx.insert(users).values({
-        id: userId,
-        name: data.administratorName,
-        email: `${userId}@accounts.klassa.invalid`,
-        phoneNumber: data.administratorPhone,
-        phoneNumberVerified: true,
-        organizationId: created.id,
-        role: "school_admin",
-        mustChangePassword: true,
-      });
-      await tx.insert(accounts).values({
-        id: randomUUID(),
-        userId,
-        accountId: userId,
-        providerId: "credential",
-        password: await hashPassword(data.temporaryPassword),
-      });
-    }
-
-    await tx.insert(organizationMemberships).values({ organizationId: created.id, userId, role: "school_admin" });
-    await logAuditEvent({ organizationId: created.id, actorUserId: actor.id, action: "organization.created",
-      entityType: "organization", entityId: created.id, metadata: { initialAdministratorId: userId } }, tx);
-    await logAuditEvent({ organizationId: created.id, actorUserId: actor.id, action: "account.initial_admin_provisioned",
-      entityType: "user", entityId: userId, metadata: { existingAccount: !!existing } }, tx);
-    return { id: created.id, name: created.name, accountCreated: !existing };
+    const [school] = await tx.insert(organizations).values({ name: data.name, slug: data.slug, timezone: data.timezone }).returning();
+    const userId = await createStaffAccount(tx, school, { ...data, role: "school_admin" });
+    await logAuditEvent({ organizationId: school.id, actorUserId: actor.id, action: "organization.created",
+      entityType: "organization", entityId: school.id, metadata: { initialAdministratorId: userId } }, tx);
+    await logAuditEvent({ organizationId: school.id, actorUserId: actor.id, action: "account.initial_admin_provisioned",
+      entityType: "user", entityId: userId, metadata: { existingAccount: false } }, tx);
+    return { id: school.id, name: school.name, accountCreated: true, tenantId: school.slug, username: data.username };
   });
   revalidatePath("/platform");
   return result;
 }
 
-const staffSchema = accountSchema.extend({
-  organizationId: z.uuid(),
-  role: z.enum(staffRole.enumValues),
-});
-
-const schoolStaffSchema = accountSchema.extend({
-  role: z.enum(staffRole.enumValues),
-});
-
 export async function provisionSchoolStaffAction(input: z.input<typeof staffSchema>) {
   const actor = await requirePlatformAdmin();
   const data = staffSchema.parse(input);
   const result = await db.transaction(async tx => {
-    const [school] = await tx.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, data.organizationId)).limit(1);
+    const [school] = await tx.select().from(organizations).where(eq(organizations.id, data.organizationId)).limit(1);
     if (!school) throw new Error("School not found.");
-    const [existing] = await tx.select().from(users).where(eq(users.phoneNumber, data.administratorPhone)).limit(1);
-    const userId = existing?.id ?? randomUUID();
-
-    if (!existing) {
-      await tx.insert(users).values({
-        id: userId,
-        name: data.administratorName,
-        email: `${userId}@accounts.klassa.invalid`,
-        phoneNumber: data.administratorPhone,
-        phoneNumberVerified: true,
-        organizationId: data.organizationId,
-        role: data.role,
-        mustChangePassword: true,
-      });
-      await tx.insert(accounts).values({
-        id: randomUUID(),
-        userId,
-        accountId: userId,
-        providerId: "credential",
-        password: await hashPassword(data.temporaryPassword),
-      });
-    }
-
-    const [membership] = await tx.insert(organizationMemberships).values({
-      organizationId: data.organizationId,
-      userId,
-      role: data.role,
-    }).onConflictDoNothing({ target: [organizationMemberships.organizationId, organizationMemberships.userId] }).returning({ id: organizationMemberships.id });
-    if (!membership) throw new Error("This account already belongs to that school.");
-    await logAuditEvent({ organizationId: data.organizationId, actorUserId: actor.id, action: "account.staff_provisioned",
-      entityType: "user", entityId: userId, metadata: { role: data.role, existingAccount: !!existing } }, tx);
-    return { accountCreated: !existing };
+    const userId = await createStaffAccount(tx, school, data);
+    await logAuditEvent({ organizationId: school.id, actorUserId: actor.id, action: "account.staff_provisioned",
+      entityType: "user", entityId: userId, metadata: { role: data.role, existingAccount: false } }, tx);
+    return { accountCreated: true, tenantId: school.slug, username: data.username };
   });
   revalidatePath("/platform");
   return result;
@@ -118,44 +80,12 @@ export async function provisionStaffForCurrentSchoolAction(input: z.input<typeof
   const actor = await requireStaff(["school_admin"]);
   const data = schoolStaffSchema.parse(input);
   const result = await db.transaction(async tx => {
-    const [existing] = await tx.select().from(users).where(eq(users.phoneNumber, data.administratorPhone)).limit(1);
-    const userId = existing?.id ?? randomUUID();
-
-    if (!existing) {
-      await tx.insert(users).values({
-        id: userId,
-        name: data.administratorName,
-        email: `${userId}@accounts.klassa.invalid`,
-        phoneNumber: data.administratorPhone,
-        phoneNumberVerified: true,
-        organizationId: actor.organizationId,
-        role: data.role,
-        mustChangePassword: true,
-      });
-      await tx.insert(accounts).values({
-        id: randomUUID(),
-        userId,
-        accountId: userId,
-        providerId: "credential",
-        password: await hashPassword(data.temporaryPassword),
-      });
-    }
-
-    const [membership] = await tx.insert(organizationMemberships).values({
-      organizationId: actor.organizationId,
-      userId,
-      role: data.role,
-    }).onConflictDoNothing({ target: [organizationMemberships.organizationId, organizationMemberships.userId] }).returning({ id: organizationMemberships.id });
-    if (!membership) throw new Error("This account already belongs to your school.");
-    await logAuditEvent({
-      organizationId: actor.organizationId,
-      actorUserId: actor.userId,
-      action: "account.staff_provisioned",
-      entityType: "user",
-      entityId: userId,
-      metadata: { role: data.role, existingAccount: !!existing, provisionedBy: "school_admin" },
-    }, tx);
-    return { accountCreated: !existing };
+    const [school] = await tx.select().from(organizations).where(eq(organizations.id, actor.organizationId)).limit(1);
+    if (!school) throw new Error("School not found.");
+    const userId = await createStaffAccount(tx, school, data);
+    await logAuditEvent({ organizationId: school.id, actorUserId: actor.userId, action: "account.staff_provisioned",
+      entityType: "user", entityId: userId, metadata: { role: data.role, existingAccount: false, provisionedBy: "school_admin" } }, tx);
+    return { accountCreated: true, tenantId: school.slug, username: data.username };
   });
   revalidatePath("/");
   return result;

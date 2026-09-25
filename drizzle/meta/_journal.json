@@ -64,6 +64,13 @@
       "when": 1790075064679,
       "tag": "0008_boring_gladiator",
       "breakpoints": true
+    },
+    {
+      "idx": 9,
+      "version": "7",
+      "when": 1790292079519,
+      "tag": "0009_tenant_usernames",
+      "breakpoints": true
     }
   ]
 }

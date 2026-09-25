@@ -44,6 +44,8 @@ export const users = pgTable("users", {
   name: text("name").notNull(),
   email: text("email").notNull(),
   emailVerified: boolean("email_verified").default(false).notNull(),
+  username: varchar("username", { length: 145 }),
+  displayUsername: varchar("display_username", { length: 64 }),
   phoneNumber: varchar("phone_number", { length: 16 }),
   phoneNumberVerified: boolean("phone_number_verified").default(false).notNull(),
   isPlatformAdmin: boolean("is_platform_admin").default(false).notNull(),
@@ -54,7 +56,7 @@ export const users = pgTable("users", {
   role: staffRole("role"),
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
   updatedAt: timestamp("updated_at", { withTimezone: true }).defaultNow().notNull(),
-}, (table) => [uniqueIndex("users_email_unique").on(table.email), uniqueIndex("users_phone_unique").on(table.phoneNumber), index("users_organization_idx").on(table.organizationId)]);
+}, (table) => [uniqueIndex("users_username_unique").on(table.username), uniqueIndex("users_email_unique").on(table.email), uniqueIndex("users_phone_unique").on(table.phoneNumber), index("users_organization_idx").on(table.organizationId)]);
 
 export const sessions = pgTable("sessions", {
   id: text("id").primaryKey(),

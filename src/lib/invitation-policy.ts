@@ -1,12 +1,14 @@
 import { createHash, randomBytes } from "node:crypto";
 import { z } from "zod";
 import { phoneNumberSchema } from "@/lib/phone";
+import { usernameSchema } from "@/lib/login-identity";
 
 export const invitationTokenSchema = z.string().regex(/^[A-Za-z0-9_-]{43}$/, "Invalid invitation.");
 export const invitationAcceptanceSchema = z.object({
   token: invitationTokenSchema,
   phoneNumber: phoneNumberSchema,
   name: z.string().trim().min(2).max(180),
+  username: usernameSchema.optional(),
   password: z.string().min(12, "Use at least 12 characters.").max(128).optional(),
 });
 export const INVITATION_LIFETIME_MS = 48 * 60 * 60 * 1000;

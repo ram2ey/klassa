@@ -11,6 +11,7 @@ import { getAuth } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
 import { getSmsProvider } from "@/lib/sms";
 import { maskPhoneNumber, phoneNumberSchema } from "@/lib/phone";
+import { loginUsername } from "@/lib/login-identity";
 import { hashInvitationToken, invitationAcceptanceSchema, invitationTokenSchema, invitationUrl, INVITATION_LIFETIME_MS,
   InvitationError, isInvitationActive, newInvitationToken } from "@/lib/invitation-policy";
 
@@ -111,6 +112,7 @@ export async function acceptSchoolInvitation(raw: z.input<typeof invitationAccep
     }
     const [existing] = await tx.select().from(users).where(eq(users.phoneNumber, invitation.phoneNumber)).limit(1);
     let userId: string;
+    let username = existing?.username ?? null;
     if (existing) {
       if (signedIn?.user.id !== existing.id || !existing.phoneNumberVerified) {
         throw new InvitationError("This phone number already has an account. Sign in to that account first, then reopen the invitation link.");
@@ -119,10 +121,15 @@ export async function acceptSchoolInvitation(raw: z.input<typeof invitationAccep
     } else {
       if (signedIn) throw new InvitationError("Sign out before activating an invitation for a different phone number.");
       if (!input.password) throw new InvitationError("Choose a password of at least 12 characters.");
+      if (!input.username) throw new InvitationError("Choose a username for your school account.");
+      const [school] = await tx.select().from(organizations).where(eq(organizations.id, invitation.organizationId)).limit(1);
+      if (!school) throw new InvitationError("School not found.");
+      username = loginUsername(school.slug, input.username);
       userId = randomUUID();
       await tx.insert(users).values({ id: userId, name: input.name,
         // Better Auth requires an email column; this is an internal identifier, never a mailbox or login credential.
         email: `${userId}@accounts.klasso.invalid`, emailVerified: false,
+        username, displayUsername: input.username,
         phoneNumber: invitation.phoneNumber, phoneNumberVerified: true,
         organizationId: invitation.organizationId, role: invitation.role,
       });
@@ -133,7 +140,7 @@ export async function acceptSchoolInvitation(raw: z.input<typeof invitationAccep
     await tx.update(smsInvitations).set({ acceptedAt: new Date(), acceptedBy: userId, updatedAt: new Date() }).where(eq(smsInvitations.id, invitation.id));
     await logAuditEvent({ organizationId: invitation.organizationId, actorUserId: userId, action: "invitation.accepted",
       entityType: "sms_invitation", entityId: invitation.id, metadata: { role: invitation.role } }, tx);
-    return { existingAccount: !!existing };
+    return { existingAccount: !!existing, username };
   });
 }
 
@@ -149,7 +156,7 @@ export async function getPlatformInvitationData() {
       lastSentAt: smsInvitations.lastSentAt }).from(smsInvitations).orderBy(desc(smsInvitations.createdAt)).limit(200),
     db.select({ id: organizationMemberships.id, organizationId: organizationMemberships.organizationId,
       userId: organizationMemberships.userId, role: organizationMemberships.role, joinedAt: organizationMemberships.createdAt,
-      name: users.name, phoneNumber: users.phoneNumber, phoneNumberVerified: users.phoneNumberVerified,
+      name: users.name, username: users.username, phoneNumber: users.phoneNumber, phoneNumberVerified: users.phoneNumberVerified,
       twoFactorEnabled: users.twoFactorEnabled, mustChangePassword: users.mustChangePassword }).from(organizationMemberships)
       .innerJoin(users, eq(organizationMemberships.userId, users.id)).orderBy(users.name),
     db.select({ userId: sessions.userId, expiresAt: sessions.expiresAt }).from(sessions)
@@ -176,12 +183,12 @@ export async function getPlatformInvitationData() {
 
 export async function inspectSchoolInvitation(token: string) {
   requireLiveMode(); invitationTokenSchema.parse(token);
-  const [record] = await db.select({ invitation: smsInvitations, schoolName: organizations.name }).from(smsInvitations)
+  const [record] = await db.select({ invitation: smsInvitations, schoolName: organizations.name, tenantId: organizations.slug }).from(smsInvitations)
     .innerJoin(organizations, eq(organizations.id, smsInvitations.organizationId))
     .where(eq(smsInvitations.tokenHash, hashInvitationToken(token))).limit(1);
   if (!record || !isInvitationActive(record.invitation)) throw new InvitationError("Invitation expired, revoked or already used. Ask your administrator for a new link.");
   const [account] = await db.select({ id: users.id }).from(users).where(eq(users.phoneNumber, record.invitation.phoneNumber)).limit(1);
   const session = await getAuth().api.getSession({ headers: await headers() });
-  return { schoolName: record.schoolName, role: record.invitation.role, phoneHint: maskPhoneNumber(record.invitation.phoneNumber),
+  return { schoolName: record.schoolName, tenantId: record.tenantId, role: record.invitation.role, phoneHint: maskPhoneNumber(record.invitation.phoneNumber),
     mode: account ? (session?.user.id === account.id ? "existing" as const : "sign-in" as const) : "new" as const };
 }
