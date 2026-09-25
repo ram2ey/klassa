@@ -157,13 +157,16 @@ export async function getPlatformInvitationData() {
     db.select({ id: organizationMemberships.id, organizationId: organizationMemberships.organizationId,
       userId: organizationMemberships.userId, role: organizationMemberships.role, joinedAt: organizationMemberships.createdAt,
       name: users.name, username: users.username, isPlatformAdmin: users.isPlatformAdmin, phoneNumber: users.phoneNumber, phoneNumberVerified: users.phoneNumberVerified,
-      twoFactorEnabled: users.twoFactorEnabled, mustChangePassword: users.mustChangePassword, suspendedAt: users.suspendedAt }).from(organizationMemberships)
+      twoFactorEnabled: users.twoFactorEnabled, mustChangePassword: users.mustChangePassword, suspendedAt: users.suspendedAt,
+      lastSignedInAt: users.lastSignedInAt, createdAt: users.createdAt, updatedAt: users.updatedAt,
+      membershipUpdatedAt: organizationMemberships.updatedAt, accessReviewedAt: users.accessReviewedAt,
+      accessReviewDecision: users.accessReviewDecision, accessReviewedBy: users.accessReviewedBy }).from(organizationMemberships)
       .innerJoin(users, eq(organizationMemberships.userId, users.id)).orderBy(users.name),
     db.select({ userId: sessions.userId, expiresAt: sessions.expiresAt }).from(sessions)
       .where(sql`${sessions.expiresAt} > now()`),
     db.select({ id: auditEvents.id, organizationId: auditEvents.organizationId, schoolName: organizations.name,
       actorName: users.name, action: auditEvents.action, entityType: auditEvents.entityType,
-      entityId: auditEvents.entityId, createdAt: auditEvents.createdAt }).from(auditEvents)
+      entityId: auditEvents.entityId, metadata: auditEvents.metadata, createdAt: auditEvents.createdAt }).from(auditEvents)
       .leftJoin(organizations, eq(auditEvents.organizationId, organizations.id))
       .leftJoin(users, eq(auditEvents.actorUserId, users.id)).orderBy(desc(auditEvents.createdAt)).limit(80),
     db.select({ id: rateLimitLogs.id, organizationId: rateLimitLogs.organizationId, tier: rateLimitLogs.tier,

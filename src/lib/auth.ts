@@ -40,6 +40,15 @@ function createAuth() {
     if (!user || user.suspendedAt || await isSchoolSuspendedForUser(user)) {
       throw new APIError("FORBIDDEN", { message: "This account is suspended." });
     }
+  }, after: async (session, context) => {
+    // MFA sign-in first creates a temporary session that the plugin immediately deletes.
+    // Record the final session created after the authenticator challenge instead.
+    if (context?.path === "/sign-in/username") {
+      const [user] = await db.select({ twoFactorEnabled: users.twoFactorEnabled }).from(users)
+        .where(eq(users.id, session.userId)).limit(1);
+      if (user?.twoFactorEnabled) return;
+    }
+    await db.update(users).set({ lastSignedInAt: session.createdAt }).where(eq(users.id, session.userId));
   } } }, user: { update: { after: async (user, context) => {
     // Initial TOTP verification creates a fresh session after this hook. Remove
     // every pre-enrollment session so none gains access merely when MFA becomes enabled.

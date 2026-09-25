@@ -43,6 +43,7 @@ const auditProjection = {
   action: auditEvents.action,
   entityType: auditEvents.entityType,
   entityId: auditEvents.entityId,
+  metadata: auditEvents.metadata,
   createdAt: auditEvents.createdAt,
 };
 
@@ -78,9 +79,9 @@ export async function exportPlatformAuditAction(input: Omit<z.input<typeof audit
     .orderBy(desc(auditEvents.createdAt), desc(auditEvents.id)).limit(10_001);
   const truncated = rows.length > 10_000;
   const exportedRows = rows.slice(0, 10_000);
-  const header = ["Event", "Actor", "Scope", "Resource type", "Resource ID", "Timestamp"];
+  const header = ["Event", "Actor", "Scope", "Resource type", "Resource ID", "Details", "Timestamp"];
   const lines = [header, ...exportedRows.map(row => [
-    row.action, row.actorName, row.schoolName ?? "Platform", row.entityType, row.entityId, row.createdAt.toISOString(),
+    row.action, row.actorName, row.schoolName ?? "Platform", row.entityType, row.entityId, JSON.stringify(row.metadata), row.createdAt.toISOString(),
   ])].map(columns => columns.map(csvCell).join(","));
   return { csv: lines.join("\r\n"), rowCount: exportedRows.length, truncated };
 }

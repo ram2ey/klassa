@@ -10,7 +10,10 @@ vi.mock("better-auth/adapters/drizzle", async () => {
 });
 vi.mock("@/db", async () => {
   const { getTableName } = await import("drizzle-orm");
-  return { db: { select: () => ({ from: (table: Parameters<typeof getTableName>[0]) => ({ where: () => {
+  return { db: { update: () => ({ set: (values: Record<string, unknown>) => ({ where: async () => {
+    const user = state.data.user?.find(row => row.username === state.signInUsername);
+    if (user) Object.assign(user, values);
+  } }) }), select: () => ({ from: (table: Parameters<typeof getTableName>[0]) => ({ where: () => {
     const user = state.data.user?.find(row => row.username === state.signInUsername);
     const rows = getTableName(table) === "users" ? (user ? [user] : [])
       : getTableName(table) === "organizations" ? state.data.organization.filter(row => row.id === user?.organizationId)
@@ -59,6 +62,7 @@ describe("tenant username authentication", () => {
     const data = await response.json();
     expect(data.user.id).toBe("user-0");
     expect(data.user.mustChangePassword).toBe(true);
+    expect(state.data.user[0].lastSignedInAt).toBeInstanceOf(Date);
   });
 
   it("requires MFA for platform administrators and leaves no authenticated session", async () => {
@@ -68,6 +72,7 @@ describe("tenant username authentication", () => {
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ twoFactorRedirect: true });
     expect(state.data.session).toHaveLength(0);
+    expect(state.data.user[2].lastSignedInAt).toBeUndefined();
   });
 
   it("lets a newly provisioned platform administrator sign in to set up MFA", async () => {
@@ -87,6 +92,7 @@ describe("tenant username authentication", () => {
     });
     expect(response.status).toBe(403);
     expect(state.data.session).toHaveLength(0);
+    expect(state.data.user[2].lastSignedInAt).toBeUndefined();
   });
 
   it("signs school staff in without MFA and blocks authenticator enrollment", async () => {

@@ -1,5 +1,5 @@
 import {
-  bigint, boolean, date, index, integer, jsonb, numeric, pgEnum, pgTable, text,
+  type AnyPgColumn, bigint, boolean, date, index, integer, jsonb, numeric, pgEnum, pgTable, text,
   primaryKey, timestamp, uniqueIndex, uuid, varchar,
 } from "drizzle-orm/pg-core";
 import { isNull } from "drizzle-orm";
@@ -55,6 +55,10 @@ export const users = pgTable("users", {
   isPlatformAdmin: boolean("is_platform_admin").default(false).notNull(),
   mustChangePassword: boolean("must_change_password").default(false).notNull(),
   suspendedAt: timestamp("suspended_at", { withTimezone: true }),
+  lastSignedInAt: timestamp("last_signed_in_at", { withTimezone: true }),
+  accessReviewedAt: timestamp("access_reviewed_at", { withTimezone: true }),
+  accessReviewDecision: varchar("access_review_decision", { length: 20 }),
+  accessReviewedBy: text("access_reviewed_by").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
   image: text("image"),
   twoFactorEnabled: boolean("two_factor_enabled").default(false),
   organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "restrict" }),
