@@ -1,6 +1,6 @@
 "use server";
 
-import { and, asc, count, desc, eq, gte, ilike, lt, or } from "drizzle-orm";
+import { and, count, desc, eq, gte, ilike, lt, or } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
 import { auditEvents, organizations, users } from "@/db/schema";
@@ -50,7 +50,7 @@ export async function getPlatformAuditPageAction(input: z.input<typeof auditFilt
   await requirePlatformAdmin();
   const parsed = auditFilterSchema.parse(input);
   const where = filtersFor(parsed);
-  const [{ total = 0 } = { total: 0 }, rows] = await Promise.all([
+  const [totals, rows] = await Promise.all([
     db.select({ total: count() }).from(auditEvents)
       .innerJoin(organizations, eq(auditEvents.organizationId, organizations.id))
       .leftJoin(users, eq(auditEvents.actorUserId, users.id)).where(where),
@@ -59,6 +59,7 @@ export async function getPlatformAuditPageAction(input: z.input<typeof auditFilt
       .leftJoin(users, eq(auditEvents.actorUserId, users.id)).where(where)
       .orderBy(desc(auditEvents.createdAt), desc(auditEvents.id)).limit(25).offset((parsed.page - 1) * 25),
   ]);
+  const total = totals[0]?.total ?? 0;
   return { rows, total, page: parsed.page, pageSize: 25, pageCount: Math.ceil(total / 25) };
 }
 
