@@ -35,10 +35,17 @@ describe("server action authorization", () => {
     mocks.user.mockResolvedValue([{ id: "teacher", organizationId: "school-a", role: "teacher", twoFactorEnabled: true }]);
     await expect(requireStaff(["school_admin"])).rejects.toThrow("Access denied");
   });
-  it("requires MFA and school membership", async () => {
+  it("allows school staff without MFA when their membership is valid", async () => {
     mocks.session.mockResolvedValue({ user: { id: "admin" } });
-    mocks.user.mockResolvedValue([{ id: "admin", organizationId: "school-a", role: "school_admin", twoFactorEnabled: false }]);
+    mocks.user.mockResolvedValueOnce([{ id: "admin", organizationId: "school-a", role: "school_admin", twoFactorEnabled: false, isPlatformAdmin: false }])
+      .mockResolvedValueOnce([{ role: "school_admin" }]);
+    await expect(requireStaff(["school_admin"])).resolves.toMatchObject({ userId: "admin", organizationId: "school-a" });
+  });
+  it("requires MFA for platform administrators and membership for school access", async () => {
+    mocks.session.mockResolvedValue({ user: { id: "admin" } });
+    mocks.user.mockResolvedValue([{ id: "admin", organizationId: "school-a", role: "school_admin", twoFactorEnabled: false, isPlatformAdmin: true }]);
     await expect(requireStaff(["school_admin"])).rejects.toThrow("two-factor");
+    await expect(requirePlatformAdmin()).rejects.toThrow("two-factor");
     mocks.user.mockResolvedValue([{ id: "admin", organizationId: null, role: "school_admin", twoFactorEnabled: true }]);
     await expect(requireStaff(["school_admin"])).rejects.toThrow("Access denied");
   });

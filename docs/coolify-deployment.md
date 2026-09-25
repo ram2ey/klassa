@@ -161,8 +161,8 @@ Then verify the user flow:
 4. Store the one-use recovery codes offline.
 5. Open `/platform`.
 6. Create a school, its initial administrator, and a temporary password.
-7. In a private browser session, sign in as that administrator and confirm Klassa requires a new password before authenticator enrollment.
-8. Complete authenticator enrollment, confirm the new administrator can open their school, and create a test staff account from the school workspace.
+7. In a private browser session, sign in as that administrator and confirm Klassa requires a new password before school access.
+8. Confirm the school administrator can open their school without an authenticator, and create a test staff account from the school workspace.
 
 Share tenant IDs, usernames and temporary passwords through a secure, separate channel. Never send them together in ordinary email or store them in tickets. Klassa never displays the temporary password again.
 
@@ -223,7 +223,7 @@ Confirm the domain is assigned to `web`, includes the internal `:3000` target, D
 
 ### A new account cannot sign in
 
-Confirm the tenant ID and username match the account, and that the password was copied exactly. A new account must replace its temporary password before MFA enrollment or school access. Usernames are unique within a school. Existing installations receive migrated login names as described in the README; passwords remain unchanged.
+Confirm the tenant ID and username match the account, and that the password was copied exactly. A new account must replace its temporary password before school access. Usernames are unique within a school. Existing installations receive migrated login names as described in the README; passwords remain unchanged.
 
 ## Production-readiness boundary
 

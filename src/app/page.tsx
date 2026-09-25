@@ -17,7 +17,7 @@ export default async function Home() {
   const session = await getAuth().api.getSession({ headers: await headers() });
   if (!session) redirect("/login");
   if (session.user.mustChangePassword) redirect("/change-password");
-  if (!session.user.twoFactorEnabled) redirect("/setup-mfa");
+  if (session.user.isPlatformAdmin && !session.user.twoFactorEnabled) redirect("/setup-mfa");
   if (session.user.isPlatformAdmin) redirect("/platform");
   if (!session.session.activeOrganizationId && !session.user.organizationId) redirect("/schools");
   const actor = await requireStaff(["school_admin", "office_staff", "teacher", "safeguarding_lead", "senco", "health_nurse"]);

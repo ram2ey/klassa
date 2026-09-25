@@ -147,7 +147,7 @@ export async function acceptSchoolInvitation(raw: z.input<typeof invitationAccep
 export async function getPlatformInvitationData() {
   await requirePlatformAdmin();
   const loadedAt = Date.now();
-  const [schools, invitations, memberships, activeSessions, audit, securityEvents] = await Promise.all([
+  const [schools, invitations, memberships, activeSessions, audit, securityEvents, platformAdmins] = await Promise.all([
     db.select({ id: organizations.id, name: organizations.name, slug: organizations.slug, timezone: organizations.timezone,
       createdAt: organizations.createdAt }).from(organizations).orderBy(organizations.name),
     db.select({ id: smsInvitations.id, organizationId: smsInvitations.organizationId,
@@ -156,7 +156,7 @@ export async function getPlatformInvitationData() {
       lastSentAt: smsInvitations.lastSentAt }).from(smsInvitations).orderBy(desc(smsInvitations.createdAt)).limit(200),
     db.select({ id: organizationMemberships.id, organizationId: organizationMemberships.organizationId,
       userId: organizationMemberships.userId, role: organizationMemberships.role, joinedAt: organizationMemberships.createdAt,
-      name: users.name, username: users.username, phoneNumber: users.phoneNumber, phoneNumberVerified: users.phoneNumberVerified,
+      name: users.name, username: users.username, isPlatformAdmin: users.isPlatformAdmin, phoneNumber: users.phoneNumber, phoneNumberVerified: users.phoneNumberVerified,
       twoFactorEnabled: users.twoFactorEnabled, mustChangePassword: users.mustChangePassword }).from(organizationMemberships)
       .innerJoin(users, eq(organizationMemberships.userId, users.id)).orderBy(users.name),
     db.select({ userId: sessions.userId, expiresAt: sessions.expiresAt }).from(sessions)
@@ -169,6 +169,7 @@ export async function getPlatformInvitationData() {
     db.select({ id: rateLimitLogs.id, organizationId: rateLimitLogs.organizationId, tier: rateLimitLogs.tier,
       endpoint: rateLimitLogs.endpoint, requestCount: rateLimitLogs.requestCount, limit: rateLimitLogs.limit,
       blockedAt: rateLimitLogs.blockedAt }).from(rateLimitLogs).orderBy(desc(rateLimitLogs.blockedAt)).limit(50),
+    db.select({ id: users.id, twoFactorEnabled: users.twoFactorEnabled }).from(users).where(eq(users.isPlatformAdmin, true)),
   ]);
   const sessionUserIds = new Set(activeSessions.map(session => session.userId));
   return {
@@ -177,6 +178,7 @@ export async function getPlatformInvitationData() {
     memberships: memberships.map(membership => ({ ...membership, hasActiveSession: sessionUserIds.has(membership.userId) })),
     audit,
     securityEvents,
+    platformAdmins,
     loadedAt,
   };
 }

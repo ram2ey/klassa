@@ -1,4 +1,5 @@
 import { betterAuth } from "better-auth";
+import { APIError, createAuthMiddleware, getSessionFromCtx } from "better-auth/api";
 import { drizzleAdapter } from "better-auth/adapters/drizzle";
 import { username, twoFactor } from "better-auth/plugins";
 import { db } from "@/db";
@@ -23,6 +24,13 @@ function createAuth() {
   },
   // Accounts and tenant-scoped login names are assigned by administrators.
   disabledPaths: ["/sign-in/email", "/sign-up/email", "/update-user", "/is-username-available"],
+  hooks: { before: createAuthMiddleware(async context => {
+    if (!context.path.startsWith("/two-factor/")) return;
+    const session = await getSessionFromCtx(context);
+    if (session && session.user.isPlatformAdmin !== true) {
+      throw new APIError("FORBIDDEN", { message: "Authenticator access is reserved for platform administrators." });
+    }
+  }) },
   session: { additionalFields: { activeOrganizationId: { type: "string", required: false, input: false } } },
   databaseHooks: { user: { update: { after: async (user, context) => {
     // Initial TOTP verification creates a fresh session after this hook. Remove

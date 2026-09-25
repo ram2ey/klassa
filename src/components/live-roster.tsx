@@ -58,7 +58,7 @@ export function LiveRoster({ students, canManageStaff }: { students: Awaited<Ret
       </form>
     </section>
     {canManageStaff && <section className="rounded border border-slate-200 bg-white p-5"><h2 className="font-bold">Create a staff account</h2>
-      <p className="mt-1 text-sm text-slate-600">Assign access to this school directly. New staff must replace the temporary password and configure MFA before accessing school data.</p>
+      <p className="mt-1 text-sm text-slate-600">Assign access to this school directly. New staff must replace the temporary password before accessing school data.</p>
       <form className="mt-4 grid gap-3 sm:grid-cols-2" onSubmit={event => {
         event.preventDefault(); const form = event.currentTarget; const data = new FormData(form);
         run(async () => {

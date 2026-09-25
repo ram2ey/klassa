@@ -10,6 +10,6 @@ export const metadata: Metadata = { title: "Change temporary password · Klassa"
 export default async function ChangePasswordPage() {
   const session = await getAuth().api.getSession({ headers: await headers() });
   if (!session) redirect("/login");
-  if (!session.user.mustChangePassword) redirect(session.user.twoFactorEnabled ? "/" : "/setup-mfa");
+  if (!session.user.mustChangePassword) redirect("/");
   return <ChangeTemporaryPassword />;
 }

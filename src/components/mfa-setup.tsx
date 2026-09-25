@@ -12,7 +12,7 @@ export function MfaSetup() {
   const router = useRouter();
   return <main className="mx-auto max-w-lg space-y-5 p-6 text-slate-900">
     <header className="flex items-center justify-between gap-3"><h1 className="text-xl font-bold">Secure your account</h1><AccountSignOut /></header>
-    <p className="text-sm text-slate-600">Add Klassa to your authenticator app. School records remain locked until you verify the first code.</p>
+    <p className="text-sm text-slate-600">Add Klassa to your authenticator app. Platform administration remains locked until you verify the first code.</p>
     <form className="space-y-4 rounded border border-slate-200 bg-white p-5" onSubmit={async event => {
       event.preventDefault(); setPending(true); setError("");
       const data = new FormData(event.currentTarget);

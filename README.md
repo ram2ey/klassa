@@ -9,13 +9,13 @@ Klassa is a secure K–12 school administration system. Phase 1 establishes the 
 3. Run `npm run db:migrate`. Use `npm run db:generate` only after intentionally changing the schema.
 4. Start Klassa with `npm run dev`.
 
-The UI currently uses representative local records so the design and workflows can be reviewed before production data is connected. Better Auth is mounted at `/api/auth/[...all]`; public registration is disabled and staff MFA is provided through the TOTP plugin.
+The UI currently uses representative local records so the design and workflows can be reviewed before production data is connected. Better Auth is mounted at `/api/auth/[...all]`; public registration is disabled and platform administrator MFA is provided through the TOTP plugin.
 
 ### Preview and live boundaries
 
 For the synthetic local preview, set `KLASSO_DEMO_MODE=true` in `.env.local` and run `npm run dev`. Demo actions never write to PostgreSQL. Preview changes remain temporary and are shared by visitors to that local server; use synthetic information only. Roster changes are loaded from the server on refresh, but restarting the server resets the demo.
 
-Demo mode is rejected in production. With demo mode disabled, the home page requires an existing staff account, school membership and enabled MFA. Live roster reads, student enrollment and status updates use PostgreSQL and enforce the authenticated organization. Enrollment requires an existing class/grade in the school's current academic year. Mutations and their audit entries commit atomically. Database errors are never converted into successful demo writes.
+Demo mode is rejected in production. With demo mode disabled, the home page requires an existing staff account and school membership. Platform administrators also need enabled MFA. Live roster reads, student enrollment and status updates use PostgreSQL and enforce the authenticated organization. Enrollment requires an existing class/grade in the school's current academic year. Mutations and their audit entries commit atomically. Database errors are never converted into successful demo writes.
 
 Attendance, assessments, communications, sensitive cases, GDPR workflows and the old school-provisioning preview remain local demonstrations. Their server actions reject live requests, including requests from administrators. Anonymization is unavailable even in the preview: it cannot yet erase all related records and must not mark requests complete. Emergency approvals are simulations; class/grade SMS audiences are unavailable, and scheduled previews do not dispatch automatically. SMS simulations have zero cost and are not marked delivered.
 
@@ -55,7 +55,7 @@ Follow the complete [Coolify deployment guide](docs/coolify-deployment.md). For 
 3. In a trusted administration shell, set `KLASSO_BOOTSTRAP_USERNAME` (for example, `admin`), `KLASSO_BOOTSTRAP_NAME`, and `KLASSO_BOOTSTRAP_PASSWORD` (12–128 characters). Run `npm run admin:bootstrap`. Clear the bootstrap variables afterward.
 4. Sign in at `/login` and complete authenticator enrollment at `/setup-mfa`. Save the one-use recovery codes offline.
 5. Open `/platform`. Create each school together with its initial administrator, username, and a unique temporary password. Platform administrators can add more staff there; after setup, each school administrator can also create staff accounts directly inside their own school.
-6. Share the tenant ID, username and temporary password through a secure channel. On first sign-in, the account must replace the temporary password before MFA enrollment or school access.
+6. Share the tenant ID, username and temporary password through a secure channel. On first sign-in, the account must replace the temporary password before school access.
 
 Tenant IDs are school slugs, and `platform` is reserved for platform administrators. Usernames are case insensitive and unique within a tenant. A duplicate username in the same school is rejected; the same username in another school creates a separate account. Existing users with several memberships can still choose a school at `/schools`.
 
@@ -66,3 +66,5 @@ The platform role is separate from school roles and is checked from the database
 Deploy migration `0009_tenant_usernames` before starting the updated application. It keeps existing passwords, MFA secrets, recovery codes, and memberships. The earliest platform administrator receives tenant ID `platform` and username `admin`; additional platform administrators receive `admin-2`, `admin-3`, and so on. Existing school staff receive `staff-N` usernames, visible alongside their login tenant in **Users & access**. Distribute those login details before staff sign in again. Accounts without a school membership or primary school need administrator provisioning. A school slug named `platform` must be renamed before migration.
 
 For new deployments use `KLASSO_BOOTSTRAP_USERNAME` instead of `KLASSO_BOOTSTRAP_PHONE`. An existing administrator is not recreated by bootstrap; use the migrated username and existing password.
+
+Authenticator MFA is required only for platform administrators. Migration `0010_platform_admin_mfa` disables previously enrolled MFA for school accounts while retaining platform administrator enrollment. School administrators and all other staff use tenant ID, username and password; temporary password changes still apply.

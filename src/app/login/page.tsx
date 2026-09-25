@@ -47,7 +47,7 @@ export default function Login() {
       {twoFactor && <Button type="button" variant="ghost" disabled={pending} onClick={() => { setError(""); setUseRecoveryCode(!useRecoveryCode); }}>
         {useRecoveryCode ? "Use authenticator" : "Use a recovery code"}
       </Button>}
-      <p className="text-xs text-slate-600">Use the tenant ID, username and password supplied by your administrator. Platform administrators use tenant ID platform. New staff must change their temporary password and set up an authenticator. Contact your administrator if you need help signing in.</p>
+      <p className="text-xs text-slate-600">Use the tenant ID, username and password supplied by your administrator. Platform administrators use tenant ID platform. New staff must change their temporary password. Only platform administrators use an authenticator. Contact your administrator if you need help signing in.</p>
     </form>
   </main>;
 }

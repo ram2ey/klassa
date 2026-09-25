@@ -14,8 +14,8 @@ export default async function PlatformPage() {
   const session = await getAuth().api.getSession({ headers: await headers() });
   if (!session) redirect("/login");
   if (session.user.mustChangePassword) redirect("/change-password");
-  if (!session.user.twoFactorEnabled) redirect("/setup-mfa");
   if (!session.user.isPlatformAdmin) return <main className="p-6">Platform administrator access required.</main>;
+  if (!session.user.twoFactorEnabled) redirect("/setup-mfa");
   const data = await getPlatformInvitationData();
   return <PlatformInvitations data={data} health={await getLiveSystemHealthReport()} />;
 }

@@ -8,13 +8,13 @@ import { and, eq } from "drizzle-orm";
 export type StaffRole = typeof users.$inferSelect.role;
 
 /** Identity is fetched from the database, never accepted from action arguments. */
-export async function requireAccount(requireMfa = true) {
+export async function requireAccount() {
   const session = await getAuth().api.getSession({ headers: await headers() });
   if (!session) throw new Error("Authentication required.");
   const [user] = await db.select().from(users).where(eq(users.id, session.user.id)).limit(1);
   if (!user) throw new Error("Access denied.");
   if (user.mustChangePassword) throw new Error("Password change required before accessing school data.");
-  if (requireMfa && !user.twoFactorEnabled) throw new Error("Staff two-factor authentication is required.");
+  if (user.isPlatformAdmin && !user.twoFactorEnabled) throw new Error("Platform administrator two-factor authentication is required.");
   return { session, user };
 }
 

@@ -34,7 +34,7 @@ export function AcceptInvitation() {
       <div className="rounded border border-slate-200 bg-white p-4"><h2 className="font-bold">{invitation.schoolName}</h2>
         <p className="mt-1 text-sm text-slate-600">Tenant ID: {invitation.tenantId}</p>
         <p className="mt-1 text-sm text-slate-600">{invitation.role.replaceAll("_", " ")} · Invitation for {invitation.phoneHint}</p></div>
-      {invitation.mode === "sign-in" ? <p className="text-sm">You already have a Klassa account. <Link href="/login" className="text-blue-700 underline">Sign in</Link>, then reopen this SMS link to add the school. Your existing password and authenticator will stay the same.</p> :
+      {invitation.mode === "sign-in" ? <p className="text-sm">You already have a Klassa account. <Link href="/login" className="text-blue-700 underline">Sign in</Link>, then reopen this SMS link to add the school. Your existing password will stay the same.</p> :
         <form className="space-y-4" onSubmit={async event => {
           event.preventDefault(); setPending(true); setError("");
           const data = new FormData(event.currentTarget);
@@ -49,8 +49,8 @@ export function AcceptInvitation() {
             setActivated(true); token.current = null;
             if (!result.existingAccount && password && result.username) {
               const login = await authClient.signIn.username({ username: result.username, password });
-              if (login.error) { setError("Account created. Sign in to finish authenticator setup."); return; }
-              router.replace("/setup-mfa");
+              if (login.error) { setError("Account created. Sign in to continue."); return; }
+              router.replace("/");
             } else router.replace("/schools");
             router.refresh();
           } catch { setError("Unable to complete activation. Reopen the invitation or try signing in if your account was already created."); }
@@ -60,7 +60,7 @@ export function AcceptInvitation() {
           {invitation.mode === "new" && <>
             <label className="block text-sm">Username<input name="username" autoComplete="username" autoCapitalize="none" required minLength={3} maxLength={64} className="mt-1 block w-full rounded border border-slate-300 px-3 py-2" /></label>
             <label className="block text-sm">Your name<input name="name" autoComplete="name" required minLength={2} maxLength={180} className="mt-1 block w-full rounded border border-slate-300 px-3 py-2" /></label>
-            <label className="block text-sm">Choose a password<input name="password" type="password" autoComplete="new-password" required minLength={12} maxLength={128} className="mt-1 block w-full rounded border border-slate-300 px-3 py-2" /><span className="mt-1 block text-xs text-slate-500">At least 12 characters. Next, you’ll set up an authenticator app.</span></label>
+            <label className="block text-sm">Choose a password<input name="password" type="password" autoComplete="new-password" required minLength={12} maxLength={128} className="mt-1 block w-full rounded border border-slate-300 px-3 py-2" /><span className="mt-1 block text-xs text-slate-500">At least 12 characters. Use a unique password for this account.</span></label>
           </>}
           <Button type="submit" disabled={pending}>{invitation.mode === "new" ? "Activate account" : "Accept school membership"}</Button>
         </form>}

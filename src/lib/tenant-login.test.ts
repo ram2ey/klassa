@@ -19,9 +19,9 @@ let passwordHash: string;
 beforeAll(async () => { passwordHash = await hashPassword("tenant-test-password"); });
 beforeEach(() => {
   for (const key of Object.keys(state.data)) delete state.data[key];
-  state.data.user = ["northfield", "southfield"].map((tenant, i) => ({
+  state.data.user = ["northfield", "southfield", "platform"].map((tenant, i) => ({
     id: `user-${i}`, name: "Alex", email: `${i}@accounts.klassa.invalid`, emailVerified: false,
-    username: `${tenant}:alex`, displayUsername: "alex", twoFactorEnabled: i === 1,
+    username: `${tenant}:alex`, displayUsername: "alex", twoFactorEnabled: i === 2, isPlatformAdmin: i === 2,
     mustChangePassword: true, createdAt: new Date(), updatedAt: new Date(),
   }));
   state.data.account = state.data.user.map(user => ({
@@ -49,13 +49,28 @@ describe("tenant username authentication", () => {
     expect(data.user.mustChangePassword).toBe(true);
   });
 
-  it("requires MFA for the same username in another tenant and leaves no authenticated session", async () => {
+  it("requires MFA for platform administrators and leaves no authenticated session", async () => {
     const response = await request("/sign-in/username", {
-      username: loginUsername("southfield", "alex"), password: "tenant-test-password",
+      username: loginUsername("platform", "alex"), password: "tenant-test-password",
     });
     expect(response.status).toBe(200);
     expect(await response.json()).toMatchObject({ twoFactorRedirect: true });
     expect(state.data.session).toHaveLength(0);
+  });
+
+  it("signs school staff in without MFA and blocks authenticator enrollment", async () => {
+    const response = await request("/sign-in/username", {
+      username: loginUsername("southfield", "alex"), password: "tenant-test-password",
+    });
+    expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ user: { id: "user-1" } });
+    const cookie = response.headers.getSetCookie().map(value => value.split(";")[0]).join("; ");
+    const enrollment = await getAuth().handler(new Request("http://localhost:3000/api/auth/two-factor/enable", {
+      method: "POST", headers: { "Content-Type": "application/json", Origin: "http://localhost:3000", Cookie: cookie },
+      body: JSON.stringify({ password: "tenant-test-password" }),
+    }));
+    expect(enrollment.status).toBe(403);
+    expect(state.data.twoFactor).toHaveLength(0);
   });
 
   it.each([
