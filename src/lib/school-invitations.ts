@@ -1,11 +1,11 @@
 import { randomUUID } from "node:crypto";
-import { and, eq, isNull, sql, desc } from "drizzle-orm";
+import { and, asc, count, eq, isNull, sql, desc } from "drizzle-orm";
 import { hashPassword } from "better-auth/crypto";
 import { headers } from "next/headers";
 import { z } from "zod";
 import { db } from "@/db";
-import { accounts, auditEvents, invitationSmsLimits, organizationMemberships, organizations, rateLimitLogs,
-  sessions, smsInvitations, staffRole, users } from "@/db/schema";
+import { academicYears, accounts, auditEvents, invitationSmsLimits, organizationMemberships, organizations,
+  rateLimitLogs, sessions, smsInvitations, staffRole, students, users } from "@/db/schema";
 import { requireLiveMode, requirePlatformAdmin } from "@/lib/action-access";
 import { getAuth } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
@@ -147,7 +147,7 @@ export async function acceptSchoolInvitation(raw: z.input<typeof invitationAccep
 export async function getPlatformInvitationData() {
   await requirePlatformAdmin();
   const loadedAt = Date.now();
-  const [schools, invitations, memberships, activeSessions, audit, securityEvents, platformAdmins] = await Promise.all([
+  const [schools, invitations, memberships, activeSessions, audit, securityEvents, platformAdmins, years, studentCounts, auditActions] = await Promise.all([
     db.select({ id: organizations.id, name: organizations.name, slug: organizations.slug, timezone: organizations.timezone,
       createdAt: organizations.createdAt }).from(organizations).orderBy(organizations.name),
     db.select({ id: smsInvitations.id, organizationId: smsInvitations.organizationId,
@@ -170,13 +170,30 @@ export async function getPlatformInvitationData() {
       endpoint: rateLimitLogs.endpoint, requestCount: rateLimitLogs.requestCount, limit: rateLimitLogs.limit,
       blockedAt: rateLimitLogs.blockedAt }).from(rateLimitLogs).orderBy(desc(rateLimitLogs.blockedAt)).limit(50),
     db.select({ id: users.id, twoFactorEnabled: users.twoFactorEnabled }).from(users).where(eq(users.isPlatformAdmin, true)),
+    db.select({ organizationId: academicYears.organizationId }).from(academicYears),
+    db.select({ organizationId: students.organizationId, count: count() }).from(students).groupBy(students.organizationId),
+    db.selectDistinct({ action: auditEvents.action }).from(auditEvents).orderBy(asc(auditEvents.action)),
   ]);
   const sessionUserIds = new Set(activeSessions.map(session => session.userId));
+  const yearOrganizations = new Set(years.map(year => year.organizationId));
+  const rosterCounts = new Map(studentCounts.map(row => [row.organizationId, row.count]));
   return {
-    schools,
+    schools: schools.map(school => {
+      const schoolMemberships = memberships.filter(membership => membership.organizationId === school.id);
+      return {
+        ...school,
+        setup: {
+          schoolAdmin: schoolMemberships.some(membership => membership.role === "school_admin"),
+          academicYear: yearOrganizations.has(school.id),
+          safeguardingLead: schoolMemberships.some(membership => membership.role === "safeguarding_lead"),
+          roster: (rosterCounts.get(school.id) ?? 0) > 0,
+        },
+      };
+    }),
     invitations,
     memberships: memberships.map(membership => ({ ...membership, hasActiveSession: sessionUserIds.has(membership.userId) })),
     audit,
+    auditActions: auditActions.map(row => row.action),
     securityEvents,
     platformAdmins,
     loadedAt,

@@ -7,6 +7,7 @@ import {
   type SystemHealthReport,
 } from "@/lib/monitoring";
 import { sql } from "drizzle-orm";
+import { getPlatformRequestMetrics } from "@/lib/platform-telemetry";
 
 export async function getLiveSystemHealthReport(): Promise<SystemHealthReport> {
   const startedAt = performance.now();
@@ -25,5 +26,21 @@ export async function getLiveSystemHealthReport(): Promise<SystemHealthReport> {
 
   const report = getSystemHealthReport(database);
   if (database.status === "unhealthy") report.status = "unhealthy";
+  try {
+    const telemetry = await getPlatformRequestMetrics();
+    report.metrics = {
+      rollingRequestCount: telemetry.requestCount,
+      rollingErrorCount: telemetry.errorCount,
+      rollingErrorRate: telemetry.errorRate,
+      averageLatencyMs: null,
+    };
+    report.telemetryAvailable = true;
+    if (telemetry.requestCount >= 10 && telemetry.errorRate > 15 && report.status === "healthy") {
+      report.status = "degraded";
+    }
+  } catch {
+    report.telemetryAvailable = false;
+    if (report.status === "healthy") report.status = "degraded";
+  }
   return report;
 }

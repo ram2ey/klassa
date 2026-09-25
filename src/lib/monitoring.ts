@@ -35,9 +35,11 @@ export interface SystemHealthReport {
   };
   metrics: {
     rollingRequestCount: number;
+    rollingErrorCount: number;
     rollingErrorRate: number; // percentage (0 - 100)
-    averageLatencyMs: number;
+    averageLatencyMs: number | null;
   };
+  telemetryAvailable: boolean;
   activeIncidents: SystemIncident[];
 }
 
@@ -165,7 +167,7 @@ export function getSystemHealthReport(database: DatabaseHealth = { status: "heal
   const errorCount = rollingSamples.filter((s) => s.isError).length;
   const rollingErrorRate = totalRequests > 0 ? (errorCount / totalRequests) * 100 : 0;
   const totalDuration = rollingSamples.reduce((sum, s) => sum + s.durationMs, 0);
-  const averageLatencyMs = totalRequests > 0 ? Math.round(totalDuration / totalRequests) : 12;
+  const averageLatencyMs = totalRequests > 0 ? Math.round(totalDuration / totalRequests) : null;
 
   // Overall system status determination
   let overallStatus: HealthStatus = "healthy";
@@ -190,9 +192,11 @@ export function getSystemHealthReport(database: DatabaseHealth = { status: "heal
     },
     metrics: {
       rollingRequestCount: totalRequests,
+      rollingErrorCount: errorCount,
       rollingErrorRate: Math.round(rollingErrorRate * 10) / 10,
       averageLatencyMs,
     },
+    telemetryAvailable: true,
     activeIncidents: [...activeIncidents],
   };
 }

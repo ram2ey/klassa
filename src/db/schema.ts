@@ -1,6 +1,6 @@
 import {
   bigint, boolean, date, index, integer, jsonb, numeric, pgEnum, pgTable, text,
-  timestamp, uniqueIndex, uuid, varchar,
+  primaryKey, timestamp, uniqueIndex, uuid, varchar,
 } from "drizzle-orm/pg-core";
 
 const timestamps = {
@@ -691,6 +691,15 @@ export const rateLimitLogs = pgTable("rate_limit_logs", {
   index("rate_limit_logs_client_idx").on(table.clientIdentifier),
 ]);
 
+export const platformRequestMetrics = pgTable("platform_request_metrics", {
+  minute: timestamp("minute", { withTimezone: true }).notNull(),
+  instanceId: varchar("instance_id", { length: 120 }).notNull(),
+  requestCount: integer("request_count").default(0).notNull(),
+  errorCount: integer("error_count").default(0).notNull(),
+}, (table) => [
+  primaryKey({ columns: [table.minute, table.instanceId] }),
+]);
+
 export const schema = {
   organizationMemberships,
   smsInvitations,
@@ -739,4 +748,5 @@ export const schema = {
   gdprRequests,
   restoreDrills,
   rateLimitLogs,
+  platformRequestMetrics,
 };
