@@ -160,7 +160,7 @@ export function SchoolAdminWorkspace({ data, workflow, gdpr, section, date: sele
 
         {current.id === "academic" && <div className="space-y-6"><section className={panelStyle}><PanelHeading title="Academic years" description="The current year is used for student enrollment and class placement." action={add("year", "Add academic year")} />
           <DataTable caption="Academic years" headers={["Year", "Starts", "Ends", "Status", "Actions"]} rows={data.years.filter(year => matches(year.name)).map(year => ({ key: year.id, cells: [<strong key="name">{year.name}</strong>, date(year.startsOn), date(year.endsOn), <Status key="status" value={year.isCurrent ? "current" : "not current"} />, editButton("year", `Edit ${year.name}`, { id: year.id, name: year.name, startsOn: year.startsOn, endsOn: year.endsOn, isCurrent: year.isCurrent })] }))} empty="Add an academic year and mark it current to begin school setup." />
-        </section><section className={panelStyle}><PanelHeading title="Terms" description="Term dates must be within their academic year. Closing a term seals its gradebook and attendance." action={add("term", "Add term")} />
+        </section><section className={panelStyle}><PanelHeading title="Terms" description="Term dates must be within their academic year. Closing requires submitted roll calls, published grades and report cards." action={add("term", "Add term")} />
           <DataTable caption="Academic terms" headers={["Term", "Academic year", "Starts", "Ends", "Status", "Actions"]} rows={data.terms.filter(term => matches(term.name, yearName(term.academicYearId))).map(term => {
             const isLocked = !!term.isLocked;
             return {
@@ -264,7 +264,7 @@ function TermLockControl({ term, onUpdated }: { term: SchoolAdminData["terms"][n
           <div className="w-full max-w-md bg-white p-6 shadow-xl space-y-4">
             <h3 className="text-lg font-bold text-slate-900">Close & lock {term.name}</h3>
             <p className="text-sm text-slate-600">
-              Closing this term will seal all roll call attendance sessions and lock the gradebook against further modifications or tampering.
+              Submit every recorded roll call and publish all assessments, grades and latest report cards for active students first. Closing then seals attendance and locks the gradebook.
             </p>
             {error && <p role="alert" className="text-xs text-rose-700 bg-rose-50 p-2 border border-rose-200">{error}</p>}
             <form onSubmit={handleLock} className="space-y-3">
@@ -294,7 +294,7 @@ function TermLockControl({ term, onUpdated }: { term: SchoolAdminData["terms"][n
           <div className="w-full max-w-md bg-white p-6 shadow-xl space-y-4">
             <h3 className="text-lg font-bold text-slate-900">Unlock {term.name}</h3>
             <p className="text-sm text-slate-600">
-              Reopening this term will allow staff to modify attendance and grades again. An audit trail reason is required.
+              Reopening this term restores locked attendance sessions to their submitted or in-progress state. Gradebook changes will be allowed again. An audit trail reason is required.
             </p>
             {error && <p role="alert" className="text-xs text-rose-700 bg-rose-50 p-2 border border-rose-200">{error}</p>}
             <form onSubmit={handleUnlock} className="space-y-3">

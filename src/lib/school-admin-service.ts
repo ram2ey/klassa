@@ -1,7 +1,7 @@
-import { and, count, eq, inArray, ne, sql } from "drizzle-orm";
+import { and, count, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { academicYears, attendanceSessions, classes, enrollments, gradeLevels, guardians, organizationMemberships, organizations,
-  studentGuardians, students, subjects, teacherClassAssignments, terms } from "@/db/schema";
+import { academicYears, assessmentGrades, assessments, attendanceSessions, classes, enrollments, gradeLevels, guardians, organizationMemberships, organizations,
+  reportCards, studentGuardians, students, subjects, teacherClassAssignments, terms } from "@/db/schema";
 import { AuditActions, logAuditEvent } from "@/lib/audit";
 import { SCHOOL_TIME_ZONE } from "@/lib/timezone";
 import { bulkStudentUpdateSchema, schoolCommandSchema, SchoolAdminError, type BulkStudentUpdate, type SchoolCommand } from "@/lib/school-admin-policy";
@@ -184,6 +184,43 @@ export async function saveSchoolRecord(actor: Actor, raw: SchoolCommand) {
         if (actor.role !== "school_admin") throw new SchoolAdminError("Only a school administrator can close and lock a term.");
         const term = found((await tx.select().from(terms).where(and(eq(terms.id, value.termId), eq(terms.organizationId, org))).for("update"))[0], "Term");
         if (term.isLocked) throw new SchoolAdminError("This term is already closed and locked.");
+        const termSessions = await tx.select({ status: attendanceSessions.status }).from(attendanceSessions).where(and(
+          eq(attendanceSessions.organizationId, org), eq(attendanceSessions.academicYearId, term.academicYearId),
+          sql`${attendanceSessions.sessionDate} >= ${term.startsOn} AND ${attendanceSessions.sessionDate} <= ${term.endsOn}`
+        ));
+        if (termSessions.some(session => session.status !== "submitted")) {
+          throw new SchoolAdminError("Submit every recorded roll call before closing this term.");
+        }
+        const termAssessments = await tx.select({ id: assessments.id, classId: assessments.classId, status: assessments.status })
+          .from(assessments).where(and(eq(assessments.organizationId, org), eq(assessments.termId, term.id)));
+        if (termAssessments.some(assessment => assessment.status !== "published")) {
+          throw new SchoolAdminError("Publish every term assessment before closing this term.");
+        }
+        const activeEnrollments = await tx.select({ studentId: enrollments.studentId, classId: enrollments.classId })
+          .from(enrollments).where(and(eq(enrollments.organizationId, org), eq(enrollments.academicYearId, term.academicYearId),
+            eq(enrollments.status, "active"), sql`${enrollments.startsOn} <= ${term.endsOn}`,
+            sql`(${enrollments.endsOn} IS NULL OR ${enrollments.endsOn} >= ${term.startsOn})`));
+        if (activeEnrollments.some(enrollment => !enrollment.classId)) {
+          throw new SchoolAdminError("Assign every active student to a class before closing this term.");
+        }
+        const termGrades = termAssessments.length ? await tx.select({ assessmentId: assessmentGrades.assessmentId, studentId: assessmentGrades.studentId,
+          status: assessmentGrades.status }).from(assessmentGrades).where(and(eq(assessmentGrades.organizationId, org),
+            inArray(assessmentGrades.assessmentId, termAssessments.map(assessment => assessment.id)))) : [];
+        const publishedGrades = new Set(termGrades.filter(grade => grade.status === "published")
+          .map(grade => `${grade.assessmentId}:${grade.studentId}`));
+        if (termAssessments.some(assessment => activeEnrollments.some(enrollment => enrollment.classId === assessment.classId &&
+          !publishedGrades.has(`${assessment.id}:${enrollment.studentId}`)))) {
+          throw new SchoolAdminError("Publish a grade for every active student in each term assessment before closing.");
+        }
+        const cards = await tx.select({ studentId: reportCards.studentId, version: reportCards.version, status: reportCards.status })
+          .from(reportCards).where(and(eq(reportCards.organizationId, org), eq(reportCards.termId, term.id)));
+        const latestCards = new Map<string, { version: number; status: string }>();
+        for (const card of cards) {
+          if ((latestCards.get(card.studentId)?.version ?? 0) < card.version) latestCards.set(card.studentId, card);
+        }
+        if (activeEnrollments.some(enrollment => latestCards.get(enrollment.studentId)?.status !== "published")) {
+          throw new SchoolAdminError("Publish the latest report card for every active student before closing this term.");
+        }
         await tx.update(terms).set({
           isLocked: true,
           lockedAt: new Date(),
@@ -197,6 +234,7 @@ export async function saveSchoolRecord(actor: Actor, raw: SchoolCommand) {
         }).where(and(
           eq(attendanceSessions.organizationId, org),
           eq(attendanceSessions.academicYearId, term.academicYearId),
+          eq(attendanceSessions.status, "submitted"),
           sql`${attendanceSessions.sessionDate} >= ${term.startsOn} AND ${attendanceSessions.sessionDate} <= ${term.endsOn}`
         )).returning({ id: attendanceSessions.id });
         entityId = term.id;
@@ -221,11 +259,22 @@ export async function saveSchoolRecord(actor: Actor, raw: SchoolCommand) {
           lockNotes: null,
           updatedAt: new Date(),
         }).where(and(eq(terms.id, term.id), eq(terms.organizationId, org)));
+        const submitted = await tx.update(attendanceSessions).set({ status: "submitted", updatedAt: new Date() }).where(and(
+          eq(attendanceSessions.organizationId, org), eq(attendanceSessions.academicYearId, term.academicYearId),
+          eq(attendanceSessions.status, "locked"), isNotNull(attendanceSessions.submittedAt),
+          sql`${attendanceSessions.sessionDate} >= ${term.startsOn} AND ${attendanceSessions.sessionDate} <= ${term.endsOn}`
+        )).returning({ id: attendanceSessions.id });
+        const inProgress = await tx.update(attendanceSessions).set({ status: "in_progress", updatedAt: new Date() }).where(and(
+          eq(attendanceSessions.organizationId, org), eq(attendanceSessions.academicYearId, term.academicYearId),
+          eq(attendanceSessions.status, "locked"), isNull(attendanceSessions.submittedAt),
+          sql`${attendanceSessions.sessionDate} >= ${term.startsOn} AND ${attendanceSessions.sessionDate} <= ${term.endsOn}`
+        )).returning({ id: attendanceSessions.id });
         entityId = term.id;
         auditAction = AuditActions.TERM_UNLOCKED;
         auditMetadata = {
           termName: term.name,
           unlockReason: value.unlockReason,
+          reopenedAttendanceSessionsCount: submitted.length + inProgress.length,
         };
         break;
       }

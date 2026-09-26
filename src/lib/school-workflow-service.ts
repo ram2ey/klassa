@@ -204,6 +204,7 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
       }
       case "report_generate": {
         const term = found((await tx.select().from(terms).where(and(eq(terms.id, value.termId), eq(terms.organizationId, org))))[0], "Term");
+        if (term.isLocked) throw new SchoolAdminError(`Report cards for ${term.name} are closed and locked.`);
         const enrollment = found((await tx.select().from(enrollments).where(and(eq(enrollments.organizationId, org), eq(enrollments.studentId, value.studentId), eq(enrollments.academicYearId, term.academicYearId))))[0], "Student enrollment");
         if (!enrollment.classId) throw new SchoolAdminError("Assign the student to a class before generating a report card.");
         const previous = await tx.select().from(reportCards).where(and(eq(reportCards.organizationId, org), eq(reportCards.studentId, value.studentId), eq(reportCards.termId, term.id)));
@@ -241,6 +242,9 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
       }
       case "report_status": {
         const card = found((await tx.select().from(reportCards).where(and(eq(reportCards.id, value.reportCardId), eq(reportCards.organizationId, org))))[0], "Report card");
+        const term = found((await tx.select({ isLocked: terms.isLocked, name: terms.name }).from(terms)
+          .where(and(eq(terms.id, card.termId), eq(terms.organizationId, org))))[0], "Term");
+        if (term.isLocked) throw new SchoolAdminError(`Report cards for ${term.name} are closed and locked.`);
         if ((value.status === "approved" && card.status !== "draft") || (value.status === "published" && card.status !== "approved")) throw new SchoolAdminError("Approve the draft before publishing the report card.");
         await tx.update(reportCards).set({ status: value.status, approvedBy: value.status === "approved" ? actor.userId : card.approvedBy,
           publishedAt: value.status === "published" ? new Date() : null, updatedAt: new Date() }).where(and(eq(reportCards.id, card.id), eq(reportCards.organizationId, org)));
@@ -249,6 +253,9 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
       }
       case "report_remarks": {
         const card = found((await tx.select().from(reportCards).where(and(eq(reportCards.id, value.reportCardId), eq(reportCards.organizationId, org))))[0], "Report card");
+        const term = found((await tx.select({ isLocked: terms.isLocked, name: terms.name }).from(terms)
+          .where(and(eq(terms.id, card.termId), eq(terms.organizationId, org))))[0], "Term");
+        if (term.isLocked) throw new SchoolAdminError(`Report cards for ${term.name} are closed and locked.`);
         if (card.status !== "draft") throw new SchoolAdminError("Teacher remarks can only be changed on a draft report card.");
         await tx.update(reportCards).set({ teacherRemarks: value.teacherRemarks || null, updatedAt: new Date() })
           .where(and(eq(reportCards.id, card.id), eq(reportCards.organizationId, org)));

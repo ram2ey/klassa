@@ -173,6 +173,11 @@ describe("live school administration boundaries", () => {
     mocks.execute.mockImplementation(async query => {
       if (query.includes('from "organizations"')) return [[org]];
       if (query.includes('from "terms"')) return [[record, org, other, "Autumn Term", "2026-09-01", "2026-12-15", 1, false, null, null, null, now, now]];
+      if (query.includes('from "attendance_sessions"')) return [["submitted"]];
+      if (query.includes('from "assessments"')) return [[record, other, "published"]];
+      if (query.includes('from "enrollments"')) return [[record, other]];
+      if (query.includes('from "assessment_grades"')) return [[record, record, "published"]];
+      if (query.includes('from "report_cards"')) return [[record, 1, "published"]];
       if (query.startsWith('update "terms"')) return [[record]];
       if (query.startsWith('update "attendance_sessions"')) return [[record], [other]];
       if (query.startsWith('insert into "audit_events"')) return [[record]];
@@ -189,6 +194,26 @@ describe("live school administration boundaries", () => {
     expect(auditCall[1]).toContain("term.closed_and_locked");
     expect(mocks.commit).toHaveBeenCalledOnce();
   });
+  it.each([
+    { incompleteTable: "attendance_sessions", rows: [["in_progress"]], message: "Submit every recorded roll call" },
+    { incompleteTable: "assessments", rows: [[record, other, "draft"]], message: "Publish every term assessment" },
+    { incompleteTable: "assessment_grades", rows: [], message: "Publish a grade for every active student" },
+    { incompleteTable: "report_cards", rows: [[record, 1, "published"], [record, 2, "draft"]], message: "Publish the latest report card" },
+  ])("refuses term closure with incomplete $incompleteTable", async ({ incompleteTable, rows, message }) => {
+    mocks.execute.mockImplementation(async query => {
+      if (query.includes('from "organizations"')) return [[org]];
+      if (query.includes('from "terms"')) return [[record, org, other, "Autumn Term", "2026-09-01", "2026-12-15", 1, false, null, null, null, now, now]];
+      if (query.includes('from "attendance_sessions"')) return incompleteTable === "attendance_sessions" ? rows : [["submitted"]];
+      if (query.includes('from "assessments"')) return incompleteTable === "assessments" ? rows : [[record, other, "published"]];
+      if (query.includes('from "enrollments"')) return [[record, other]];
+      if (query.includes('from "assessment_grades"')) return incompleteTable === "assessment_grades" ? rows : [[record, record, "published"]];
+      if (query.includes('from "report_cards"')) return incompleteTable === "report_cards" ? rows : [[record, 1, "published"]];
+      return [];
+    });
+    await expect(saveSchoolRecord(actor, { kind: "term_lock", termId: record })).rejects.toThrow(message);
+    expect(mocks.execute.mock.calls.some(([query]) => query.startsWith('update "terms"'))).toBe(false);
+    expect(mocks.rollback).toHaveBeenCalledOnce();
+  });
   it("rejects locking an already closed term", async () => {
     mocks.execute.mockImplementation(async query => {
       if (query.includes('from "organizations"')) return [[org]];
@@ -202,6 +227,7 @@ describe("live school administration boundaries", () => {
       if (query.includes('from "organizations"')) return [[org]];
       if (query.includes('from "terms"')) return [[record, org, other, "Autumn Term", "2026-09-01", "2026-12-15", 1, true, now, actor.userId, "Locked", now, now]];
       if (query.startsWith('update "terms"')) return [[record]];
+      if (query.startsWith('update "attendance_sessions"')) return [[record]];
       if (query.startsWith('insert into "audit_events"')) return [[record]];
       return [];
     });
@@ -209,6 +235,12 @@ describe("live school administration boundaries", () => {
     const termUpdate = mocks.execute.mock.calls.find(([query]) => query.startsWith('update "terms"'))!;
     expect(termUpdate[0]).toContain('"is_locked" = $1');
     expect(termUpdate[1]).toContain(false);
+    const sessionUpdates = mocks.execute.mock.calls.filter(([query]) => query.startsWith('update "attendance_sessions"'));
+    expect(sessionUpdates).toHaveLength(2);
+    expect(sessionUpdates[0][0]).toContain('"submitted_at" is not null');
+    expect(sessionUpdates[0][1]).toContain("submitted");
+    expect(sessionUpdates[1][0]).toContain('"submitted_at" is null');
+    expect(sessionUpdates[1][1]).toContain("in_progress");
     const auditCall = mocks.execute.mock.calls.find(([query]) => query.startsWith('insert into "audit_events"'))!;
     expect(auditCall[1]).toContain("term.unlocked");
     expect(mocks.commit).toHaveBeenCalledOnce();
