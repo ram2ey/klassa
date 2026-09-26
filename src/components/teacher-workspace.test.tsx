@@ -104,5 +104,29 @@ describe("teacher class information", () => {
     expect(screen.getByText("Praise & Merits Awarded")).toBeTruthy();
     expect(screen.getByText("Superb analytical skills")).toBeTruthy();
   });
+
+  it("disables attendance saving when the date falls in a closed and locked term", () => {
+    const lockedData = {
+      ...data,
+      homeroomClassIds: [classId],
+      currentYear: { id: "year-1", name: "2026" },
+      terms: [{ id: "term-1", academicYearId: "year-1", name: "Autumn Term", startsOn: "2026-09-01", endsOn: "2026-12-15", isLocked: true }],
+    } as unknown as TeacherData;
+    render(<TeacherWorkspace data={lockedData} notices={[]} section="attendance" date="2026-09-26" />);
+    expect(screen.getByText(/Attendance for this period or date is closed and locked/)).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it("disables gradebook saving and publishing when the assessment belongs to a locked term", () => {
+    const lockedGradeData = {
+      ...data,
+      terms: [{ id: "term-1", name: "Autumn Term", isLocked: true }],
+      assessments: [{ id: "assm-1", classId, subjectId: "subject-a", termId: "term-1", title: "Midterm Exam", status: "draft", maxScore: 100 }],
+    } as unknown as TeacherData;
+    render(<TeacherWorkspace data={lockedGradeData} notices={[]} section="gradebook" date="2026-09-26" />);
+    expect(screen.getByText(/The gradebook for this term is closed and locked/)).toBeTruthy();
+    expect((screen.getByRole("button", { name: "Save" }) as HTMLButtonElement).disabled).toBe(true);
+    expect((screen.getByRole("button", { name: "Publish assessment and grades" }) as HTMLButtonElement).disabled).toBe(true);
+  });
 });
 

@@ -183,6 +183,13 @@
       "when": 1790430000000,
       "tag": "0025_yielding_timetables",
       "breakpoints": true
+    },
+    {
+      "idx": 26,
+      "version": "7",
+      "when": 1790435000000,
+      "tag": "0026_term_closure_gradebook_lock",
+      "breakpoints": true
     }
   ]
 }

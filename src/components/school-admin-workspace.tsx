@@ -4,7 +4,7 @@ import { useEffect, useRef, useState, useTransition, type ReactNode } from "reac
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Award, BookOpen, CalendarDays, Check, ChevronRight, ClipboardList, FileClock, GraduationCap, Megaphone, ShieldAlert, NotebookPen, ClipboardCheck,
-  LayoutDashboard, Menu, Plus, Search, Settings, Users, UsersRound, X } from "lucide-react";
+  LayoutDashboard, Lock, Menu, Plus, Search, Settings, Unlock, Users, UsersRound, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AccountSignOut } from "@/components/account-sign-out";
 import { formatGMTDateTime, SCHOOL_TIME_ZONE, SCHOOL_TIME_ZONE_LABEL } from "@/lib/timezone";
@@ -42,7 +42,7 @@ const roles = ["school_admin", "office_staff", "teacher", "safeguarding_lead", "
 const fieldStyle = "mt-1.5 block min-h-11 w-full border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-600";
 const panelStyle = "border border-slate-200 bg-white";
 const words = (value: string) => value.replaceAll("_", " ").replace(/\b\w/g, letter => letter.toUpperCase());
-type Editor = { kind: Exclude<SchoolCommand["kind"], "teacher_subject_assignment_remove"> | "staff"; title: string; values?: Record<string, string | number | boolean | null> };
+type Editor = { kind: Exclude<SchoolCommand["kind"], "teacher_subject_assignment_remove" | "term_lock" | "term_unlock"> | "staff"; title: string; values?: Record<string, string | number | boolean | null> };
 type Option = { value: string; label: string };
 type Field = { name: string; label: string; type?: "text" | "date" | "email" | "password" | "number" | "checkbox"; required?: boolean; options?: Option[]; hint?: string; max?: number; min?: number; disabled?: boolean };
 
@@ -160,8 +160,27 @@ export function SchoolAdminWorkspace({ data, workflow, gdpr, section, date: sele
 
         {current.id === "academic" && <div className="space-y-6"><section className={panelStyle}><PanelHeading title="Academic years" description="The current year is used for student enrollment and class placement." action={add("year", "Add academic year")} />
           <DataTable caption="Academic years" headers={["Year", "Starts", "Ends", "Status", "Actions"]} rows={data.years.filter(year => matches(year.name)).map(year => ({ key: year.id, cells: [<strong key="name">{year.name}</strong>, date(year.startsOn), date(year.endsOn), <Status key="status" value={year.isCurrent ? "current" : "not current"} />, editButton("year", `Edit ${year.name}`, { id: year.id, name: year.name, startsOn: year.startsOn, endsOn: year.endsOn, isCurrent: year.isCurrent })] }))} empty="Add an academic year and mark it current to begin school setup." />
-        </section><section className={panelStyle}><PanelHeading title="Terms" description="Term dates must be within their academic year." action={add("term", "Add term")} />
-          <DataTable caption="Academic terms" headers={["Term", "Academic year", "Starts", "Ends", "Order", "Actions"]} rows={data.terms.filter(term => matches(term.name, yearName(term.academicYearId))).map(term => ({ key: term.id, cells: [term.name, yearName(term.academicYearId), date(term.startsOn), date(term.endsOn), term.position, editButton("term", `Edit ${term.name}`, { id: term.id, name: term.name, academicYearId: term.academicYearId, startsOn: term.startsOn, endsOn: term.endsOn, position: term.position })] }))} empty="Create an academic year, then add its terms." />
+        </section><section className={panelStyle}><PanelHeading title="Terms" description="Term dates must be within their academic year. Closing a term seals its gradebook and attendance." action={add("term", "Add term")} />
+          <DataTable caption="Academic terms" headers={["Term", "Academic year", "Starts", "Ends", "Status", "Actions"]} rows={data.terms.filter(term => matches(term.name, yearName(term.academicYearId))).map(term => {
+            const isLocked = !!term.isLocked;
+            return {
+              key: term.id,
+              cells: [
+                <strong key="name">{term.name}</strong>,
+                yearName(term.academicYearId),
+                date(term.startsOn),
+                date(term.endsOn),
+                <span key="status" className={`inline-flex items-center gap-1.5 border px-2 py-0.5 text-xs font-semibold ${isLocked ? "border-amber-300 bg-amber-50 text-amber-900" : "border-emerald-200 bg-emerald-50 text-emerald-800"}`}>
+                  {isLocked ? <Lock size={12} aria-hidden="true" /> : <Unlock size={12} aria-hidden="true" />}
+                  {isLocked ? "Closed & Locked" : "Open"}
+                </span>,
+                <div key="actions" className="flex flex-wrap items-center gap-2">
+                  {!isLocked && editButton("term", `Edit ${term.name}`, { id: term.id, name: term.name, academicYearId: term.academicYearId, startsOn: term.startsOn, endsOn: term.endsOn, position: term.position })}
+                  <TermLockControl term={term} onUpdated={msg => setNotice(msg)} />
+                </div>,
+              ],
+            };
+          })} empty="Create an academic year, then add its terms." />
         </section></div>}
 
         {current.id === "audit" && <section className={panelStyle}><PanelHeading title="School audit history" description="The latest 100 recorded events for this school, newest first." />
@@ -179,6 +198,129 @@ export function SchoolAdminWorkspace({ data, workflow, gdpr, section, date: sele
       existingGuardians={data.guardians.map(item => ({ id: item.id, label: `${item.firstName} ${item.lastName}${item.email ? ` · ${item.email}` : ""}` }))}
       onClose={() => setShowEnrollment(false)} onSaved={message => { setNotice(message); setShowEnrollment(false); }} />}
   </div>;
+}
+
+function TermLockControl({ term, onUpdated }: { term: SchoolAdminData["terms"][number]; onUpdated: (msg: string) => void }) {
+  const [modal, setModal] = useState<"lock" | "unlock" | null>(null);
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState("");
+  const [notes, setNotes] = useState("");
+  const router = useRouter();
+
+  const handleLock = (e: React.FormEvent) => {
+    e.preventDefault();
+    setError("");
+    startTransition(async () => {
+      const res = await saveSchoolRecordAction({ kind: "term_lock", termId: term.id, lockNotes: notes });
+      if (!res.success) { setError(res.error); return; }
+      setModal(null);
+      setNotes("");
+      onUpdated(`Term "${term.name}" has been closed and locked.`);
+      router.refresh();
+    });
+  };
+
+  const handleUnlock = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (notes.trim().length < 4) {
+      setError("Please explain why this locked term is being reopened (minimum 4 characters).");
+      return;
+    }
+    setError("");
+    startTransition(async () => {
+      const res = await saveSchoolRecordAction({ kind: "term_unlock", termId: term.id, unlockReason: notes });
+      if (!res.success) { setError(res.error); return; }
+      setModal(null);
+      setNotes("");
+      onUpdated(`Term "${term.name}" has been reopened.`);
+      router.refresh();
+    });
+  };
+
+  return (
+    <>
+      {term.isLocked ? (
+        <Button
+          variant="secondary"
+          className="min-h-11 border-amber-300 text-amber-900 hover:bg-amber-50"
+          onClick={() => { setNotes(""); setError(""); setModal("unlock"); }}
+        >
+          <Unlock size={14} className="mr-1" />
+          Unlock term
+        </Button>
+      ) : (
+        <Button
+          variant="secondary"
+          className="min-h-11 border-slate-300 text-slate-800 hover:bg-slate-100"
+          onClick={() => { setNotes(""); setError(""); setModal("lock"); }}
+        >
+          <Lock size={14} className="mr-1" />
+          Close & lock term
+        </Button>
+      )}
+
+      {modal === "lock" && (
+        <dialog open className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md bg-white p-6 shadow-xl space-y-4">
+            <h3 className="text-lg font-bold text-slate-900">Close & lock {term.name}</h3>
+            <p className="text-sm text-slate-600">
+              Closing this term will seal all roll call attendance sessions and lock the gradebook against further modifications or tampering.
+            </p>
+            {error && <p role="alert" className="text-xs text-rose-700 bg-rose-50 p-2 border border-rose-200">{error}</p>}
+            <form onSubmit={handleLock} className="space-y-3">
+              <label className="block text-sm font-medium text-slate-700">
+                Lock notes (optional)
+                <textarea
+                  className="mt-1 w-full border border-slate-300 p-2 text-sm"
+                  rows={3}
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  placeholder="e.g. End of term marks finalized and published."
+                />
+              </label>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="secondary" onClick={() => setModal(null)} disabled={pending}>Cancel</Button>
+                <Button type="submit" disabled={pending} className="bg-amber-700 hover:bg-amber-800 text-white">
+                  {pending ? "Locking…" : "Confirm close & lock"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </dialog>
+      )}
+
+      {modal === "unlock" && (
+        <dialog open className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
+          <div className="w-full max-w-md bg-white p-6 shadow-xl space-y-4">
+            <h3 className="text-lg font-bold text-slate-900">Unlock {term.name}</h3>
+            <p className="text-sm text-slate-600">
+              Reopening this term will allow staff to modify attendance and grades again. An audit trail reason is required.
+            </p>
+            {error && <p role="alert" className="text-xs text-rose-700 bg-rose-50 p-2 border border-rose-200">{error}</p>}
+            <form onSubmit={handleUnlock} className="space-y-3">
+              <label className="block text-sm font-medium text-slate-700">
+                Reason for unlocking *
+                <textarea
+                  className="mt-1 w-full border border-slate-300 p-2 text-sm"
+                  rows={3}
+                  required
+                  value={notes}
+                  onChange={e => setNotes(e.target.value)}
+                  placeholder="e.g. Grade review appeal granted by academic committee."
+                />
+              </label>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button type="button" variant="secondary" onClick={() => setModal(null)} disabled={pending}>Cancel</Button>
+                <Button type="submit" disabled={pending} className="bg-blue-700 hover:bg-blue-800 text-white">
+                  {pending ? "Unlocking…" : "Confirm unlock"}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </dialog>
+      )}
+    </>
+  );
 }
 
 function SubjectAssignmentRemove({ assignmentId, label, onRemoved }: { assignmentId: string; label: string; onRemoved: () => void }) {

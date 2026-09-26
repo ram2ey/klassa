@@ -1,4 +1,4 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { academicYears, announcements, assessmentCategories, assessmentGrades, assessments,
   attendanceCorrections, attendanceRecords, attendanceSessions, classes, clinicVisits, enrollments, gradeCorrections,
@@ -109,6 +109,14 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
         const classRow = found((await tx.select().from(classes).where(and(eq(classes.id, value.classId), eq(classes.organizationId, org))))[0], "Class");
         const year = found((await tx.select().from(academicYears).where(and(eq(academicYears.id, classRow.academicYearId), eq(academicYears.organizationId, org))))[0], "Academic year");
         if (value.sessionDate < year.startsOn || value.sessionDate > year.endsOn) throw new SchoolAdminError("Attendance date must be within the class academic year.");
+        const [lockedTerm] = await tx.select({ id: terms.id, name: terms.name }).from(terms)
+          .where(and(
+            eq(terms.organizationId, org),
+            eq(terms.academicYearId, year.id),
+            eq(terms.isLocked, true),
+            sql`${value.sessionDate} >= ${terms.startsOn} AND ${value.sessionDate} <= ${terms.endsOn}`
+          ));
+        if (lockedTerm) throw new SchoolAdminError(`Attendance for ${lockedTerm.name} is closed and locked.`);
         let [session] = await tx.select().from(attendanceSessions).where(and(eq(attendanceSessions.organizationId, org), eq(attendanceSessions.classId, value.classId), eq(attendanceSessions.sessionDate, value.sessionDate), eq(attendanceSessions.period, value.period)));
         if (actor.role === "office_staff" && (!session || session.status !== "submitted")) throw new SchoolAdminError("Only submitted roll calls can be corrected by the office.");
         if (!session && value.kind === "attendance_submit") throw new SchoolAdminError("Record attendance before submitting the roll call.");
@@ -149,6 +157,7 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
       case "assessment": {
         const classRow = found((await tx.select().from(classes).where(and(eq(classes.id, value.classId), eq(classes.organizationId, org))))[0], "Class");
         const term = found((await tx.select().from(terms).where(and(eq(terms.id, value.termId), eq(terms.organizationId, org))))[0], "Term");
+        if (term.isLocked) throw new SchoolAdminError("Cannot add assessments to a closed and locked term.");
         const category = found((await tx.select().from(assessmentCategories).where(and(eq(assessmentCategories.id, value.categoryId), eq(assessmentCategories.organizationId, org))))[0], "Category");
         found((await tx.select({ id: subjects.id }).from(subjects).where(and(eq(subjects.id, value.subjectId), eq(subjects.organizationId, org))))[0], "Subject");
         if (term.academicYearId !== classRow.academicYearId || category.academicYearId !== classRow.academicYearId || category.subjectId !== value.subjectId) throw new SchoolAdminError("Class, term, subject and category must belong to the same school year.");
@@ -161,6 +170,8 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
       }
       case "assessment_publish": {
         const assessment = found((await tx.select().from(assessments).where(and(eq(assessments.id, value.assessmentId), eq(assessments.organizationId, org))))[0], "Assessment");
+        const term = found((await tx.select({ isLocked: terms.isLocked, name: terms.name }).from(terms).where(and(eq(terms.id, assessment.termId), eq(terms.organizationId, org))))[0], "Term");
+        if (term.isLocked) throw new SchoolAdminError(`The gradebook for ${term.name} is closed and locked.`);
         const roster = await tx.select({ studentId: enrollments.studentId }).from(enrollments).where(and(eq(enrollments.organizationId, org), eq(enrollments.classId, assessment.classId), eq(enrollments.academicYearId, assessment.academicYearId), eq(enrollments.status, "active")));
         const grades = await tx.select({ studentId: assessmentGrades.studentId }).from(assessmentGrades).where(and(eq(assessmentGrades.organizationId, org), eq(assessmentGrades.assessmentId, assessment.id)));
         if (!roster.length || roster.some(item => !grades.some(grade => grade.studentId === item.studentId))) throw new SchoolAdminError("Enter a grade for every active student before publishing.");
@@ -171,6 +182,8 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
       }
       case "grade_entry": {
         const assessment = found((await tx.select().from(assessments).where(and(eq(assessments.id, value.assessmentId), eq(assessments.organizationId, org))))[0], "Assessment");
+        const term = found((await tx.select({ isLocked: terms.isLocked, name: terms.name }).from(terms).where(and(eq(terms.id, assessment.termId), eq(terms.organizationId, org))))[0], "Term");
+        if (term.isLocked) throw new SchoolAdminError(`The gradebook for ${term.name} is closed and locked.`);
         found((await tx.select({ id: enrollments.id }).from(enrollments).where(and(eq(enrollments.organizationId, org), eq(enrollments.classId, assessment.classId), eq(enrollments.academicYearId, assessment.academicYearId), eq(enrollments.studentId, value.studentId), eq(enrollments.status, "active"))))[0], "Active enrollment");
         if (value.score > assessment.maxScore) throw new SchoolAdminError("Score cannot exceed the assessment maximum.");
         const [previous] = await tx.select().from(assessmentGrades).where(and(eq(assessmentGrades.organizationId, org), eq(assessmentGrades.assessmentId, assessment.id), eq(assessmentGrades.studentId, value.studentId)));

@@ -1,8 +1,8 @@
 import { and, count, eq, inArray, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { academicYears, classes, enrollments, gradeLevels, guardians, organizationMemberships, organizations,
+import { academicYears, attendanceSessions, classes, enrollments, gradeLevels, guardians, organizationMemberships, organizations,
   studentGuardians, students, subjects, teacherClassAssignments, terms } from "@/db/schema";
-import { logAuditEvent } from "@/lib/audit";
+import { AuditActions, logAuditEvent } from "@/lib/audit";
 import { SCHOOL_TIME_ZONE } from "@/lib/timezone";
 import { bulkStudentUpdateSchema, schoolCommandSchema, SchoolAdminError, type BulkStudentUpdate, type SchoolCommand } from "@/lib/school-admin-policy";
 import type { requireStaff } from "@/lib/action-access";
@@ -25,6 +25,8 @@ export async function saveSchoolRecord(actor: Actor, raw: SchoolCommand) {
     // Serialize school setup changes, including current-year and primary-contact selection.
     found((await tx.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, org)).for("update"))[0], "School");
     let entityId: string;
+    let auditAction: string | undefined;
+    let auditMetadata: Record<string, unknown> | undefined;
     switch (value.kind) {
       case "student": {
         const { id, classId } = value;
@@ -168,6 +170,7 @@ export async function saveSchoolRecord(actor: Actor, raw: SchoolCommand) {
         if (value.startsOn < year.startsOn || value.endsOn > year.endsOn) throw new SchoolAdminError("Term dates must fall within the academic year.");
         if (value.id) {
           const previous = found((await tx.select().from(terms).where(and(eq(terms.id, value.id), eq(terms.organizationId, org))))[0], "Term");
+          if (previous.isLocked) throw new SchoolAdminError("Unlock this term before modifying its dates or name.");
           if (previous.academicYearId !== value.academicYearId) throw new SchoolAdminError("Create a new term for a different academic year.");
         }
         const fields = { name: value.name, academicYearId: value.academicYearId, startsOn: value.startsOn, endsOn: value.endsOn, position: value.position };
@@ -175,6 +178,55 @@ export async function saveSchoolRecord(actor: Actor, raw: SchoolCommand) {
           ? await tx.update(terms).set({ ...fields, updatedAt: new Date() }).where(and(eq(terms.id, value.id), eq(terms.organizationId, org))).returning({ id: terms.id })
           : await tx.insert(terms).values({ ...fields, organizationId: org }).returning({ id: terms.id });
         entityId = found(saved, "Term").id;
+        break;
+      }
+      case "term_lock": {
+        if (actor.role !== "school_admin") throw new SchoolAdminError("Only a school administrator can close and lock a term.");
+        const term = found((await tx.select().from(terms).where(and(eq(terms.id, value.termId), eq(terms.organizationId, org))).for("update"))[0], "Term");
+        if (term.isLocked) throw new SchoolAdminError("This term is already closed and locked.");
+        await tx.update(terms).set({
+          isLocked: true,
+          lockedAt: new Date(),
+          lockedById: actor.userId,
+          lockNotes: value.lockNotes || null,
+          updatedAt: new Date(),
+        }).where(and(eq(terms.id, term.id), eq(terms.organizationId, org)));
+        const sealed = await tx.update(attendanceSessions).set({
+          status: "locked",
+          updatedAt: new Date(),
+        }).where(and(
+          eq(attendanceSessions.organizationId, org),
+          eq(attendanceSessions.academicYearId, term.academicYearId),
+          sql`${attendanceSessions.sessionDate} >= ${term.startsOn} AND ${attendanceSessions.sessionDate} <= ${term.endsOn}`
+        )).returning({ id: attendanceSessions.id });
+        entityId = term.id;
+        auditAction = AuditActions.TERM_CLOSED_AND_LOCKED;
+        auditMetadata = {
+          termName: term.name,
+          startsOn: term.startsOn,
+          endsOn: term.endsOn,
+          lockNotes: value.lockNotes || null,
+          sealedAttendanceSessionsCount: sealed.length,
+        };
+        break;
+      }
+      case "term_unlock": {
+        if (actor.role !== "school_admin") throw new SchoolAdminError("Only a school administrator can reopen a locked term.");
+        const term = found((await tx.select().from(terms).where(and(eq(terms.id, value.termId), eq(terms.organizationId, org))).for("update"))[0], "Term");
+        if (!term.isLocked) throw new SchoolAdminError("This term is not locked.");
+        await tx.update(terms).set({
+          isLocked: false,
+          lockedAt: null,
+          lockedById: null,
+          lockNotes: null,
+          updatedAt: new Date(),
+        }).where(and(eq(terms.id, term.id), eq(terms.organizationId, org)));
+        entityId = term.id;
+        auditAction = AuditActions.TERM_UNLOCKED;
+        auditMetadata = {
+          termName: term.name,
+          unlockReason: value.unlockReason,
+        };
         break;
       }
       case "settings": {
@@ -199,8 +251,10 @@ export async function saveSchoolRecord(actor: Actor, raw: SchoolCommand) {
         break;
       }
     }
-    await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action: `${value.kind}.saved`,
-      entityType: value.kind, entityId, metadata: value.kind === "staff_role" ? { role: value.role } : {} }, tx);
+    const action = auditAction ?? `${value.kind}.saved`;
+    const metadata = auditMetadata ?? (value.kind === "staff_role" ? { role: value.role } : {});
+    await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action,
+      entityType: value.kind.startsWith("term") ? "term" : value.kind, entityId, metadata }, tx);
     return { entityId };
   });
 }

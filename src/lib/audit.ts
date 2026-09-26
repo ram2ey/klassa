@@ -43,6 +43,8 @@ export const AuditActions = {
   TIMETABLE_PERIOD_CREATED: "timetable.period_created",
   TIMETABLE_PERIOD_UPDATED: "timetable.period_updated",
   TIMETABLE_PERIOD_DELETED: "timetable.period_deleted",
+  TERM_CLOSED_AND_LOCKED: "term.closed_and_locked",
+  TERM_UNLOCKED: "term.unlocked",
   GDPR_PORTABILITY_EXPORTED: "gdpr.portability_exported",
   GDPR_STUDENT_ANONYMIZED: "gdpr.student_anonymized",
   GDPR_RECTIFICATION_APPLIED: "gdpr.rectification_applied",

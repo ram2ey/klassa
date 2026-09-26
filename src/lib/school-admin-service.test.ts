@@ -169,4 +169,58 @@ describe("live school administration boundaries", () => {
     expect(enrollment[1]).toContain("active");
     expect(mocks.commit).toHaveBeenCalledOnce();
   });
+  it("closes and locks a term, seals attendance sessions, and records audit event", async () => {
+    mocks.execute.mockImplementation(async query => {
+      if (query.includes('from "organizations"')) return [[org]];
+      if (query.includes('from "terms"')) return [[record, org, other, "Autumn Term", "2026-09-01", "2026-12-15", 1, false, null, null, null, now, now]];
+      if (query.startsWith('update "terms"')) return [[record]];
+      if (query.startsWith('update "attendance_sessions"')) return [[record], [other]];
+      if (query.startsWith('insert into "audit_events"')) return [[record]];
+      return [];
+    });
+    await expect(saveSchoolRecord(actor, { kind: "term_lock", termId: record, lockNotes: "Term finalized" })).resolves.toEqual({ entityId: record });
+    const termUpdate = mocks.execute.mock.calls.find(([query]) => query.startsWith('update "terms"'))!;
+    expect(termUpdate[0]).toContain('"is_locked" = $1');
+    expect(termUpdate[1]).toContain(true);
+    const sessionUpdate = mocks.execute.mock.calls.find(([query]) => query.startsWith('update "attendance_sessions"'))!;
+    expect(sessionUpdate[0]).toContain('"status" = $1');
+    expect(sessionUpdate[1]).toContain("locked");
+    const auditCall = mocks.execute.mock.calls.find(([query]) => query.startsWith('insert into "audit_events"'))!;
+    expect(auditCall[1]).toContain("term.closed_and_locked");
+    expect(mocks.commit).toHaveBeenCalledOnce();
+  });
+  it("rejects locking an already closed term", async () => {
+    mocks.execute.mockImplementation(async query => {
+      if (query.includes('from "organizations"')) return [[org]];
+      if (query.includes('from "terms"')) return [[record, org, other, "Autumn Term", "2026-09-01", "2026-12-15", 1, true, now, actor.userId, "Already locked", now, now]];
+      return [];
+    });
+    await expect(saveSchoolRecord(actor, { kind: "term_lock", termId: record })).rejects.toThrow("already closed and locked");
+  });
+  it("reopens a locked term with audit reason", async () => {
+    mocks.execute.mockImplementation(async query => {
+      if (query.includes('from "organizations"')) return [[org]];
+      if (query.includes('from "terms"')) return [[record, org, other, "Autumn Term", "2026-09-01", "2026-12-15", 1, true, now, actor.userId, "Locked", now, now]];
+      if (query.startsWith('update "terms"')) return [[record]];
+      if (query.startsWith('insert into "audit_events"')) return [[record]];
+      return [];
+    });
+    await expect(saveSchoolRecord(actor, { kind: "term_unlock", termId: record, unlockReason: "Approved appeal for grade entry" })).resolves.toEqual({ entityId: record });
+    const termUpdate = mocks.execute.mock.calls.find(([query]) => query.startsWith('update "terms"'))!;
+    expect(termUpdate[0]).toContain('"is_locked" = $1');
+    expect(termUpdate[1]).toContain(false);
+    const auditCall = mocks.execute.mock.calls.find(([query]) => query.startsWith('insert into "audit_events"'))!;
+    expect(auditCall[1]).toContain("term.unlocked");
+    expect(mocks.commit).toHaveBeenCalledOnce();
+  });
+  it("rejects modifying an existing term while it is locked", async () => {
+    mocks.execute.mockImplementation(async query => {
+      if (query.includes('from "organizations"')) return [[org]];
+      if (query.includes('from "academic_years"')) return [[other, org, "2026/27", "2026-08-01", "2027-06-30", true, now, now]];
+      if (query.includes('from "terms"')) return [[record, org, other, "Autumn Term", "2026-09-01", "2026-12-15", 1, true, now, actor.userId, "Locked", now, now]];
+      return [];
+    });
+    await expect(saveSchoolRecord(actor, { kind: "term", id: record, academicYearId: other, name: "Autumn Term Renamed", startsOn: "2026-09-01", endsOn: "2026-12-15", position: 1 })).rejects.toThrow("Unlock this term before modifying its dates or name");
+  });
 });
+

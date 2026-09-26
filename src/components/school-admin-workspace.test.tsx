@@ -125,4 +125,40 @@ describe("school administration workspace", () => {
     await waitFor(() => expect(mocks.save).toHaveBeenCalledWith({ kind: "teacher_subject_assignment", id: "assignment-1",
       classId: "class-1", subjectId: "subject-1", teacherId: "teacher-1" }));
   });
+  it("displays term lock status and seals an open term via term_lock", async () => {
+    const termData = {
+      ...data,
+      years: [{ id: "year-1", name: "2026/27", isCurrent: true, startsOn: "2026-08-01", endsOn: "2027-06-30" }],
+      terms: [
+        { id: "term-1", academicYearId: "year-1", name: "Autumn Term", startsOn: "2026-09-01", endsOn: "2026-12-15", position: 1, isLocked: false },
+        { id: "term-2", academicYearId: "year-1", name: "Spring Term", startsOn: "2027-01-05", endsOn: "2027-03-25", position: 2, isLocked: true },
+      ],
+    } as unknown as SchoolAdminData;
+    render(<SchoolAdminWorkspace data={termData} section="academic" />);
+    expect(screen.getByText("Open")).toBeTruthy();
+    expect(screen.getByText("Closed & Locked")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Close & lock term/ })).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Unlock term/ })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /Close & lock term/ }));
+    expect(screen.getByText("Close & lock Autumn Term")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/Lock notes/i), { target: { value: "Finalized marks" } });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm close & lock" }));
+    await waitFor(() => expect(mocks.save).toHaveBeenCalledWith({ kind: "term_lock", termId: "term-1", lockNotes: "Finalized marks" }));
+  });
+  it("reopens a locked term with justification reason via term_unlock", async () => {
+    const termData = {
+      ...data,
+      years: [{ id: "year-1", name: "2026/27", isCurrent: true, startsOn: "2026-08-01", endsOn: "2027-06-30" }],
+      terms: [
+        { id: "term-2", academicYearId: "year-1", name: "Spring Term", startsOn: "2027-01-05", endsOn: "2027-03-25", position: 2, isLocked: true },
+      ],
+    } as unknown as SchoolAdminData;
+    render(<SchoolAdminWorkspace data={termData} section="academic" />);
+    fireEvent.click(screen.getByRole("button", { name: /Unlock term/ }));
+    expect(screen.getByText("Unlock Spring Term")).toBeTruthy();
+    fireEvent.change(screen.getByLabelText(/Reason for unlocking/i), { target: { value: "Re-evaluating appealed assessment" } });
+    fireEvent.click(screen.getByRole("button", { name: "Confirm unlock" }));
+    await waitFor(() => expect(mocks.save).toHaveBeenCalledWith({ kind: "term_unlock", termId: "term-2", unlockReason: "Re-evaluating appealed assessment" }));
+  });
 });

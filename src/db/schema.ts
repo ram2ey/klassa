@@ -171,8 +171,15 @@ export const terms = pgTable("terms", {
   startsOn: date("starts_on").notNull(),
   endsOn: date("ends_on").notNull(),
   position: integer("position").notNull(),
+  isLocked: boolean("is_locked").default(false).notNull(),
+  lockedAt: timestamp("locked_at", { withTimezone: true }),
+  lockedById: text("locked_by_id").references(() => users.id, { onDelete: "set null" }),
+  lockNotes: text("lock_notes"),
   ...timestamps,
-}, (table) => [index("terms_year_idx").on(table.academicYearId)]);
+}, (table) => [
+  index("terms_year_idx").on(table.academicYearId),
+  index("terms_locked_idx").on(table.organizationId, table.isLocked),
+]);
 
 export const gradeLevels = pgTable("grade_levels", {
   id: uuid("id").defaultRandom().primaryKey(),

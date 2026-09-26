@@ -10,6 +10,7 @@ import type { WorkflowCommand } from "@/lib/school-workflow-policy";
 import { formatGMTDateTime } from "@/lib/timezone";
 import { EmergencySmsBroadcast } from "@/components/emergency-sms-broadcast";
 import { TeacherBehaviourPanel } from "@/components/teacher-behaviour-panel";
+import { Lock } from "lucide-react";
 import { StaffInquiryList } from "@/components/staff-inquiry-list";
 
 const field = "min-h-11 w-full border border-slate-300 bg-white px-3 py-2 text-sm";
@@ -45,7 +46,7 @@ export function SchoolAdminWorkflows({ section, date, base, data }: { section: s
   const classOptions = classes.map(row => ({ value: row.id, label: row.name }));
   const subjectOptions = base.subjects.map(row => ({ value: row.id, label: row.name }));
   const studentOptions = base.students.map(row => ({ value: row.id, label: `${row.firstName} ${row.lastName}` }));
-  const termOptions = base.terms.filter(row => row.academicYearId === year?.id).map(row => ({ value: row.id, label: row.name }));
+  const termOptions = base.terms.filter(row => row.academicYearId === year?.id).map(row => ({ value: row.id, label: row.isLocked ? `${row.name} (Closed & Locked)` : row.name }));
   const roster = base.enrollments.filter(row => row.classId === classId && row.academicYearId === year?.id && row.status === "active")
     .map(row => base.students.find(student => student.id === row.studentId)).filter((student): student is NonNullable<typeof student> => !!student);
   const currentAssessment = data.assessments.find(row => row.id === assessmentId);
@@ -118,12 +119,23 @@ export function SchoolAdminWorkflows({ section, date, base, data }: { section: s
         <Select name="categoryId" label="Category" options={data.categories.filter(row => row.academicYearId === year?.id).map(row => ({ value: row.id, label: `${subject(row.subjectId ?? "")} · ${row.name}` }))} />
         <Input name="title" label="Title" /><Input name="maxScore" label="Maximum score" type="number" min={1} max={1000} defaultValue={100} /><Input name="dateDue" label="Due date" type="date" defaultValue={today()} /><button className={button} disabled={pending}>Create assessment</button>
       </form></Box></div>
-      <Box title="Enter grades"><Select name="assessmentId" label="Assessment" options={data.assessments.map(row => ({ value: row.id, label: `${row.title} · ${subject(row.subjectId)} · ${words(row.status)}` }))} value={assessmentId} onChange={setAssessmentId} />
-        {currentAssessment && <><p className="text-sm text-slate-500">Maximum score: {currentAssessment.maxScore}. Published grade changes require a correction reason.</p>
+      <Box title="Enter grades"><Select name="assessmentId" label="Assessment" options={data.assessments.map(row => {
+          const assmTerm = base.terms.find(t => t.id === row.termId);
+          return { value: row.id, label: `${row.title} · ${subject(row.subjectId)} · ${words(row.status)}${assmTerm?.isLocked ? " (Closed & Locked)" : ""}` };
+        })} value={assessmentId} onChange={setAssessmentId} />
+        {currentAssessment && <>
+          {base.terms.find(t => t.id === currentAssessment.termId)?.isLocked ? (
+            <div role="alert" className="flex items-center gap-2 border-l-4 border-amber-500 bg-amber-50 p-3 text-sm font-medium text-amber-900">
+              <Lock size={16} className="shrink-0" />
+              This assessment belongs to a term that is closed and locked. Grades and scores are sealed against edits.
+            </div>
+          ) : (
+            <p className="text-sm text-slate-500">Maximum score: {currentAssessment.maxScore}. Published grade changes require a correction reason.</p>
+          )}
           <div className="divide-y divide-slate-100">{gradeRoster.map(student => { const grade = data.grades.find(row => row.assessmentId === assessmentId && row.studentId === student.id); return <form key={student.id} className="grid items-end gap-3 py-3 md:grid-cols-[1fr_130px_1fr_1fr_auto]" onSubmit={event => submit(event, form => ({ kind: "grade_entry", assessmentId, studentId: student.id, score: amount(form.get("score")), feedback: string(form.get("feedback")), correctionReason: string(form.get("correctionReason")) }))}>
-              <strong className="text-sm">{student.firstName} {student.lastName}</strong><Input name="score" label="Score" type="number" min={0} max={currentAssessment.maxScore} defaultValue={grade?.score ?? ""} /><Input name="feedback" label="Feedback" required={false} defaultValue={grade?.feedback ?? ""} /><Input name="correctionReason" label="Correction reason" required={false} /><button className={button} disabled={pending}>Save</button>
+              <strong className="text-sm">{student.firstName} {student.lastName}</strong><Input name="score" label="Score" type="number" min={0} max={currentAssessment.maxScore} defaultValue={grade?.score ?? ""} /><Input name="feedback" label="Feedback" required={false} defaultValue={grade?.feedback ?? ""} /><Input name="correctionReason" label="Correction reason" required={false} /><button className={button} disabled={pending || !!base.terms.find(t => t.id === currentAssessment.termId)?.isLocked}>Save</button>
             </form>; })}</div>
-          {gradeRoster.length > 0 && currentAssessment.status === "draft" && <button className={secondary} disabled={pending} onClick={() => send({ kind: "assessment_publish", assessmentId })}>Publish assessment and grades</button>}
+          {gradeRoster.length > 0 && currentAssessment.status === "draft" && <button className={secondary} disabled={pending || !!base.terms.find(t => t.id === currentAssessment.termId)?.isLocked} onClick={() => send({ kind: "assessment_publish", assessmentId })}>Publish assessment and grades</button>}
         </>}
       </Box>
     </>}

@@ -280,7 +280,7 @@ flowchart TD
 | **`health_nurse`** | ✅ Active | ❌ | ❌ | ✅ Active (Health scoped)| ⚠️ Read notices | ✅ Clinic triage log & health admin | Prescription medication administration record (MAR) |
 | **`teacher`** | ✅ Active | ✅ Period & morning | ✅ Yes + Drawer | ⚠️ Safety alerts & pickup | ✅ Notices & 2-way guardian inquiries | ❌ | Teacher assignment preferences |
 | **`office_staff`** | ✅ Active | ✅ Full absence follow-up | ❌ | ⚠️ Pickup & medical alerts | ✅ Emergency SMS trigger | ✅ Intake, emergency rolls & reception desk | Front desk clinic medication intake log |
-| **`school_admin`** | ✅ Active | ✅ Full oversight | ✅ Full | ✅ Full | ✅ Emergency SMS & 2-way inquiries | ✅ Full + Subject assignments + GDPR | Bulk term-end gradebook lock |
+| **`school_admin`** | ✅ Active | ✅ Full oversight | ✅ Full + Term lock | ✅ Full | ✅ Emergency SMS & 2-way inquiries | ✅ Full + Subject assignments + GDPR | None |
 | **`guardian`** | ✅ Active | ✅ Attendance & daily timetables | ✅ Printable report cards | ❌ | ✅ 2-way inquiries & notices | ⚠️ School consents | None (Fully connected family portal) |
 | **`platform_admin`** | ✅ Active | ❌ (By design) | ❌ (By design) | ❌ (By design) | ✅ Platform-wide notice | ✅ Full + Restore drills + Tenant export | Direct UI trigger for automated restore drill execution |
 
@@ -290,6 +290,7 @@ flowchart TD
 
 | Database Table | Roles Authorized in Domain | Surfaced In Dashboard | Current Status |
 | :--- | :--- | :--- | :--- |
+| `terms` (locked status) | `school_admin`, `teacher` | `SchoolAdminWorkspace`, `TeacherWorkspace` | **Connected**: Term closure & gradebook lock with attendance sealing |
 | `teacherClassAssignments` | `school_admin`, `teacher` | `SchoolAdminWorkspace`, `TeacherWorkspace` | **Connected**: Subject teacher assignments fully editable |
 | `needToKnowAlerts` | `safeguarding_lead`, `senco`, `health_nurse`, `school_admin`, `teacher`, `office_staff` | `SpecialistWorkspace`, `TeacherWorkspace`, `OfficeWorkspace`, `SchoolAdminWorkspace` | **Connected**: Broadcasted across staff workspaces |
 | `courtRestrictions` | `safeguarding_lead`, `school_admin`, `office_staff`, `teacher` | `SpecialistWorkspace`, `TeacherWorkspace`, `OfficeWorkspace`, `SchoolAdminWorkspace` | **Connected**: Pickup prohibitions visible to staff |
@@ -327,7 +328,7 @@ flowchart TD
    Added `guardianInquiries` and `guardianInquiryMessages` tables, audit trail, server actions, [`GuardianInquiriesPanel`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/guardian-inquiries-panel.tsx) in [`GuardianPortalWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/guardian-portal-workspace.tsx), and [`StaffInquiryList`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/staff-inquiry-list.tsx) in [`TeacherWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/teacher-workspace.tsx) and [`SchoolAdminWorkflows`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/school-admin-workflows.tsx).
 8. **[COMPLETED] Student & Guardian Daily Period Timetable**:
    Added `classTimetablePeriods` table, `day_of_week` enum, `timetable-service`, `timetable-actions`, [`StudentDailyTimetable`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/student-daily-timetable.tsx) in [`GuardianPortalWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/guardian-portal-workspace.tsx), and timetable inspection tab in [`StudentAcademicDrawer`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/student-academic-drawer.tsx).
-9. **Term Closure & Gradebook Lock**:
-   School-wide lock to seal all gradebooks and attendance sessions at term completion.
+9. **[COMPLETED] Term Closure & Gradebook Lock**:
+   Added `terms.isLocked`, `lockedAt`, `lockedById`, `lockNotes`, migration `0026`, tamper guards across gradebooks and attendance, `term_lock` and `term_unlock` workflow commands, audit logging, and interactive term lock modal in [`SchoolAdminWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/school-admin-workspace.tsx).
 10. **SENCO Tiered Register & Review Scheduler**:
     Tiered SEN categorization, review scheduler, and overdue review alerts for SEN coordinator.

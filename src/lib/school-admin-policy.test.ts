@@ -14,4 +14,12 @@ describe("school setup validation", () => {
   it("cannot grant the platform administrator role", () => {
     expect(schoolCommandSchema.safeParse({ kind: "staff_role", membershipId: "00000000-0000-4000-8000-000000000001", role: "platform_admin" }).success).toBe(false);
   });
+  it("validates term_lock and requires a reason of at least 4 characters for term_unlock", () => {
+    const termId = "00000000-0000-4000-8000-000000000001";
+    expect(schoolCommandSchema.safeParse({ kind: "term_lock", termId, lockNotes: "End of term" }).success).toBe(true);
+    expect(schoolCommandSchema.safeParse({ kind: "term_lock", termId }).success).toBe(true);
+    expect(schoolCommandSchema.safeParse({ kind: "term_unlock", termId, unlockReason: "Approved reopening" }).success).toBe(true);
+    expect(schoolCommandSchema.safeParse({ kind: "term_unlock", termId, unlockReason: "No" }).success).toBe(false);
+  });
 });
+
