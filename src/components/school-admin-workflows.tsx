@@ -8,6 +8,7 @@ import type { SchoolAdminData } from "@/lib/school-admin-data";
 import type { SchoolWorkflowData } from "@/lib/school-workflow-data";
 import type { WorkflowCommand } from "@/lib/school-workflow-policy";
 import { formatGMTDateTime } from "@/lib/timezone";
+import { EmergencySmsBroadcast } from "@/components/emergency-sms-broadcast";
 
 const field = "min-h-11 w-full border border-slate-300 bg-white px-3 py-2 text-sm";
 const button = "min-h-11 bg-blue-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50";
@@ -132,6 +133,20 @@ export function SchoolAdminWorkflows({ section, date, base, data }: { section: s
           <ul className="mt-3 text-sm">{data.reportSubjects.filter(row => row.reportCardId === card.id).map(row => <li key={row.id}>{subject(row.subjectId)}: {row.scorePercentage}% ({row.letterGrade})</li>)}</ul><Link className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-blue-700" href={`/reports/${card.id}`}>Open printable report card</Link></article>)}{data.reports.length === 0 && <p className="text-sm text-slate-500">No report cards yet.</p>}</div></Box>
     </>}
     {section === "communications" && <>
+      <EmergencySmsBroadcast
+        grades={base.grades}
+        classes={base.classes}
+        dispatches={data.dispatches}
+        onDispatch={async (cmd) => {
+          const res = await saveSchoolWorkflowAction(cmd);
+          if (res.success) {
+            router.refresh();
+            return { success: true, recipientCount: res.recipientCount };
+          }
+          return { success: false, error: res.error };
+        }}
+        schoolName={base.school.name}
+      />
       <Box title={editingAnnouncement ? "Edit announcement draft" : "Create in-app announcement"}><form key={editingAnnouncement?.id ?? "new-announcement"} className="space-y-3" onSubmit={event => submit(event, form => editingAnnouncement ? ({ kind: "announcement_update", announcementId: editingAnnouncement.id, title: string(form.get("title")), content: string(form.get("content")), targetType, targetId: targetType === "school" ? "all" : string(form.get("targetId")), priority: string(form.get("priority")) as "normal" | "important" }) : ({ kind: "announcement", title: string(form.get("title")), content: string(form.get("content")), targetType, targetId: targetType === "school" ? "all" : string(form.get("targetId")), priority: string(form.get("priority")) as "normal" | "important", status: string(form.get("status")) as "draft" | "published" }))}>
         <Input name="title" label="Title" defaultValue={editingAnnouncement?.title} /><label className="block text-sm font-medium">Message<textarea className={`${field} mt-1 min-h-28`} name="content" required defaultValue={editingAnnouncement?.content ?? ""} /></label>
         <Select name="targetType" label="Audience" options={[{ value: "school", label: "Whole school" }, { value: "grade", label: "Grade" }, { value: "class", label: "Class" }]} value={targetType} onChange={value => { setTargetType(value as typeof targetType); setTargetId(""); }} />

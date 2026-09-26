@@ -64,6 +64,11 @@ export const workflowCommandSchema = z.discriminatedUnion("kind", [
     relationship: z.string().trim().max(80).default(""),
     isExcused: z.boolean().default(false),
     remarks: z.string().trim().max(1000).optional().nullable() }),
+  z.object({ kind: z.literal("emergency_sms_broadcast"),
+    scope: z.enum(["whole_school", "grade", "class"]),
+    targetId: z.string().default("all"),
+    severity: z.enum(["urgent_alert", "lockdown", "school_closure", "weather_alert", "evacuation"]),
+    message: z.string().trim().min(5).max(320) }),
 ]);
 
 export type WorkflowCommand = z.input<typeof workflowCommandSchema>;

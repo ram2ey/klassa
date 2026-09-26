@@ -1,9 +1,9 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { academicYears, announcements, assessmentCategories, assessmentGrades, assessments,
   attendanceCorrections, attendanceRecords, attendanceSessions, classes, clinicVisits, enrollments, gradeCorrections,
-  gradeLevels, organizations, receptionLogs, reportCards, reportCardSubjectGrades, sensitiveAccessLogs,
-  sensitiveCaseNotes, sensitiveCases, needToKnowAlerts, courtRestrictions, students, subjects, terms, teacherClassAssignments } from "@/db/schema";
+  gradeLevels, guardians, organizations, receptionLogs, reportCards, reportCardSubjectGrades, sensitiveAccessLogs,
+  sensitiveCaseNotes, sensitiveCases, needToKnowAlerts, courtRestrictions, smsDispatches, studentGuardians, students, subjects, terms, teacherClassAssignments } from "@/db/schema";
 import { AuditActions, logAuditEvent } from "@/lib/audit";
 import type { requireStaff } from "@/lib/action-access";
 import { SchoolAdminError } from "@/lib/school-admin-policy";
@@ -12,6 +12,8 @@ import { calculateWeightedTermGrade, scoreToGrade } from "@/lib/assessments";
 import { decryptNarrative, encryptNarrative } from "@/lib/narrative-crypto";
 import { canUserAccessCaseArea, generateDisclosurePackage, type CourtRestrictionRecord, type DisclosurePackageResult, type SensitiveCaseRecord } from "@/lib/sensitive-records";
 import { canSpecialistRunCommand, isSpecialistRole } from "@/lib/specialist-access";
+import { normalizePhoneNumber } from "@/lib/sms";
+import { isDemoMode } from "@/lib/runtime-config";
 
 type Actor = Awaited<ReturnType<typeof requireStaff>>;
 function found<T>(row: T | undefined, label: string): T {
@@ -23,7 +25,9 @@ function decimal(value: number) { return value.toFixed(2); }
 export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
   if (actor.role !== "school_admin" && actor.role !== "teacher" && actor.role !== "office_staff" && !isSpecialistRole(actor.role)) throw new SchoolAdminError("School staff access required.");
   const value = workflowCommandSchema.parse(raw);
-  if (actor.role === "office_staff" && value.kind !== "attendance" && value.kind !== "reception_log") throw new SchoolAdminError("Office staff can only correct recorded attendance or log reception desk movements.");
+  if (actor.role === "office_staff" && value.kind !== "attendance" && value.kind !== "reception_log" && value.kind !== "emergency_sms_broadcast") {
+    throw new SchoolAdminError("Office staff can only correct recorded attendance, log reception desk movements, or send emergency broadcasts.");
+  }
   if (isSpecialistRole(actor.role) && !canSpecialistRunCommand(actor.role, value.kind)) throw new SchoolAdminError("Your specialist role cannot change this school record.");
   const org = actor.organizationId;
   return db.transaction(async tx => {
@@ -72,6 +76,7 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
     let entityId = "";
     let noteText: string[] | undefined;
     let packageResult: DisclosurePackageResult | undefined;
+    let broadcastRecipientCount = 0;
     switch (value.kind) {
       case "attendance":
       case "attendance_submit": {
@@ -495,6 +500,67 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
         entityId = logRow.id;
         break;
       }
+      case "emergency_sms_broadcast": {
+        let targetStudentIds: string[] = [];
+        if (value.scope === "whole_school") {
+          const studentRows = await tx.select({ id: students.id }).from(students)
+            .where(and(eq(students.organizationId, org), eq(students.status, "active")));
+          targetStudentIds = studentRows.map(s => s.id);
+        } else if (value.scope === "grade") {
+          const classRows = await tx.select({ id: classes.id }).from(classes)
+            .where(and(eq(classes.organizationId, org), eq(classes.gradeLevelId, value.targetId)));
+          const classIds = classRows.map(c => c.id);
+          if (classIds.length > 0) {
+            const enrollRows = await tx.select({ studentId: enrollments.studentId }).from(enrollments)
+              .where(and(eq(enrollments.organizationId, org), inArray(enrollments.classId, classIds), eq(enrollments.status, "active")));
+            targetStudentIds = Array.from(new Set(enrollRows.map(e => e.studentId)));
+          }
+        } else if (value.scope === "class") {
+          const enrollRows = await tx.select({ studentId: enrollments.studentId }).from(enrollments)
+            .where(and(eq(enrollments.organizationId, org), eq(enrollments.classId, value.targetId), eq(enrollments.status, "active")));
+          targetStudentIds = Array.from(new Set(enrollRows.map(e => e.studentId)));
+        }
+
+        if (targetStudentIds.length === 0) {
+          throw new SchoolAdminError("No active students found in the selected broadcast scope.");
+        }
+
+        const recipientRows = await tx.select({
+          studentId: studentGuardians.studentId,
+          guardianId: guardians.id,
+          firstName: guardians.firstName,
+          lastName: guardians.lastName,
+          phone: guardians.phone,
+        })
+        .from(studentGuardians)
+        .innerJoin(guardians, and(eq(studentGuardians.guardianId, guardians.id), eq(guardians.organizationId, org)))
+        .where(and(eq(studentGuardians.organizationId, org), inArray(studentGuardians.studentId, targetStudentIds)));
+
+        const validRecipients = recipientRows.filter(r => r.phone && r.phone.trim().length >= 4);
+        if (validRecipients.length === 0) {
+          throw new SchoolAdminError("No guardians with registered phone numbers were found for the selected recipients.");
+        }
+
+        const broadcastId = crypto.randomUUID();
+        const sentAt = new Date();
+
+        for (const r of validRecipients) {
+          await tx.insert(smsDispatches).values({
+            organizationId: org,
+            recipientPhone: normalizePhoneNumber(r.phone!),
+            recipientName: `${r.firstName} ${r.lastName}`.trim(),
+            studentId: r.studentId,
+            message: value.message,
+            status: isDemoMode() ? "simulated" : "sent",
+            providerRef: `SM_emg_${Math.random().toString(36).substring(2, 10)}`,
+            sentAt,
+          });
+        }
+
+        broadcastRecipientCount = validRecipients.length;
+        entityId = broadcastId;
+        break;
+      }
     }
     if (value.kind === "statutory_disclosure" && packageResult) {
       await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action: AuditActions.DISCLOSURE_PACKAGE_EXPORTED,
@@ -506,10 +572,13 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
       const action = value.logType === "late_arrival" ? AuditActions.LATE_ARRIVAL_LOGGED : AuditActions.EARLY_DEPARTURE_LOGGED;
       await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action,
         entityType: "reception_log", entityId, metadata: { logType: value.logType, studentId: value.studentId, timeString: value.timeString, minutesLate: value.minutesLate, reason: value.reason, actorPersonName: value.actorPersonName, isExcused: value.isExcused } }, tx);
+    } else if (value.kind === "emergency_sms_broadcast") {
+      await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action: AuditActions.EMERGENCY_BROADCAST_CONFIRMED,
+        entityType: "sms_broadcast", entityId, metadata: { scope: value.scope, targetId: value.targetId, severity: value.severity, recipientCount: broadcastRecipientCount, messageLength: value.message.length } }, tx);
     } else {
       await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action: `${value.kind}.saved`,
         entityType: value.kind, entityId, metadata: "reason" in value ? { reason: value.reason } : {} }, tx);
     }
-    return { entityId, notes: noteText, disclosurePackage: packageResult };
+    return { entityId, notes: noteText, disclosurePackage: packageResult, recipientCount: broadcastRecipientCount };
   });
 }

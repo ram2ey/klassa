@@ -2,7 +2,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { attendanceSessions, attendanceRecords, assessmentCategories, assessments, assessmentGrades,
   reportCards, reportCardSubjectGrades, announcements, sensitiveCases, sensitiveCaseNotes, sensitiveAccessLogs,
-  needToKnowAlerts, courtRestrictions } from "@/db/schema";
+  needToKnowAlerts, courtRestrictions, smsDispatches } from "@/db/schema";
 import { requireStaff } from "@/lib/action-access";
 
 export async function getSchoolWorkflowData(section: string, sessionDate: string) {
@@ -12,6 +12,7 @@ export async function getSchoolWorkflowData(section: string, sessionDate: string
     categories: [] as (typeof assessmentCategories.$inferSelect)[], assessments: [] as (typeof assessments.$inferSelect)[],
     grades: [] as (typeof assessmentGrades.$inferSelect)[], reports: [] as (typeof reportCards.$inferSelect)[],
     reportSubjects: [] as (typeof reportCardSubjectGrades.$inferSelect)[], announcements: [] as (typeof announcements.$inferSelect)[],
+    dispatches: [] as (typeof smsDispatches.$inferSelect)[],
     cases: [] as (typeof sensitiveCases.$inferSelect)[], notes: [] as Pick<typeof sensitiveCaseNotes.$inferSelect, "id" | "caseId" | "noteType" | "createdAt">[],
     accessLogs: [] as Pick<typeof sensitiveAccessLogs.$inferSelect, "id" | "caseId" | "action" | "accessReason" | "accessedAt">[],
     alerts: [] as (typeof needToKnowAlerts.$inferSelect)[], restrictions: [] as (typeof courtRestrictions.$inferSelect)[] };
@@ -30,7 +31,13 @@ export async function getSchoolWorkflowData(section: string, sessionDate: string
     ]);
     return { ...empty, categories, assessments: assessmentRows, grades, reports, reportSubjects };
   }
-  if (section === "communications") return { ...empty, announcements: await db.select().from(announcements).where(eq(announcements.organizationId, org)).orderBy(desc(announcements.createdAt)) };
+  if (section === "communications") {
+    const [announcementRows, dispatchRows] = await Promise.all([
+      db.select().from(announcements).where(eq(announcements.organizationId, org)).orderBy(desc(announcements.createdAt)),
+      db.select().from(smsDispatches).where(eq(smsDispatches.organizationId, org)).orderBy(desc(smsDispatches.sentAt)).limit(50),
+    ]);
+    return { ...empty, announcements: announcementRows, dispatches: dispatchRows };
+  }
   if (section === "sensitive") {
     const [cases, notes, accessLogs, alerts, restrictions] = await Promise.all([
       db.select().from(sensitiveCases).where(eq(sensitiveCases.organizationId, org)).orderBy(desc(sensitiveCases.createdAt)),

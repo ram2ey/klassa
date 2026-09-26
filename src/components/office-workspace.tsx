@@ -3,11 +3,12 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CalendarCheck, ChevronRight, ClipboardList, DoorOpen, GraduationCap, LayoutDashboard, Megaphone, Menu, UsersRound, X } from "lucide-react";
+import { CalendarCheck, ChevronRight, ClipboardList, DoorOpen, GraduationCap, LayoutDashboard, Megaphone, Menu, Radio, UsersRound, X } from "lucide-react";
 import { AccountSignOut } from "@/components/account-sign-out";
 import { StudentCsvImport } from "@/components/student-csv-import";
 import { StudentEnrollmentFlow } from "@/components/student-enrollment-flow";
-import { correctOfficeAttendanceAction, markGuardianAbsenceNoteReviewedAction, recordReceptionDeskAction, reviewAndExcuseGuardianAbsenceAction, saveOfficeRecordAction } from "@/app/actions/office-actions";
+import { correctOfficeAttendanceAction, dispatchEmergencySmsAction, markGuardianAbsenceNoteReviewedAction, recordReceptionDeskAction, reviewAndExcuseGuardianAbsenceAction, saveOfficeRecordAction } from "@/app/actions/office-actions";
+import { EmergencySmsBroadcast } from "@/components/emergency-sms-broadcast";
 import type { OfficeData } from "@/lib/office-data";
 import type { SchoolCommand } from "@/lib/school-admin-policy";
 import type { announcements } from "@/db/schema";
@@ -18,6 +19,7 @@ const tabs = [
   { id: "guardians", label: "Guardians", icon: UsersRound },
   { id: "attendance", label: "Attendance follow-up", icon: CalendarCheck },
   { id: "reception", label: "Reception desk", icon: DoorOpen },
+  { id: "broadcast", label: "Emergency broadcast", icon: Radio },
   { id: "imports", label: "CSV imports", icon: ClipboardList },
   { id: "notices", label: "Notices", icon: Megaphone },
 ] as const;
@@ -95,12 +97,13 @@ export function OfficeWorkspace({ data, notices, section, date }: { data: Office
         {["overview", "attendance"].includes(current.id) && data.medicalAlerts?.length > 0 &&
           <Card title="Active medical directives"><div className="space-y-2">{data.medicalAlerts.map(alert => <article key={alert.id} className="border-l-4 border-amber-600 bg-amber-50 p-3 text-sm"><strong>{name(alert.studentId)} · {words(alert.severity)}</strong><p>{alert.directiveSummary}</p><p className="mt-1 whitespace-pre-wrap">{alert.actionRequired}</p></article>)}</div></Card>}
         {current.id === "attendance" && <Link href="/office/emergency-roll" target="_blank" className="inline-flex min-h-11 items-center border border-blue-700 bg-white px-4 py-2 text-sm font-semibold text-blue-800">Open printable emergency roll sheets</Link>}
-        {current.id === "overview" && <><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">{[
+        {current.id === "overview" && <><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-6">{[
           { label: "Students", value: data.students.length, target: "students" },
           { label: "Pending intake", value: data.students.filter(row => row.status === "pending").length, target: "students" },
           { label: "Guardian contacts", value: data.guardians.length, target: "guardians" },
           { label: "Submitted roll calls", value: submitted.length, target: "attendance" },
           { label: "Reception desk logs", value: data.receptionLogs?.length ?? 0, target: "reception" },
+          { label: "SMS broadcasts", value: data.dispatches?.length ?? 0, target: "broadcast" },
         ].map(item => <Link key={item.label} href={`/?section=${item.target}`} className="border border-slate-200 bg-white p-5"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{item.label}</p><p className="mt-3 text-3xl font-bold">{item.value}</p></Link>)}</div><div className="grid gap-5 xl:grid-cols-2"><Card title="Office tasks"><div className="space-y-3 text-sm">{[
           { label: "Review students awaiting intake", count: data.students.filter(row => row.status === "pending").length, target: "students" },
           { label: "Link guardians to students", count: data.students.filter(row => !data.links.some(link => link.studentId === row.id)).length, target: "guardians" },
@@ -309,6 +312,22 @@ export function OfficeWorkspace({ data, notices, section, date }: { data: Office
               </div>
             </Card>
           </div>
+        )}
+        {current.id === "broadcast" && (
+          <EmergencySmsBroadcast
+            grades={data.grades}
+            classes={data.classes}
+            dispatches={data.dispatches}
+            onDispatch={async (cmd) => {
+              const res = await dispatchEmergencySmsAction(cmd);
+              if (res.success) {
+                router.refresh();
+                return { success: true, recipientCount: res.recipientCount };
+              }
+              return { success: false, error: res.error };
+            }}
+            schoolName={data.school.name}
+          />
         )}
         {current.id === "imports" && <StudentCsvImport role="office_staff" />}
         {current.id === "notices" && <Card title="Published school notices">{notices.map(notice => <article key={notice.id} className="border-b border-slate-100 py-4"><div className="flex justify-between gap-3"><h3 className="font-semibold">{notice.title}</h3><span className="text-xs text-slate-500">{words(notice.priority)}</span></div><p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{notice.content}</p></article>)}{!notices.length && <p className="text-sm text-slate-500">No published notices.</p>}</Card>}

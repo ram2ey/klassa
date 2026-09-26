@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { academicYears, attendanceRecords, attendanceSessions, classes, courtRestrictions, enrollments,
-  gradeLevels, guardianAbsenceNotes, guardians, organizations, receptionLogs, studentGuardians, students, users,
+  gradeLevels, guardianAbsenceNotes, guardians, organizations, receptionLogs, smsDispatches, studentGuardians, students, users,
   needToKnowAlerts, sensitiveCases } from "@/db/schema";
 import { requireStaff } from "@/lib/action-access";
 import { buildUnexplainedAbsenceCallList } from "@/lib/office-absence-followup";
@@ -10,7 +10,7 @@ import { buildTeacherSafetyNotices } from "@/lib/teacher-safety";
 export async function getOfficeData(sessionDate: string) {
   const actor = await requireStaff(["office_staff"]);
   const org = actor.organizationId;
-  const [school, years, grades, classRows, studentRows, guardianRows, links, enrollmentRows, sessionRows, restrictions, absenceNotes, dateNotes, receptionLogRows] = await Promise.all([
+  const [school, years, grades, classRows, studentRows, guardianRows, links, enrollmentRows, sessionRows, restrictions, absenceNotes, dateNotes, receptionLogRows, dispatchRows] = await Promise.all([
     db.select({ id: organizations.id, name: organizations.name, slug: organizations.slug }).from(organizations).where(eq(organizations.id, org)).then(rows => rows[0]),
     db.select().from(academicYears).where(eq(academicYears.organizationId, org)),
     db.select().from(gradeLevels).where(eq(gradeLevels.organizationId, org)).orderBy(gradeLevels.position),
@@ -37,6 +37,10 @@ export async function getOfficeData(sessionDate: string) {
     db.select().from(receptionLogs)
       .where(and(eq(receptionLogs.organizationId, org), eq(receptionLogs.logDate, sessionDate)))
       .orderBy(desc(receptionLogs.createdAt)),
+    db.select().from(smsDispatches)
+      .where(eq(smsDispatches.organizationId, org))
+      .orderBy(desc(smsDispatches.sentAt))
+      .limit(50),
   ]);
   if (!school) throw new Error("School not found.");
   const sessionIds = sessionRows.map(row => row.id);
@@ -53,7 +57,7 @@ export async function getOfficeData(sessionDate: string) {
   const medicalAlerts = buildTeacherSafetyNotices(studentRows.map(row => row.id), medicalRows, []).alerts;
   return { actor, school, years, grades, classes: classRows, students: studentRows, guardians: guardianRows,
     links, enrollments: enrollmentRows, sessions: sessionRows, records, restrictions, absenceNotes,
-    unexplainedAbsences, medicalAlerts, receptionLogs: receptionLogRows };
+    unexplainedAbsences, medicalAlerts, receptionLogs: receptionLogRows, dispatches: dispatchRows };
 }
 
 export type OfficeData = Awaited<ReturnType<typeof getOfficeData>>;

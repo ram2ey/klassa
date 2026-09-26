@@ -61,5 +61,32 @@ describe("period attendance policy", () => {
       reason: "Section 47 child protection inquiry",
     });
     expect(disclosure).toMatchObject({ kind: "statutory_disclosure" });
+
+    const sms = workflowCommandSchema.parse({
+      kind: "emergency_sms_broadcast",
+      scope: "whole_school",
+      targetId: "all",
+      severity: "lockdown",
+      message: "Campus lockdown in effect. All students secure indoors.",
+    });
+    expect(sms).toMatchObject({ kind: "emergency_sms_broadcast", severity: "lockdown" });
+
+    // Invalid message length (less than 5 chars)
+    expect(workflowCommandSchema.safeParse({
+      kind: "emergency_sms_broadcast",
+      scope: "whole_school",
+      targetId: "all",
+      severity: "lockdown",
+      message: "Hi",
+    }).success).toBe(false);
+
+    // Invalid message length (greater than 320 chars)
+    expect(workflowCommandSchema.safeParse({
+      kind: "emergency_sms_broadcast",
+      scope: "whole_school",
+      targetId: "all",
+      severity: "lockdown",
+      message: "A".repeat(321),
+    }).success).toBe(false);
   });
 });

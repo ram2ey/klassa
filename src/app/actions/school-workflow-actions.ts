@@ -8,7 +8,7 @@ import { saveSchoolWorkflow } from "@/lib/school-workflow-service";
 import type { WorkflowCommand } from "@/lib/school-workflow-policy";
 
 export async function saveSchoolWorkflowAction(input: WorkflowCommand) {
-  const actor = await requireStaff(["school_admin", "safeguarding_lead", "senco", "health_nurse"]);
+  const actor = await requireStaff(["school_admin", "safeguarding_lead", "senco", "health_nurse", "office_staff"]);
   try {
     const result = await saveSchoolWorkflow(actor, input);
     revalidatePath("/");

@@ -87,3 +87,12 @@ export async function reviewAndExcuseGuardianAbsenceAction(noteId: string) {
     return { success: true as const, ...result };
   } catch (error) { return { success: false as const, error: failure(error) }; }
 }
+
+export async function dispatchEmergencySmsAction(input: WorkflowCommand) {
+  const actor = await requireStaff(["office_staff", "school_admin"]);
+  try {
+    const result = await saveSchoolWorkflow(actor, input);
+    revalidatePath("/");
+    return { success: true as const, ...result };
+  } catch (error) { return { success: false as const, error: failure(error) }; }
+}

@@ -7,6 +7,7 @@ const mocks = vi.hoisted(() => ({
   saveOffice: vi.fn(),
   correctAttendance: vi.fn(),
   recordReception: vi.fn(),
+  dispatchSms: vi.fn(),
   refresh: vi.fn(),
 }));
 
@@ -22,6 +23,7 @@ vi.mock("@/app/actions/office-actions", () => ({
   saveOfficeRecordAction: mocks.saveOffice,
   correctOfficeAttendanceAction: mocks.correctAttendance,
   recordReceptionDeskAction: mocks.recordReception,
+  dispatchEmergencySmsAction: mocks.dispatchSms,
   markGuardianAbsenceNoteReviewedAction: vi.fn(),
   reviewAndExcuseGuardianAbsenceAction: vi.fn(),
 }));
@@ -82,6 +84,7 @@ const mockData: OfficeData = {
       updatedAt: new Date(),
     },
   ],
+  dispatches: [],
 };
 
 beforeEach(() => {
@@ -180,5 +183,39 @@ describe("OfficeWorkspace reception desk component", () => {
     expect(screen.getAllByText("Leo Valdez").length).toBeGreaterThan(0);
     expect(screen.getByText("Bus delay")).toBeTruthy();
     expect(screen.getByText("Traffic on Route 4")).toBeTruthy();
+  });
+
+  it("renders the emergency broadcast tab and overview card", () => {
+    render(
+      <OfficeWorkspace
+        data={{
+          ...mockData,
+          dispatches: [
+            {
+              id: "disp-1",
+              organizationId: "org-1",
+              studentId: "student-1",
+              recipientName: "Parent One",
+              recipientPhone: "+354 555 1234",
+              message: "Test emergency alert",
+              status: "sent",
+              providerRef: "SM-1",
+              error: null,
+              sentAt: new Date(),
+              createdAt: new Date(),
+              updatedAt: new Date(),
+            },
+          ],
+        }}
+        notices={[]}
+        section="overview"
+        date="2026-09-26"
+      />
+    );
+    expect(screen.getByText("SMS broadcasts")).toBeTruthy();
+
+    cleanup();
+    render(<OfficeWorkspace data={mockData} notices={[]} section="broadcast" date="2026-09-26" />);
+    expect(screen.getByRole("heading", { level: 2, name: "Emergency Parent SMS Broadcast" })).toBeTruthy();
   });
 });
