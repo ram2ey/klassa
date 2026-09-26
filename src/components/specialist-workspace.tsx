@@ -9,6 +9,8 @@ import type { SpecialistData } from "@/lib/specialist-data";
 import type { WorkflowCommand } from "@/lib/school-workflow-policy";
 import type { announcements } from "@/db/schema";
 import { formatGMTDateTime } from "@/lib/timezone";
+import { DisclosurePackageModal } from "@/components/sensitive/disclosure-package-modal";
+import type { DisclosurePackageResult } from "@/lib/sensitive-records";
 
 const input = "mt-1 block min-h-11 w-full border border-slate-300 bg-white px-3 py-2 text-sm";
 const primary = "min-h-11 bg-blue-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50";
@@ -33,11 +35,21 @@ export function SpecialistWorkspace({ data, notices, section }: { data: Speciali
   const [pending, start] = useTransition();
   const [message, setMessage] = useState("");
   const [revealed, setRevealed] = useState<{ caseId: string; notes: string[] } | null>(null);
+  const [disclosurePackage, setDisclosurePackage] = useState<DisclosurePackageResult | null>(null);
   const isDsl = data.actor.role === "safeguarding_lead";
+  const isNurse = data.actor.role === "health_nurse";
   const roleName = data.actor.role === "safeguarding_lead" ? "Safeguarding lead" : data.actor.role === "senco" ? "SENCO" : "School nurse";
-  const tabs = [{ id: "overview", label: "Overview" }, { id: "cases", label: "Cases" },
-    { id: "directives", label: "Staff directives" }, ...(isDsl ? [{ id: "court", label: "Court restrictions" }] : []),
-    { id: "notices", label: "Notices" }];
+  const tabs = [
+    { id: "overview", label: "Overview" },
+    { id: "cases", label: "Cases" },
+    { id: "directives", label: "Staff directives" },
+    ...(isDsl ? [
+      { id: "court", label: "Court restrictions" },
+      { id: "disclosures", label: "Statutory disclosures" },
+    ] : []),
+    ...(isNurse ? [{ id: "clinic", label: "Clinic triage log" }] : []),
+    { id: "notices", label: "Notices" },
+  ];
   const current = tabs.find(tab => tab.id === section) ?? tabs[0];
   const studentName = (id: string) => { const student = data.students.find(row => row.id === id); return student ? `${student.firstName} ${student.lastName}` : "Student"; };
   const studentOptions = data.students.map(student => ({ id: student.id, name: `${student.firstName} ${student.lastName} (${student.studentNumber})` }));
@@ -48,6 +60,7 @@ export function SpecialistWorkspace({ data, notices, section }: { data: Speciali
     setMessage(result.success ? "Saved successfully." : result.error);
     if (result.success) {
       if (command.kind === "sensitive_access") setRevealed({ caseId: command.caseId, notes: result.notes ?? [] });
+      if (command.kind === "statutory_disclosure" && result.disclosurePackage) setDisclosurePackage(result.disclosurePackage);
       router.refresh();
     }
   });
@@ -65,10 +78,11 @@ export function SpecialistWorkspace({ data, notices, section }: { data: Speciali
     <div className="min-w-0"><header className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4 sm:px-8"><div><p className="text-xs font-semibold uppercase tracking-wide text-blue-700">{roleName}</p><p className="font-bold">{data.school.name}</p></div><AccountSignOut /></header>
       <main id="specialist-content" className="mx-auto max-w-6xl space-y-6 p-4 sm:p-8"><div><h1 className="text-2xl font-bold">{current.label}</h1><p className="mt-1 text-sm text-slate-600">{data.actor.name} · {data.areas.map(words).join(", ")}</p></div>
         {message && <p role="status" className="border border-blue-200 bg-blue-50 p-3 text-sm text-blue-950">{message}</p>}
-        {current.id === "overview" && <><div className="grid gap-4 sm:grid-cols-3">{[
+        {current.id === "overview" && <><div className={`grid gap-4 ${isNurse ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}>{[
           { label: "Open cases", value: data.cases.filter(row => row.status === "open").length, href: "cases" },
           { label: "Under review", value: data.cases.filter(row => row.status === "under_review").length, href: "cases" },
           { label: "Active directives", value: data.alerts.filter(row => row.isActive && (!row.expiresAt || row.expiresAt > new Date())).length, href: "directives" },
+          ...(isNurse ? [{ label: "Clinic visits logged", value: data.clinicVisits?.length ?? 0, href: "clinic" }] : []),
         ].map(item => <Link key={item.label} href={`/?section=${item.href}`} className="border border-slate-200 bg-white p-5"><p className="text-xs uppercase text-slate-500">{item.label}</p><p className="mt-2 text-3xl font-bold">{item.value}</p></Link>)}</div>
           <Box title="Recent cases">{data.cases.slice(0, 8).map(row => <p key={row.id} className="border-b border-slate-100 py-2 text-sm"><strong>{row.caseNumber}</strong> · {studentName(row.studentId)} · {words(row.area)} · {words(row.status)}</p>)}{!data.cases.length && <p className="text-sm text-slate-500">No cases in your permitted areas.</p>}</Box>
           {isDsl && <Box title="Enforced court restrictions"><p className="text-sm">{data.restrictions.filter(row => row.isEnforced).length} restrictions are currently marked enforced. Review dates and details before relying on an order.</p><Link href="/?section=court" className="inline-flex min-h-11 items-center font-semibold text-blue-700 underline">Review restrictions</Link></Box>}</>}
@@ -87,8 +101,116 @@ export function SpecialistWorkspace({ data, notices, section }: { data: Speciali
         {current.id === "court" && isDsl && <><Box title="Record court restriction"><form className="grid gap-3 sm:grid-cols-2" onSubmit={event => submit(event, form => ({ kind: "court_restriction", studentId: value(form, "studentId"), restrictedPersonName: value(form, "person"), orderType: value(form, "orderType") as "restraining_order", docketNumber: value(form, "docket"), issuingCourt: value(form, "court"), summary: value(form, "summary"), effectiveDate: value(form, "effectiveDate"), expirationDate: value(form, "expirationDate"), prohibitPickup: form.has("pickup"), prohibitDisclosure: form.has("disclosure"), prohibitDirectContact: form.has("contact") }))}>
           <Select name="studentId" label="Student" options={studentOptions} /><Field name="person" label="Restricted person" /><Select name="orderType" label="Order type" options={["restraining_order", "custody_restriction", "prohibited_contact", "non_disclosure"].map(item => ({ id: item, name: words(item) }))} /><Field name="docket" label="Docket number" /><Field name="court" label="Issuing court" /><Field name="effectiveDate" label="Effective date" type="date" /><label className="block text-sm font-medium">Expiration date (optional)<input className={input} name="expirationDate" type="date" /></label><label className="block text-sm font-medium sm:col-span-2">Order summary<textarea name="summary" className={`${input} min-h-24`} required /></label><div className="flex flex-wrap gap-4 text-sm sm:col-span-2"><label><input name="pickup" type="checkbox" defaultChecked /> Prohibit pickup</label><label><input name="disclosure" type="checkbox" defaultChecked /> Prohibit disclosure</label><label><input name="contact" type="checkbox" defaultChecked /> Prohibit contact</label></div><button className={primary} disabled={pending || !data.students.length}>Record restriction</button>
         </form></Box><Box title="Court restrictions">{data.restrictions.map(row => <article key={row.id} className="flex flex-wrap justify-between gap-3 border-b border-slate-100 py-3 text-sm"><div><strong>{studentName(row.studentId)} · {row.restrictedPersonName}</strong><p>{words(row.orderType)} · {row.issuingCourt} · {row.docketNumber}</p><p className="mt-1 whitespace-pre-wrap">{row.summary}</p><p className="mt-1 text-xs text-slate-500">{row.isEnforced ? "Enforced" : "Inactive"} · {row.effectiveDate}{row.expirationDate ? ` to ${row.expirationDate}` : ""}</p></div><button className={secondary} disabled={pending} onClick={() => { const reason = window.prompt(`Reason to ${row.isEnforced ? "deactivate" : "reactivate"} this restriction`); if (reason) save({ kind: "court_restriction_status", restrictionId: row.id, isEnforced: !row.isEnforced, reason }); }}>{row.isEnforced ? "Deactivate" : "Reactivate"}</button></article>)}{!data.restrictions.length && <p className="text-sm text-slate-500">No court restrictions recorded.</p>}</Box></>}
+        {current.id === "disclosures" && isDsl && <><Box title="Statutory multi-agency disclosure package">
+          <p className="text-sm text-slate-600">
+            Compile an audited, cryptographically sealed case chronology and protective order ledger for social services (MASH), child protection conferences, family courts, or law enforcement. All disclosures are logged with SHA-256 integrity checksums.
+          </p>
+          <form className="grid gap-3 sm:grid-cols-2" onSubmit={event => submit(event, form => ({
+            kind: "statutory_disclosure",
+            studentId: value(form, "studentId"),
+            recipientAgency: value(form, "agency"),
+            reason: value(form, "reason"),
+          }))}>
+            <Select name="studentId" label="Student" options={studentOptions} />
+            <Field name="agency" label="Recipient agency / authority" />
+            <div className="sm:col-span-2">
+              <Field name="reason" label="Statutory legal basis / case reference" />
+            </div>
+            <button className={primary} disabled={pending || !data.students.length}>
+              Generate certified disclosure package
+            </button>
+          </form>
+        </Box>
+        <Box title="Statutory data sharing guidelines">
+          <div className="space-y-2 text-xs text-slate-600 leading-relaxed">
+            <p><strong>KCSIE & GDPR Article 6(1)(e) / 9(2)(b):</strong> Information sharing in child safeguarding is lawful and necessary to prevent harm or assist statutory child protection inquiries.</p>
+            <p><strong>Digital Integrity Seal:</strong> Every generated dossier receives an immutable SHA-256 digest recorded in the school institutional audit trail.</p>
+          </div>
+        </Box></>}
+        {current.id === "clinic" && isNurse && <><Box title="Log clinic visit & triage">
+          <p className="text-sm text-slate-600">Record a student infirmary visit, presenting symptoms, treatment administered, and guardian notifications.</p>
+          <form className="grid gap-3 sm:grid-cols-2" onSubmit={event => submit(event, form => ({
+            kind: "clinic_visit",
+            studentId: value(form, "studentId"),
+            category: value(form, "category"),
+            symptoms: value(form, "symptoms"),
+            treatment: value(form, "treatment"),
+            outcome: value(form, "outcome") as "returned_to_class",
+            guardianNotified: form.has("guardianNotified"),
+            guardianNotificationNotes: value(form, "guardianNotificationNotes"),
+          }))}>
+            <Select name="studentId" label="Student" options={studentOptions} />
+            <Select name="category" label="Visit category" options={[
+              { id: "illness", name: "Illness / Malaise" },
+              { id: "injury", name: "Injury / First Aid" },
+              { id: "chronic_condition", name: "Chronic condition / Asthma" },
+              { id: "medication", name: "Medication administration" },
+              { id: "mental_health", name: "Mental health / Emotional distress" },
+              { id: "other", name: "Other" },
+            ]} />
+            <label className="block text-sm font-medium sm:col-span-2">Presenting symptoms / complaint
+              <textarea name="symptoms" className={`${input} min-h-20`} required placeholder="e.g. Headache, fever, nausea, scraped knee..." />
+            </label>
+            <label className="block text-sm font-medium sm:col-span-2">Triage assessment & treatment administered
+              <textarea name="treatment" className={`${input} min-h-20`} required placeholder="e.g. Rested 15 min, ice pack applied, oral rehydration, inhaler administered..." />
+            </label>
+            <Select name="outcome" label="Visit outcome" options={[
+              { id: "returned_to_class", name: "Returned to class" },
+              { id: "resting_in_clinic", name: "Resting in clinic" },
+              { id: "sent_home", name: "Sent home" },
+              { id: "collected_by_guardian", name: "Collected by guardian" },
+              { id: "emergency_referral", name: "Emergency medical referral" },
+            ]} />
+            <div className="flex flex-col justify-end space-y-2">
+              <label className="flex items-center gap-2 text-sm font-medium">
+                <input type="checkbox" name="guardianNotified" /> Guardian was notified
+              </label>
+              <Field name="guardianNotificationNotes" label="Guardian contact notes (optional)" />
+            </div>
+            <button className={`${primary} sm:col-span-2`} disabled={pending || !data.students.length}>
+              Record clinic visit
+            </button>
+          </form>
+        </Box>
+        <Box title={`Clinic visit register (${data.clinicVisits?.length ?? 0})`}>
+          <div className="space-y-4">
+            {data.clinicVisits?.map(visit => (
+              <article key={visit.id} className="space-y-2 border border-slate-200 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <h3 className="font-bold text-slate-900">
+                    {studentName(visit.studentId)} · {words(visit.category)}
+                  </h3>
+                  <span className="font-mono text-xs text-slate-500">
+                    {formatGMTDateTime(visit.createdAt)}
+                  </span>
+                </div>
+                <div className="text-xs text-slate-700 space-y-1">
+                  <p><strong>Symptoms:</strong> {visit.symptoms}</p>
+                  <p><strong>Treatment:</strong> {visit.treatment}</p>
+                  <p><strong>Outcome:</strong> <span className="font-medium capitalize">{visit.outcome.replaceAll("_", " ")}</span></p>
+                  {visit.guardianNotified && (
+                    <p className="text-emerald-700">
+                      ✓ Guardian notified{visit.guardianNotificationNotes ? `: ${visit.guardianNotificationNotes}` : ""}
+                    </p>
+                  )}
+                </div>
+              </article>
+            ))}
+            {(!data.clinicVisits || data.clinicVisits.length === 0) && (
+              <p className="text-sm text-slate-500">No clinic visits recorded yet.</p>
+            )}
+          </div>
+        </Box></>}
         {current.id === "notices" && <Box title="School notices">{notices.map(row => <article key={row.id} className="border-b border-slate-100 py-3"><h3 className="font-semibold">{row.title}</h3><p className="mt-1 whitespace-pre-wrap text-sm">{row.content}</p></article>)}{!notices.length && <p className="text-sm text-slate-500">No published notices.</p>}</Box>}
       </main>
     </div>
+    {disclosurePackage && (
+      <DisclosurePackageModal
+        packageData={disclosurePackage}
+        schoolName={data.school.name}
+        onClose={() => setDisclosurePackage(null)}
+      />
+    )}
   </div>;
 }
+

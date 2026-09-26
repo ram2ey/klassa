@@ -12,7 +12,7 @@ const data = {
   actor: { organizationId: "school-a", userId: "nurse-a", name: "Avery Lee", role: "health_nurse" },
   school: { id: "school-a", name: "Northfield School" }, areas: ["health_medical"],
   students: [{ id: "student-a", firstName: "Ada", lastName: "Lee", studentNumber: "100" }],
-  cases: [], notes: [], accessLogs: [], alerts: [], restrictions: [],
+  cases: [], notes: [], accessLogs: [], alerts: [], restrictions: [], clinicVisits: [],
 } as SpecialistData;
 
 beforeEach(() => { mocks.save.mockReset().mockResolvedValue({ success: true, entityId: "case-a" }); mocks.refresh.mockClear(); });
@@ -36,5 +36,60 @@ describe("live specialist workspace", () => {
     await waitFor(() => expect(mocks.save).toHaveBeenCalledWith({ kind: "sensitive_case", studentId: "student-a",
       caseNumber: "MED-1", area: "health_medical", confidentialityTier: "confidential", title: "Medical care plan" }));
     await waitFor(() => expect(mocks.refresh).toHaveBeenCalledOnce());
+  });
+  it("records a clinic visit for the school nurse", async () => {
+    render(<SpecialistWorkspace data={data} notices={[]} section="clinic" />);
+    fireEvent.change(screen.getByLabelText("Student"), { target: { value: "student-a" } });
+    fireEvent.change(screen.getByLabelText("Visit category"), { target: { value: "injury" } });
+    fireEvent.change(screen.getByLabelText("Presenting symptoms / complaint"), { target: { value: "Scraped knee during sports" } });
+    fireEvent.change(screen.getByLabelText("Triage assessment & treatment administered"), { target: { value: "Antiseptic wash and sterile dressing" } });
+    fireEvent.change(screen.getByLabelText("Visit outcome"), { target: { value: "returned_to_class" } });
+    fireEvent.click(screen.getByLabelText("Guardian was notified"));
+    fireEvent.change(screen.getByLabelText("Guardian contact notes (optional)"), { target: { value: "Mother notified via telephone" } });
+    fireEvent.click(screen.getByRole("button", { name: "Record clinic visit" }));
+    await waitFor(() => expect(mocks.save).toHaveBeenCalledWith({
+      kind: "clinic_visit",
+      studentId: "student-a",
+      category: "injury",
+      symptoms: "Scraped knee during sports",
+      treatment: "Antiseptic wash and sterile dressing",
+      outcome: "returned_to_class",
+      guardianNotified: true,
+      guardianNotificationNotes: "Mother notified via telephone",
+    }));
+    await waitFor(() => expect(mocks.refresh).toHaveBeenCalledOnce());
+  });
+  it("allows safeguarding lead to generate a statutory disclosure package", async () => {
+    const dslData = {
+      ...data,
+      actor: { organizationId: "school-a", userId: "dsl-1", name: "Morgan DSL", role: "safeguarding_lead" },
+      areas: ["safeguarding", "health_medical", "disciplinary"],
+    } as SpecialistData;
+    mocks.save.mockResolvedValueOnce({
+      success: true,
+      entityId: "student-a",
+      disclosurePackage: {
+        studentName: "Ada Lee",
+        dossierNumber: "DISCL-100-2026",
+        generatedAt: "2026-09-26T10:00:00Z",
+        schoolName: "Northfield School",
+        recipientAgency: "Reykjavik CPS",
+        includedRecords: [],
+        withheldSafeguardingCount: 0,
+        activeCourtOrdersCount: 0,
+        digitalIntegrityChecksum: "abcdef1234567890",
+      },
+    });
+    render(<SpecialistWorkspace data={dslData} notices={[]} section="disclosures" />);
+    fireEvent.change(screen.getByLabelText("Student"), { target: { value: "student-a" } });
+    fireEvent.change(screen.getByLabelText("Recipient agency / authority"), { target: { value: "Reykjavik CPS" } });
+    fireEvent.change(screen.getByLabelText("Statutory legal basis / case reference"), { target: { value: "Section 47 investigation" } });
+    fireEvent.click(screen.getByRole("button", { name: "Generate certified disclosure package" }));
+    await waitFor(() => expect(mocks.save).toHaveBeenCalledWith({
+      kind: "statutory_disclosure",
+      studentId: "student-a",
+      recipientAgency: "Reykjavik CPS",
+      reason: "Section 47 investigation",
+    }));
   });
 });

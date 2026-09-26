@@ -148,6 +148,20 @@
       "when": 1790403111616,
       "tag": "0020_long_polaris",
       "breakpoints": true
+    },
+    {
+      "idx": 21,
+      "version": "7",
+      "when": 1790413931472,
+      "tag": "0021_minor_cerebro",
+      "breakpoints": true
+    },
+    {
+      "idx": 22,
+      "version": "7",
+      "when": 1790415310128,
+      "tag": "0022_fresh_captain_universe",
+      "breakpoints": true
     }
   ]
 }

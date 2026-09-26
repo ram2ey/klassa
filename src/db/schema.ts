@@ -34,6 +34,8 @@ export const gdprRequestType = pgEnum("gdpr_request_type", ["export", "rectify",
 export const gdprRequestStatus = pgEnum("gdpr_request_status", ["pending", "in_review", "completed", "rejected"]);
 export const drillStatus = pgEnum("drill_status", ["passed", "failed", "partial"]);
 export const platformIncidentSeverity = pgEnum("platform_incident_severity", ["warning", "critical"]);
+export const clinicVisitOutcome = pgEnum("clinic_visit_outcome", ["returned_to_class", "resting_in_clinic", "sent_home", "collected_by_guardian", "emergency_referral"]);
+export const receptionLogType = pgEnum("reception_log_type", ["late_arrival", "early_departure"]);
 
 export const organizations = pgTable("organizations", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -643,6 +645,44 @@ export const courtRestrictions = pgTable("court_restrictions", {
   ...timestamps,
 }, (table) => [
   index("court_restrictions_student_idx").on(table.organizationId, table.studentId),
+]);
+
+export const clinicVisits = pgTable("clinic_visits", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  studentId: uuid("student_id").notNull().references(() => students.id, { onDelete: "cascade" }),
+  attendedBy: text("attended_by").references(() => users.id, { onDelete: "set null" }),
+  category: varchar("category", { length: 60 }).notNull(),
+  symptoms: text("symptoms").notNull(),
+  treatment: text("treatment").notNull(),
+  outcome: clinicVisitOutcome("outcome").default("returned_to_class").notNull(),
+  guardianNotified: boolean("guardian_notified").default(false).notNull(),
+  guardianNotificationNotes: text("guardian_notification_notes"),
+  visitDate: date("visit_date").notNull(),
+  ...timestamps,
+}, (table) => [
+  index("clinic_visits_org_date_idx").on(table.organizationId, table.visitDate),
+  index("clinic_visits_student_idx").on(table.organizationId, table.studentId),
+]);
+
+export const receptionLogs = pgTable("reception_logs", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  studentId: uuid("student_id").notNull().references(() => students.id, { onDelete: "cascade" }),
+  logType: receptionLogType("log_type").notNull(),
+  logDate: date("log_date").notNull(),
+  timeString: varchar("time_string", { length: 10 }).notNull(),
+  minutesLate: integer("minutes_late").default(0).notNull(),
+  reason: varchar("reason", { length: 255 }).notNull(),
+  actorPersonName: varchar("actor_person_name", { length: 180 }),
+  relationship: varchar("relationship", { length: 80 }),
+  isExcused: boolean("is_excused").default(false).notNull(),
+  recordedBy: text("recorded_by").references(() => users.id, { onDelete: "set null" }),
+  remarks: text("remarks"),
+  ...timestamps,
+}, (table) => [
+  index("reception_logs_org_date_idx").on(table.organizationId, table.logDate),
+  index("reception_logs_student_idx").on(table.organizationId, table.studentId),
 ]);
 
 export const gdprRequests = pgTable("gdpr_requests", {

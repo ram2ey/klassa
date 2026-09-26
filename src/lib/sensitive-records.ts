@@ -230,8 +230,11 @@ export function checkGuardianAccessRestrictions(
 // -------------------------------------------------------------
 export interface DisclosurePackageResult {
   studentName: string;
+  studentNumber?: string;
   dossierNumber: string;
   generatedAt: string;
+  schoolName?: string;
+  recipientAgency?: string;
   includedRecords: Array<{
     area: string;
     title: string;
@@ -245,10 +248,11 @@ export interface DisclosurePackageResult {
 }
 
 export function generateDisclosurePackage(
-  student: { id: string; name: string },
+  student: { id: string; name: string; studentNumber?: string },
   cases: SensitiveCaseRecord[],
   courtOrders: CourtRestrictionRecord[],
-  requestingRole: KlassoRole
+  requestingRole: KlassoRole,
+  metadata?: { schoolName?: string; recipientAgency?: string }
 ): DisclosurePackageResult {
   const studentCases = cases.filter((c) => c.studentId === student.id);
   const activeOrders = courtOrders.filter((o) => o.studentId === student.id && o.isEnforced);
@@ -277,8 +281,11 @@ export function generateDisclosurePackage(
 
   return {
     studentName: student.name,
+    studentNumber: student.studentNumber,
     dossierNumber: `DISCL-${student.id.substring(0, 8).toUpperCase()}-${Date.now().toString().slice(-4)}`,
     generatedAt: new Date().toISOString(),
+    schoolName: metadata?.schoolName,
+    recipientAgency: metadata?.recipientAgency,
     includedRecords: included,
     withheldSafeguardingCount: withheldSafeguarding,
     activeCourtOrdersCount: activeOrders.length,

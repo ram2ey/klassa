@@ -29,4 +29,37 @@ describe("period attendance policy", () => {
     expect(canTeacherTakeAttendance("period_1", false, false)).toBe(false);
     expect(canTeacherTakeAttendance("morning_roll_call", true, false)).toBe(true);
   });
+
+  it("validates reception log and specialist workflow commands", () => {
+    const late = workflowCommandSchema.parse({
+      kind: "reception_log",
+      studentId,
+      logType: "late_arrival",
+      logDate: "2026-09-26",
+      timeString: "09:30",
+      minutesLate: 30,
+      reason: "Bus delay",
+    });
+    expect(late).toMatchObject({ kind: "reception_log", minutesLate: 30, isExcused: false });
+
+    const clinic = workflowCommandSchema.parse({
+      kind: "clinic_visit",
+      studentId,
+      category: "illness",
+      symptoms: "Fever and headache",
+      treatment: "Temperature taken, rested with water",
+      outcome: "resting_in_clinic",
+      guardianNotified: true,
+      guardianNotificationNotes: "Called mom",
+    });
+    expect(clinic).toMatchObject({ outcome: "resting_in_clinic", guardianNotified: true });
+
+    const disclosure = workflowCommandSchema.parse({
+      kind: "statutory_disclosure",
+      studentId,
+      recipientAgency: "Social Services",
+      reason: "Section 47 child protection inquiry",
+    });
+    expect(disclosure).toMatchObject({ kind: "statutory_disclosure" });
+  });
 });

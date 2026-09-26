@@ -1,7 +1,8 @@
 import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { academicYears, attendanceRecords, attendanceSessions, auditEvents, classes, courtRestrictions, enrollments, gradeLevels, guardians, needToKnowAlerts, organizationMemberships,
-  organizations, reportCards, studentGuardians, students, subjects, teacherClassAssignments, terms, users } from "@/db/schema";
+  organizations, reportCards, studentGuardians, students, subjects, teacherClassAssignments, terms, users,
+  guardianAbsenceNotes } from "@/db/schema";
 import { requireStaff } from "@/lib/action-access";
 
 export async function getSchoolAdminData() {
@@ -48,8 +49,13 @@ export async function getSchoolAdminData() {
       prohibitDisclosure: courtRestrictions.prohibitDisclosure, effectiveDate: courtRestrictions.effectiveDate, expirationDate: courtRestrictions.expirationDate })
       .from(courtRestrictions).where(and(eq(courtRestrictions.organizationId, org), eq(courtRestrictions.isEnforced, true))),
   ]);
+  const absenceNotes = await db.select({ id: guardianAbsenceNotes.id, studentId: guardianAbsenceNotes.studentId,
+    absenceDate: guardianAbsenceNotes.absenceDate, reasonCategory: guardianAbsenceNotes.reasonCategory,
+    status: guardianAbsenceNotes.status, createdAt: guardianAbsenceNotes.createdAt })
+    .from(guardianAbsenceNotes).where(eq(guardianAbsenceNotes.organizationId, org))
+    .orderBy(desc(guardianAbsenceNotes.createdAt)).limit(100);
   return { school, actor, students: studentRows, guardians: guardianRows, links, staff, classes: classRows, assignments,
-    grades, years, terms: termRows, subjects: subjectRows, enrollments: enrollmentRows, audit,
+    grades, years, terms: termRows, subjects: subjectRows, enrollments: enrollmentRows, audit, absenceNotes,
     attendanceSummary, publishedReports, activeAlerts: activeAlerts.filter(alert => !alert.expiresAt || alert.expiresAt > new Date()),
     activeRestrictions: activeRestrictions.filter(restriction => restriction.effectiveDate <= new Date().toISOString().slice(0, 10) &&
       (!restriction.expirationDate || restriction.expirationDate >= new Date().toISOString().slice(0, 10))) };

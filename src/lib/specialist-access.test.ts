@@ -17,5 +17,8 @@ describe("specialist permissions", () => {
     expect(canSpecialistRunCommand("safeguarding_lead", "court_restriction")).toBe(true);
     expect(canSpecialistRunCommand("senco", "court_restriction")).toBe(false);
     expect(canSpecialistRunCommand("health_nurse", "court_restriction_status")).toBe(false);
+    expect(canSpecialistRunCommand("health_nurse", "clinic_visit")).toBe(true);
+    expect(canSpecialistRunCommand("senco", "clinic_visit")).toBe(false);
+    expect(canSpecialistRunCommand("safeguarding_lead", "clinic_visit")).toBe(false);
   });
 });

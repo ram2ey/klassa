@@ -3,11 +3,11 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { CalendarCheck, ChevronRight, ClipboardList, GraduationCap, LayoutDashboard, Megaphone, Menu, UsersRound, X } from "lucide-react";
+import { CalendarCheck, ChevronRight, ClipboardList, DoorOpen, GraduationCap, LayoutDashboard, Megaphone, Menu, UsersRound, X } from "lucide-react";
 import { AccountSignOut } from "@/components/account-sign-out";
 import { StudentCsvImport } from "@/components/student-csv-import";
 import { StudentEnrollmentFlow } from "@/components/student-enrollment-flow";
-import { correctOfficeAttendanceAction, markGuardianAbsenceNoteReviewedAction, reviewAndExcuseGuardianAbsenceAction, saveOfficeRecordAction } from "@/app/actions/office-actions";
+import { correctOfficeAttendanceAction, markGuardianAbsenceNoteReviewedAction, recordReceptionDeskAction, reviewAndExcuseGuardianAbsenceAction, saveOfficeRecordAction } from "@/app/actions/office-actions";
 import type { OfficeData } from "@/lib/office-data";
 import type { SchoolCommand } from "@/lib/school-admin-policy";
 import type { announcements } from "@/db/schema";
@@ -17,6 +17,7 @@ const tabs = [
   { id: "students", label: "Students", icon: GraduationCap },
   { id: "guardians", label: "Guardians", icon: UsersRound },
   { id: "attendance", label: "Attendance follow-up", icon: CalendarCheck },
+  { id: "reception", label: "Reception desk", icon: DoorOpen },
   { id: "imports", label: "CSV imports", icon: ClipboardList },
   { id: "notices", label: "Notices", icon: Megaphone },
 ] as const;
@@ -46,6 +47,8 @@ export function OfficeWorkspace({ data, notices, section, date }: { data: Office
   const [editor, setEditor] = useState<Editor | null>(null);
   const [showEnrollment, setShowEnrollment] = useState(false);
   const [attendanceClass, setAttendanceClass] = useState("");
+  const [receptionType, setReceptionType] = useState<"late_arrival" | "early_departure">("late_arrival");
+  const [selectedReceptionStudent, setSelectedReceptionStudent] = useState("");
   const current = tabs.find(tab => tab.id === section) ?? tabs[0];
   const year = data.years.find(row => row.isCurrent);
   const yearClasses = data.classes.filter(row => row.academicYearId === year?.id);
@@ -60,6 +63,7 @@ export function OfficeWorkspace({ data, notices, section, date }: { data: Office
   const today = new Date().toISOString().slice(0, 10);
   const activeRestrictions = (id: string) => data.restrictions.filter(row => row.studentId === id && row.isEnforced &&
     (row.prohibitPickup || row.prohibitDisclosure) && row.effectiveDate <= today && (!row.expirationDate || row.expirationDate >= today));
+  const selectedStudentRestrictions = selectedReceptionStudent ? activeRestrictions(selectedReceptionStudent) : [];
   const matches = (...values: unknown[]) => values.join(" ").toLowerCase().includes(query.toLowerCase());
   const submitted = data.sessions.filter(row => row.status === "submitted");
   const attendanceSession = data.sessions.find(row => row.classId === selectedAttendanceClass && row.period === "morning_roll_call");
@@ -88,11 +92,15 @@ export function OfficeWorkspace({ data, notices, section, date }: { data: Office
     <div className="min-w-0"><header className="flex min-h-20 items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4 sm:px-8"><div><p className="text-[10px] font-bold uppercase tracking-[.15em] text-blue-700">{year?.name ?? "No current school year"}</p><p className="mt-1 font-bold">{data.school.name}</p></div><AccountSignOut /></header>
       <main id="office-content" className="mx-auto max-w-[1400px] space-y-6 p-4 sm:p-8"><div className="flex flex-wrap items-end justify-between gap-3"><div><p className="text-xs text-slate-500">School operations</p><h1 className="mt-1 text-2xl font-bold">{current.label}</h1></div>{["students", "guardians"].includes(current.id) && <label className="text-sm"><span className="sr-only">Search {current.label}</span><input value={query} onChange={event => setQuery(event.target.value)} placeholder={`Search ${current.label.toLowerCase()}`} className={`${field} min-w-64`} /></label>}</div>
         {message && <p role="status" className="border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">{message}</p>}
-        {current.id === "overview" && <><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">{[
+        {["overview", "attendance"].includes(current.id) && data.medicalAlerts?.length > 0 &&
+          <Card title="Active medical directives"><div className="space-y-2">{data.medicalAlerts.map(alert => <article key={alert.id} className="border-l-4 border-amber-600 bg-amber-50 p-3 text-sm"><strong>{name(alert.studentId)} · {words(alert.severity)}</strong><p>{alert.directiveSummary}</p><p className="mt-1 whitespace-pre-wrap">{alert.actionRequired}</p></article>)}</div></Card>}
+        {current.id === "attendance" && <Link href="/office/emergency-roll" target="_blank" className="inline-flex min-h-11 items-center border border-blue-700 bg-white px-4 py-2 text-sm font-semibold text-blue-800">Open printable emergency roll sheets</Link>}
+        {current.id === "overview" && <><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">{[
           { label: "Students", value: data.students.length, target: "students" },
           { label: "Pending intake", value: data.students.filter(row => row.status === "pending").length, target: "students" },
           { label: "Guardian contacts", value: data.guardians.length, target: "guardians" },
           { label: "Submitted roll calls", value: submitted.length, target: "attendance" },
+          { label: "Reception desk logs", value: data.receptionLogs?.length ?? 0, target: "reception" },
         ].map(item => <Link key={item.label} href={`/?section=${item.target}`} className="border border-slate-200 bg-white p-5"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{item.label}</p><p className="mt-3 text-3xl font-bold">{item.value}</p></Link>)}</div><div className="grid gap-5 xl:grid-cols-2"><Card title="Office tasks"><div className="space-y-3 text-sm">{[
           { label: "Review students awaiting intake", count: data.students.filter(row => row.status === "pending").length, target: "students" },
           { label: "Link guardians to students", count: data.students.filter(row => !data.links.some(link => link.studentId === row.id)).length, target: "guardians" },
@@ -112,6 +120,196 @@ export function OfficeWorkspace({ data, notices, section, date }: { data: Office
           </Card>
           <Card title="Guardian absence notes"><p className="mb-3 text-sm text-slate-600">Review a note on its own, or review and excuse the matching absent morning mark in one audited step.</p><div className="space-y-3">{data.absenceNotes.map(note => { const matchingSession = note.absenceDate === date ? data.sessions.find(session => session.period === "morning_roll_call" && session.status === "submitted" && data.records.some(record => record.sessionId === session.id && record.studentId === note.studentId && record.status === "absent")) : undefined; return <article key={note.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3"><div><strong className="text-sm">{name(note.studentId)}</strong><p className="mt-1 text-xs text-slate-600">{note.absenceDate} · {note.reasonCategory.replaceAll("_", " ")} · Guardian: {note.guardianName} {note.guardianLastName}</p><p className="mt-1 text-xs text-slate-500">{words(note.status)}{note.reviewerName ? ` by ${note.reviewerName}` : ""}</p></div>{note.status === "submitted" && <div className="flex flex-wrap gap-2"><button className={secondary} disabled={pending} onClick={() => start(async () => { setMessage(""); const result = await markGuardianAbsenceNoteReviewedAction(note.id); setMessage(result.success ? "Absence note marked reviewed." : result.error); if (result.success) router.refresh(); })}>Review only</button>{matchingSession ? <button className={primary} disabled={pending} onClick={() => start(async () => { setMessage(""); const result = await reviewAndExcuseGuardianAbsenceAction(note.id); setMessage(result.success ? "Absence note reviewed and attendance excused." : result.error); if (result.success) router.refresh(); })}>Review and excuse</button> : note.absenceDate !== date ? <Link className={secondary} href={`/?section=attendance&date=${encodeURIComponent(note.absenceDate)}`}>Load note date</Link> : null}</div>}</article>; })}{!data.absenceNotes.length && <p className="text-sm text-slate-500">No guardian absence notes have been submitted.</p>}</div></Card>
           {attendanceSession && <Card title="Attendance records"><div className="space-y-3">{attendanceRecords.map(record => <form key={record.id} className={`grid items-end gap-3 border-b border-slate-100 pb-3 md:grid-cols-[1fr_170px_1fr_1fr_auto] ${record.status === "absent" || record.status === "late" ? "bg-amber-50/50" : ""}`} onSubmit={event => { event.preventDefault(); const form = new FormData(event.currentTarget); start(async () => { setMessage(""); const result = await correctOfficeAttendanceAction({ kind: "attendance", classId: attendanceSession.classId, sessionDate: date, studentId: record.studentId, status: str(form, "status") as "present", reason: str(form, "reason"), correctionReason: str(form, "correctionReason") }); setMessage(result.success ? "Attendance correction saved." : result.error); if (result.success) router.refresh(); }); }}><div><strong className="text-sm">{name(record.studentId)}</strong><span className="block text-xs text-slate-500">Previously {words(record.status)}</span></div><Select label="Status" name="status" choices={["present", "absent", "late", "excused"].map(value => ({ id: value, name: words(value) }))} defaultValue={record.status} /><Field label="Attendance reason" name="reason" required={false} defaultValue={record.reason} /><Field label="Correction explanation" name="correctionReason" /><button className={primary} disabled={pending || attendanceSession.status !== "submitted"}>Correct</button></form>)}{!attendanceRecords.length && <p className="text-sm text-slate-500">No student marks recorded in this roll call.</p>}</div></Card>}</div>}
+        {current.id === "reception" && (
+          <div className="space-y-5">
+            <Card title="Front desk reception log">
+              <div className="mb-4 flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  onClick={() => setReceptionType("late_arrival")}
+                  className={receptionType === "late_arrival" ? primary : secondary}
+                >
+                  Late arrival check-in
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setReceptionType("early_departure")}
+                  className={receptionType === "early_departure" ? primary : secondary}
+                >
+                  Early departure sign-out
+                </button>
+              </div>
+              <p className="mb-4 text-sm text-slate-600">
+                {receptionType === "late_arrival"
+                  ? "Sign in students arriving after morning roll call. Automatically updates attendance and logs tardiness."
+                  : "Sign out students leaving campus before the end of the school day. Checks court pickup restrictions."}
+              </p>
+
+              {selectedStudentRestrictions.length > 0 && (
+                <div className="mb-4 border-l-4 border-rose-600 bg-rose-50 p-4 text-sm text-rose-900">
+                  <p className="font-bold">⚠️ SAFEGUARDING ALERT: Court Order on File</p>
+                  <p className="mt-1">
+                    This student has an active legal restriction. Verify identity of collecting adult before releasing the student:
+                  </p>
+                  <ul className="mt-2 list-disc pl-5 text-xs">
+                    {selectedStudentRestrictions.map(r => (
+                      <li key={r.id}>
+                        <strong>Restricted person:</strong> {r.restrictedPersonName} · Docket: {r.docketNumber} · {r.prohibitPickup ? "Prohibit pickup" : "Restrictions apply"}
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              <form
+                key={receptionType}
+                className="grid gap-3 sm:grid-cols-2"
+                onSubmit={event => {
+                  event.preventDefault();
+                  const target = event.currentTarget;
+                  const form = new FormData(target);
+                  start(async () => {
+                    setMessage("");
+                    const result = await recordReceptionDeskAction({
+                      kind: "reception_log",
+                      studentId: selectedReceptionStudent || str(form, "studentId"),
+                      logType: receptionType,
+                      logDate: date,
+                      timeString: str(form, "timeString"),
+                      minutesLate: Number(form.get("minutesLate") ?? 0),
+                      reason: str(form, "reason"),
+                      actorPersonName: str(form, "actorPersonName"),
+                      relationship: str(form, "relationship"),
+                      isExcused: form.has("isExcused"),
+                      remarks: str(form, "remarks"),
+                    });
+                    setMessage(result.success ? `${receptionType === "late_arrival" ? "Late arrival" : "Early departure"} recorded.` : result.error);
+                    if (result.success) {
+                      target.reset();
+                      setSelectedReceptionStudent("");
+                      router.refresh();
+                    }
+                  });
+                }}
+              >
+                <label className="block text-sm font-medium">
+                  Student
+                  <select
+                    name="studentId"
+                    required
+                    value={selectedReceptionStudent}
+                    onChange={e => setSelectedReceptionStudent(e.target.value)}
+                    className={field}
+                  >
+                    <option value="">Choose student</option>
+                    {studentOptions.map(item => (
+                      <option key={item.id} value={item.id}>{item.name}</option>
+                    ))}
+                  </select>
+                </label>
+                <Field
+                  label={receptionType === "late_arrival" ? "Arrival time" : "Departure time"}
+                  name="timeString"
+                  defaultValue="09:15"
+                />
+                {receptionType === "late_arrival" && (
+                  <label className="block text-sm font-medium">
+                    Minutes late
+                    <input name="minutesLate" type="number" min="1" max="480" defaultValue="15" className={field} required />
+                  </label>
+                )}
+                <label className="block text-sm font-medium">
+                  Reason
+                  <select name="reason" required className={field}>
+                    <option value="">Choose reason</option>
+                    {receptionType === "late_arrival" ? (
+                      <>
+                        <option value="Medical / Dental appointment">Medical / Dental appointment</option>
+                        <option value="Traffic / Transport delay">Traffic / Transport delay</option>
+                        <option value="Family emergency">Family emergency</option>
+                        <option value="Overslept">Overslept</option>
+                        <option value="Other">Other</option>
+                      </>
+                    ) : (
+                      <>
+                        <option value="Medical / Dental appointment">Medical / Dental appointment</option>
+                        <option value="Illness during school day">Illness during school day</option>
+                        <option value="Family emergency">Family emergency</option>
+                        <option value="Approved early release">Approved early release</option>
+                        <option value="Other">Other</option>
+                      </>
+                    )}
+                  </select>
+                </label>
+                <Field
+                  label={receptionType === "late_arrival" ? "Brought in by (or 'Unaccompanied')" : "Collected by (adult's full name)"}
+                  name="actorPersonName"
+                  defaultValue={receptionType === "late_arrival" ? "Unaccompanied" : ""}
+                />
+                <Field
+                  label="Relationship to student"
+                  name="relationship"
+                  defaultValue={receptionType === "late_arrival" ? "self" : "parent"}
+                />
+                <div className="flex items-center gap-2 pt-6 sm:col-span-2">
+                  <label className="flex items-center gap-2 text-sm font-medium">
+                    <input type="checkbox" name="isExcused" defaultChecked={receptionType === "late_arrival"} />
+                    {receptionType === "late_arrival" ? "Excused late arrival" : "Authorized early departure"}
+                  </label>
+                </div>
+                <label className="block text-sm font-medium sm:col-span-2">
+                  Receptionist remarks (optional)
+                  <input name="remarks" className={field} placeholder="e.g. Doctor slip provided / Verified photo ID at desk" />
+                </label>
+                <button className={`${primary} sm:col-span-2`} disabled={pending || !data.students.length}>
+                  {receptionType === "late_arrival" ? "Record late arrival" : "Sign out student"}
+                </button>
+              </form>
+            </Card>
+
+            <Card title={`Reception desk register for ${date} (${data.receptionLogs?.length ?? 0})`}>
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm">
+                  <thead>
+                    <tr className="border-b border-slate-200 text-slate-500">
+                      <th className="py-2">Time</th>
+                      <th>Type</th>
+                      <th>Student</th>
+                      <th>Reason</th>
+                      <th>Person / Collector</th>
+                      <th>Status</th>
+                      <th>Notes</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.receptionLogs?.map(log => (
+                      <tr key={log.id} className="border-b border-slate-100">
+                        <td className="py-3 font-mono font-bold">{log.timeString}</td>
+                        <td>
+                          <span className={`inline-block px-2 py-0.5 text-xs font-semibold rounded ${log.logType === "late_arrival" ? "bg-amber-100 text-amber-800" : "bg-purple-100 text-purple-800"}`}>
+                            {log.logType === "late_arrival" ? `Late (${log.minutesLate}m)` : "Early departure"}
+                          </span>
+                        </td>
+                        <td className="font-semibold">{name(log.studentId)}</td>
+                        <td>{log.reason}</td>
+                        <td>{log.actorPersonName || "—"}{log.relationship ? ` (${words(log.relationship)})` : ""}</td>
+                        <td>
+                          <span className={`inline-block px-2 py-0.5 text-xs font-semibold rounded ${log.isExcused ? "bg-emerald-100 text-emerald-800" : "bg-slate-100 text-slate-700"}`}>
+                            {log.isExcused ? "Excused / Authorized" : "Unexcused"}
+                          </span>
+                        </td>
+                        <td className="text-xs text-slate-500">{log.remarks || "—"}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+                {(!data.receptionLogs || data.receptionLogs.length === 0) && (
+                  <p className="py-4 text-sm text-slate-500">No late arrivals or early departures recorded for this date.</p>
+                )}
+              </div>
+            </Card>
+          </div>
+        )}
         {current.id === "imports" && <StudentCsvImport role="office_staff" />}
         {current.id === "notices" && <Card title="Published school notices">{notices.map(notice => <article key={notice.id} className="border-b border-slate-100 py-4"><div className="flex justify-between gap-3"><h3 className="font-semibold">{notice.title}</h3><span className="text-xs text-slate-500">{words(notice.priority)}</span></div><p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{notice.content}</p></article>)}{!notices.length && <p className="text-sm text-slate-500">No published notices.</p>}</Card>}
       </main></div>

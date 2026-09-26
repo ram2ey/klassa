@@ -41,6 +41,15 @@ export async function correctOfficeAttendanceAction(input: WorkflowCommand) {
   } catch (error) { return { success: false as const, error: failure(error) }; }
 }
 
+export async function recordReceptionDeskAction(input: WorkflowCommand) {
+  const actor = await requireStaff(["office_staff"]);
+  try {
+    const result = await saveSchoolWorkflow(actor, input);
+    revalidatePath("/");
+    return { success: true as const, entityId: result.entityId };
+  } catch (error) { return { success: false as const, error: failure(error) }; }
+}
+
 export async function importOfficeStudentsAction(csvText: string) {
   const actor = await requireStaff(["office_staff"]);
   try {

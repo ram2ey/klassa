@@ -8,12 +8,18 @@ import type { DisclosurePackageResult } from "@/lib/sensitive-records";
 interface DisclosurePackageModalProps {
   packageData: DisclosurePackageResult;
   onClose: () => void;
+  schoolName?: string;
 }
 
-export function DisclosurePackageModal({ packageData, onClose }: DisclosurePackageModalProps) {
+export function DisclosurePackageModal({ packageData, onClose, schoolName }: DisclosurePackageModalProps) {
   const handlePrint = () => {
     window.print();
   };
+
+  const displaySchool = packageData.schoolName || schoolName || "Official Educational Institution";
+  const subtitle = packageData.recipientAgency
+    ? `Statutory Multi-Agency Safeguarding Disclosure • Designated Authority: ${packageData.recipientAgency}`
+    : "Office of Records & Pastoral Safeguarding";
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
@@ -24,7 +30,7 @@ export function DisclosurePackageModal({ packageData, onClose }: DisclosurePacka
               <FileText size={18} weight="bold" />
             </div>
             <div>
-              <h2 className="text-base font-bold text-slate-900">Official Redacted Disclosure Package</h2>
+              <h2 className="text-base font-bold text-slate-900">Official Statutory Disclosure Package</h2>
               <span className="font-mono text-xs text-slate-500">{packageData.dossierNumber}</span>
             </div>
           </div>
@@ -49,8 +55,8 @@ export function DisclosurePackageModal({ packageData, onClose }: DisclosurePacka
           <div className="border-b-2 border-slate-900 pb-4">
             <div className="flex items-start justify-between">
               <div>
-                <h1 className="text-xl font-bold tracking-tight text-slate-900">NORTHFIELD ACADEMY</h1>
-                <p className="text-xs text-slate-600">Office of Records & Pastoral Safeguarding • Reykjavik Campus</p>
+                <h1 className="text-xl font-bold tracking-tight text-slate-900">{displaySchool.toUpperCase()}</h1>
+                <p className="text-xs text-slate-600">{subtitle}</p>
               </div>
               <div className="text-right">
                 <span className="inline-block border border-slate-900 px-2 py-0.5 text-[10px] font-bold tracking-wider uppercase">
@@ -67,7 +73,10 @@ export function DisclosurePackageModal({ packageData, onClose }: DisclosurePacka
           <div className="grid grid-cols-2 gap-4 rounded-xs border border-slate-200 bg-slate-50 p-4 text-xs">
             <div>
               <span className="block text-slate-500 font-medium">Subject Student:</span>
-              <span className="text-sm font-bold text-slate-900">{packageData.studentName}</span>
+              <span className="text-sm font-bold text-slate-900">
+                {packageData.studentName}
+                {packageData.studentNumber ? ` (${packageData.studentNumber})` : ""}
+              </span>
             </div>
             <div>
               <span className="block text-slate-500 font-medium">Date of Certification:</span>
@@ -85,6 +94,12 @@ export function DisclosurePackageModal({ packageData, onClose }: DisclosurePacka
                 {packageData.activeCourtOrdersCount} active protective order(s)
               </span>
             </div>
+            {packageData.recipientAgency && (
+              <div className="col-span-2 border-t border-slate-200/60 pt-2">
+                <span className="block text-slate-500 font-medium">Recipient Authority / External Agency:</span>
+                <span className="font-semibold text-slate-900">{packageData.recipientAgency}</span>
+              </div>
+            )}
           </div>
 
           {/* Records Summary */}

@@ -12,7 +12,7 @@ vi.mock("@/app/actions/school-access-actions", () => ({ provisionStaffForCurrent
 const data: SchoolAdminData = {
   school: { id: "school-1", name: "Northfield School", slug: "northfield", timezone: "Etc/GMT" },
   actor: { organizationId: "school-1", userId: "admin-1", name: "School Admin", role: "school_admin" },
-  students: [], guardians: [], links: [], staff: [], classes: [], assignments: [], grades: [], years: [], terms: [], subjects: [], enrollments: [], audit: [],
+  students: [], guardians: [], links: [], staff: [], classes: [], assignments: [], grades: [], years: [], terms: [], subjects: [], enrollments: [], audit: [], absenceNotes: [],
   attendanceSummary: [], publishedReports: [], activeAlerts: [], activeRestrictions: [],
 };
 const assignmentData = {

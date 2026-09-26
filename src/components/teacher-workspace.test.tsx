@@ -13,7 +13,7 @@ const studentId = "00000000-0000-4000-8000-000000000002";
 const data = {
   actor: { name: "Teacher" }, school: { id: "school-a", name: "School A" }, currentYear: { name: "2026" },
   classes: [{ id: classId, name: "Class A" }], homeroomClassIds: [], assignments: [{ classId, subjectId: "subject-a" }],
-  enrollments: [{ classId, studentId, status: "active" }], students: [{ id: studentId, firstName: "Ada", lastName: "Lee" }],
+  enrollments: [{ classId, studentId, status: "active" }], students: [{ id: studentId, firstName: "Ada", lastName: "Lee", status: "active", studentNumber: "A001" }],
   sessions: [], records: [], safety: { alerts: [], pickupWarnings: [] }, subjects: [], terms: [],
   assessments: [], grades: [], categories: [], reports: [], reportSubjects: [], gradeLevels: [],
 } as unknown as TeacherData;
@@ -46,5 +46,36 @@ describe("teacher period attendance", () => {
     expect((screen.getByLabelText("Status") as HTMLSelectElement).value).toBe("absent");
     fireEvent.change(screen.getByLabelText("Session period"), { target: { value: "period_1" } });
     expect((screen.getByLabelText("Status") as HTMLSelectElement).value).toBe("late");
+  });
+  it("shows guardian absence notes for the selected attendance date", () => {
+    const withNote = { ...data, homeroomClassIds: [classId],
+      absenceNotes: [{ id: "note-1", studentId, absenceDate: "2026-09-26",
+        reasonCategory: "medical_appointment", status: "submitted" }] } as unknown as TeacherData;
+    render(<TeacherWorkspace data={withNote} notices={[]} section="attendance" date="2026-09-26" />);
+    expect(screen.getByText("Guardian absence notes for this date")).toBeTruthy();
+    expect(screen.getByText("Ada Lee: Medical Appointment (Submitted)")).toBeTruthy();
+  });
+});
+
+describe("teacher class information", () => {
+  it("publishes a notice only to the selected assigned class", async () => {
+    render(<TeacherWorkspace data={data} notices={[]} section="notices" date="2026-09-26" />);
+    fireEvent.change(screen.getByLabelText("Class"), { target: { value: classId } });
+    fireEvent.change(screen.getByLabelText("Title"), { target: { value: "Class trip" } });
+    fireEvent.change(screen.getByLabelText("Message"), { target: { value: "Please bring a coat." } });
+    fireEvent.click(screen.getByRole("button", { name: "Publish to class" }));
+    await waitFor(() => expect(mocks.save).toHaveBeenCalledWith({ kind: "announcement", title: "Class trip",
+      content: "Please bring a coat.", targetType: "class", targetId: classId,
+      priority: "normal", status: "published" }));
+  });
+  it("shows linked contact and published attendance history on a roster", () => {
+    const enriched = { ...data, guardianContacts: [{ studentId, isPrimary: true,
+      guardian: { firstName: "Morgan", lastName: "Lee", phone: "+441234567890", email: "morgan@example.test" } }],
+      historyRecords: [{ studentId, status: "present" }, { studentId, status: "absent" }],
+      publishedReports: [] } as unknown as TeacherData;
+    render(<TeacherWorkspace data={enriched} notices={[]} section="classes" date="2026-09-26" />);
+    fireEvent.click(screen.getByText("Contact and history"));
+    expect(screen.getByText("Morgan Lee", { exact: false })).toBeTruthy();
+    expect(screen.getByText("Recent morning attendance: 1/2 present")).toBeTruthy();
   });
 });

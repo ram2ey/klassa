@@ -2,7 +2,8 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { academicYears, assessmentCategories, assessmentGrades, assessments, attendanceRecords, attendanceSessions,
   classes, enrollments, gradeLevels, organizations, reportCards, reportCardSubjectGrades, students, subjects,
-  teacherClassAssignments, terms, needToKnowAlerts, courtRestrictions } from "@/db/schema";
+  teacherClassAssignments, terms, needToKnowAlerts, courtRestrictions, guardians, studentGuardians,
+  guardianAbsenceNotes } from "@/db/schema";
 import { requireStaff } from "@/lib/action-access";
 import { buildTeacherSafetyNotices } from "@/lib/teacher-safety";
 
@@ -42,6 +43,34 @@ export async function getTeacherData(section: string, sessionDate: string) {
         eq(courtRestrictions.isEnforced, true), eq(courtRestrictions.prohibitPickup, true))),
   ]) : [[], []];
   const safety = buildTeacherSafetyNotices(studentIds, alertRows, restrictionRows);
+  const [guardianLinks, guardianRows, absenceNotes, historySessions, publishedReports] = studentIds.length ? await Promise.all([
+    db.select({ studentId: studentGuardians.studentId, guardianId: studentGuardians.guardianId,
+      isPrimary: studentGuardians.isPrimary }).from(studentGuardians)
+      .where(and(eq(studentGuardians.organizationId, org), inArray(studentGuardians.studentId, studentIds))),
+    db.select({ id: guardians.id, firstName: guardians.firstName, lastName: guardians.lastName,
+      phone: guardians.phone, email: guardians.email }).from(guardians).where(eq(guardians.organizationId, org)),
+    section === "attendance" ? db.select({ id: guardianAbsenceNotes.id, studentId: guardianAbsenceNotes.studentId,
+      absenceDate: guardianAbsenceNotes.absenceDate, reasonCategory: guardianAbsenceNotes.reasonCategory,
+      status: guardianAbsenceNotes.status }).from(guardianAbsenceNotes).where(and(
+      eq(guardianAbsenceNotes.organizationId, org), inArray(guardianAbsenceNotes.studentId, studentIds),
+      eq(guardianAbsenceNotes.absenceDate, sessionDate))) : Promise.resolve([]),
+    section === "classes" ? db.select({ id: attendanceSessions.id, sessionDate: attendanceSessions.sessionDate,
+      classId: attendanceSessions.classId }).from(attendanceSessions).where(and(
+      eq(attendanceSessions.organizationId, org), inArray(attendanceSessions.classId, classIds),
+      eq(attendanceSessions.period, "morning_roll_call"), inArray(attendanceSessions.status, ["submitted", "locked"])))
+      .orderBy(desc(attendanceSessions.sessionDate)).limit(300) : Promise.resolve([]),
+    section === "classes" ? db.select({ id: reportCards.id, studentId: reportCards.studentId,
+      termId: reportCards.termId, overallPercentage: reportCards.overallPercentage,
+      attendanceRate: reportCards.attendanceRate }).from(reportCards).where(and(
+      eq(reportCards.organizationId, org), inArray(reportCards.studentId, studentIds),
+      eq(reportCards.status, "published"))).orderBy(desc(reportCards.publishedAt)).limit(200) : Promise.resolve([]),
+  ]) : [[], [], [], [], []];
+  const historyRecords = historySessions.length ? await db.select({ studentId: attendanceRecords.studentId,
+    sessionId: attendanceRecords.sessionId, status: attendanceRecords.status }).from(attendanceRecords)
+    .where(and(eq(attendanceRecords.organizationId, org), inArray(attendanceRecords.sessionId, historySessions.map(row => row.id)),
+      inArray(attendanceRecords.studentId, studentIds))) : [];
+  const guardianContacts = guardianLinks.map(link => ({ studentId: link.studentId, isPrimary: link.isPrimary,
+    guardian: guardianRows.find(row => row.id === link.guardianId) })).filter(link => !!link.guardian);
   const termRows = currentYear ? await db.select().from(terms).where(and(eq(terms.organizationId, org), eq(terms.academicYearId, currentYear.id))) : [];
   const assessmentRows = classIds.length && ["overview", "gradebook", "reports"].includes(section) ? await db.select().from(assessments)
     .where(and(eq(assessments.organizationId, org), inArray(assessments.classId, classIds))).orderBy(desc(assessments.dateDue)) : [];
@@ -68,7 +97,8 @@ export async function getTeacherData(section: string, sessionDate: string) {
   return { actor, school, currentYear, classes: classRows, assignments, homeroomClassIds: homeIds, gradeLevels: gradeLevelsRows,
     subjects: subjectsRows, terms: termRows, enrollments: enrollmentRows, students: studentRows,
     assessments: permittedAssessments, grades: gradeRows, categories: categoryRows, reports: reportRows, reportSubjects,
-    sessions: sessionRows, records: recordRows, safety };
+    sessions: sessionRows, records: recordRows, safety, guardianContacts, absenceNotes,
+    historySessions, historyRecords, publishedReports };
 }
 
 export type TeacherData = Awaited<ReturnType<typeof getTeacherData>>;

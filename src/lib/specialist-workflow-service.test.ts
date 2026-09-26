@@ -85,4 +85,69 @@ describe("live specialist workflow authorization", () => {
       reason: "Resolved after review" })).rejects.toThrow("case area");
     expect(mocks.execute.mock.calls.some(([query]) => query.startsWith('update "need_to_know_alerts"'))).toBe(false);
   });
+  it("prevents a nurse from compiling a statutory disclosure package", async () => {
+    await expect(saveSchoolWorkflow(actor, {
+      kind: "statutory_disclosure",
+      studentId: record,
+      recipientAgency: "Social Services",
+      reason: "Section 47 inquiry",
+    })).rejects.toThrow("specialist role");
+  });
+  it("lets a safeguarding lead compile an audited statutory disclosure package", async () => {
+    const dslActor = { organizationId: org, userId: "dsl-1", name: "Safeguarding Lead", role: "safeguarding_lead" as const };
+    mocks.execute.mockImplementation(async query => {
+      if (query.includes('from "organizations"')) return [[org, "Northfield Academy", "northfield"]];
+      if (query.includes('from "students"')) return [[record, org, "ST-100", null, "Ada", null, "Lovelace", null, "2010-01-01", "active", new Date(), new Date()]];
+      if (query.includes('from "sensitive_cases"')) return [caseRow("safeguarding")];
+      if (query.includes('from "court_restrictions"')) return [];
+      if (query.startsWith('insert into "audit_events"')) return [[record, org, dslActor.userId, "disclosure_package.exported", "student", record, null, {}, new Date()]];
+      return [];
+    });
+    const result = await saveSchoolWorkflow(dslActor, {
+      kind: "statutory_disclosure",
+      studentId: record,
+      recipientAgency: "Reykjavik Child Protection Services",
+      reason: "Statutory child protection case conference",
+    });
+    expect(result.disclosurePackage).toBeDefined();
+    expect(result.disclosurePackage?.studentName).toBe("Ada Lovelace");
+    expect(result.disclosurePackage?.schoolName).toBe("Northfield Academy");
+    expect(result.disclosurePackage?.recipientAgency).toBe("Reykjavik Child Protection Services");
+    expect(result.disclosurePackage?.digitalIntegrityChecksum).toHaveLength(16);
+    expect(mocks.commit).toHaveBeenCalledOnce();
+  });
+  it("prevents a SENCO from recording a clinic visit", async () => {
+    const sencoActor = { organizationId: org, userId: "senco-1", name: "SENCO Lead", role: "senco" as const };
+    await expect(saveSchoolWorkflow(sencoActor, {
+      kind: "clinic_visit",
+      studentId: record,
+      category: "first_aid",
+      symptoms: "Minor scrape",
+      treatment: "Cleaned and bandaged",
+      outcome: "returned_to_class",
+      guardianNotified: false,
+    })).rejects.toThrow("specialist role");
+  });
+  it("lets a nurse record an audited clinic visit", async () => {
+    mocks.execute.mockImplementation(async query => {
+      if (query.includes('from "organizations"')) return [[org]];
+      if (query.includes('from "students"')) return [[record, org, "ST-100", null, "Ada", null, "Lovelace", null, "2010-01-01", "active", new Date(), new Date()]];
+      if (query.startsWith('insert into "clinic_visits"')) return [[record, org, record, actor.userId, "first_aid", "Minor scrape", "Bandage", "returned_to_class", false, null, "2026-09-26", new Date(), new Date()]];
+      if (query.startsWith('insert into "audit_events"')) return [[record, org, actor.userId, "clinic_visit.logged", "clinic_visit", record, null, {}, new Date()]];
+      return [];
+    });
+    const result = await saveSchoolWorkflow(actor, {
+      kind: "clinic_visit",
+      studentId: record,
+      category: "first_aid",
+      symptoms: "Minor scrape",
+      treatment: "Bandage applied",
+      outcome: "returned_to_class",
+      guardianNotified: false,
+    });
+    expect(result.entityId).toBe(record);
+    expect(mocks.commit).toHaveBeenCalledOnce();
+    const auditCall = mocks.execute.mock.calls.find(([query]) => query.startsWith('insert into "audit_events"'));
+    expect(auditCall).toBeDefined();
+  });
 });

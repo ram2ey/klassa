@@ -49,6 +49,21 @@ export const workflowCommandSchema = z.discriminatedUnion("kind", [
     summary: z.string().trim().min(4).max(5000), effectiveDate: date, expirationDate: z.union([date, z.literal("")]),
     prohibitPickup: z.boolean(), prohibitDisclosure: z.boolean(), prohibitDirectContact: z.boolean() }),
   z.object({ kind: z.literal("court_restriction_status"), restrictionId: id, isEnforced: z.boolean(), reason }),
+  z.object({ kind: z.literal("statutory_disclosure"), studentId: id,
+    recipientAgency: z.string().trim().min(2).max(180), reason: z.string().trim().min(4).max(500) }),
+  z.object({ kind: z.literal("clinic_visit"), studentId: id, category: z.string().trim().min(2).max(60),
+    symptoms: z.string().trim().min(2).max(1000), treatment: z.string().trim().min(2).max(1000),
+    outcome: z.enum(["returned_to_class", "resting_in_clinic", "sent_home", "collected_by_guardian", "emergency_referral"]),
+    guardianNotified: z.boolean().default(false), guardianNotificationNotes: z.string().trim().max(1000).optional().nullable() }),
+  z.object({ kind: z.literal("reception_log"), studentId: id,
+    logType: z.enum(["late_arrival", "early_departure"]),
+    logDate: date, timeString: z.string().trim().min(2).max(10),
+    minutesLate: z.number().int().min(0).max(480).default(0),
+    reason: z.string().trim().min(2).max(255),
+    actorPersonName: z.string().trim().max(180).default(""),
+    relationship: z.string().trim().max(80).default(""),
+    isExcused: z.boolean().default(false),
+    remarks: z.string().trim().max(1000).optional().nullable() }),
 ]);
 
 export type WorkflowCommand = z.input<typeof workflowCommandSchema>;

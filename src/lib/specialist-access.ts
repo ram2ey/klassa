@@ -15,7 +15,8 @@ export function specialistAreas(role: SpecialistRole): SensitiveCaseArea[] {
 }
 
 export function canSpecialistRunCommand(role: SpecialistRole, kind: WorkflowCommand["kind"]): boolean {
-  if (role === "safeguarding_lead" && (kind === "court_restriction" || kind === "court_restriction_status")) return true;
+  if (role === "safeguarding_lead" && (kind === "court_restriction" || kind === "court_restriction_status" || kind === "statutory_disclosure")) return true;
+  if (role === "health_nurse" && kind === "clinic_visit") return true;
   return ["sensitive_case", "sensitive_note", "sensitive_access", "sensitive_case_status",
     "need_to_know", "need_to_know_resolve"].includes(kind);
 }

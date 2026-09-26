@@ -108,6 +108,10 @@ export function SchoolAdminWorkspace({ data, workflow, gdpr, section, date: sele
             <Metric label="Attendance rate" value={attendanceRate} detail={attendanceTotals.marks ? `Across ${attendanceTotals.marks} submitted or locked marks` : "No submitted attendance marks yet"} icon={<ClipboardCheck size={22} />} />
             <Metric label="Unexcused absences" value={attendanceTotals.absent} detail="Across submitted or locked attendance marks" icon={<CalendarDays size={22} />} />
           </div>
+          <section className={panelStyle}><PanelHeading title="Guardian absence notes" description="Recent submissions and unresolved notes across the school." />
+            <div className="p-5 text-sm"><p className="font-semibold">{data.absenceNotes?.filter(note => note.status === "submitted").length ?? 0} awaiting office review</p>
+              <ul className="mt-3 divide-y divide-slate-100">{data.absenceNotes?.slice(0, 10).map(note => <li key={note.id} className="flex flex-wrap justify-between gap-2 py-2"><span>{studentName(note.studentId)} · {note.absenceDate} · {words(note.reasonCategory)}</span><span className="font-medium">{words(note.status)}</span></li>)}</ul>
+              {!data.absenceNotes?.length && <p className="mt-2 text-slate-500">No guardian absence notes have been submitted.</p>}</div></section>
           <div className="grid gap-6 xl:grid-cols-[1fr_1.4fr]">
             <section className={panelStyle}><PanelHeading title="School setup" description="Build the foundations for your school year." />
               <div className="divide-y divide-slate-100">{[

@@ -1,10 +1,12 @@
 # Comprehensive Role & Dashboard Gap Analysis
 
-An exhaustive review of the roles, database schema, authentication policies, data loaders, server actions, and dashboard UI components across the Klassa codebase was performed.
+An exhaustive review of the roles, database schema, authentication policies, data loaders, server actions, and dashboard UI components across the Klassa codebase.
+
+*Last Updated: 2026-09-26 (Audit & Progress Tracking)*
 
 ---
 
-## 1. Executive Summary & Core Architectural Gaps
+## 1. System Role Taxonomy & Architecture
 
 The codebase defines **8 distinct user roles** across three authorization tiers (Platform Administration, School Staff, and Family/Guardian):
 
@@ -26,258 +28,255 @@ flowchart TD
     end
 ```
 
-### Key Architectural Findings:
-1. **The Specialist Live Dashboard Lockout**:
-   In [`src/app/page.tsx`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/app/page.tsx#L42-L67), when a `safeguarding_lead`, `senco`, or `health_nurse` signs in to a live school, they are met with a static placeholder:
-   > *"Your school account is ready. Your membership is active. Live workflows for your role are still being connected."*
-   There is **no dedicated live workspace or dashboard component** for any of these three specialist roles. Furthermore, [`saveSchoolWorkflowAction`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/app/actions/school-workflow-actions.ts#L10-L13) restricts workflow mutations strictly to `school_admin`, leaving specialists with no route or action to interact with sensitive records, court orders, or need-to-know alerts in live mode.
-2. **Dual-System Fragmentation (Live vs Demo Mode)**:
-   A rich set of specialized UI components exists in [`src/components/sensitive/`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/sensitive/) (`sensitive-records-module.tsx`, `disclosure-package-modal.tsx`, `court-order-dialog.tsx`, etc.), but they are connected only to [`klasso-workspace.tsx`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/klasso-workspace.tsx#L1474-L1476) (the demo mode workspace) and backed by server actions gated behind `requireDemoAction()`, which deliberately throws an error in live mode.
-3. **Broken Report Card Access for Guardians**:
-   [`src/app/reports/[id]/page.tsx`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/app/reports/%5Bid%5D/page.tsx#L12-L18) enforces `await requireStaff(["school_admin", "teacher"])`. If a parent/guardian attempts to access the printable report card URL for their child, the server throws an access denied exception.
-4. **Missing Subject Teacher Assignment Workflow**:
-   [`src/lib/teacher-data.ts`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/lib/teacher-data.ts#L15-L36) relies on `teacherClassAssignments` matching `subjectId` to allow teachers to enter grades for non-homeroom classes. However, [`SchoolAdminWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/school-admin-workspace.tsx#L205-L217) and [`school-admin-service.ts`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/lib/school-admin-service.ts#L106-L108) only provide UI and commands to set the *homeroom teacher*. There is **no UI or command for assigning subject teachers to classes**.
+### High-Priority Architectural Remediations Delivered:
+1. **Live Specialist Workspaces Unblocked**:
+   [`src/app/page.tsx`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/app/page.tsx#L68-L72) now actively routes `safeguarding_lead`, `senco`, and `health_nurse` to [`SpecialistWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/specialist-workspace.tsx), backed by [`getSpecialistData()`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/lib/specialist-data.ts) and role-specific case area isolation.
+2. **Classroom Safety Notices & Period Attendance for Teachers**:
+   [`TeacherWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/teacher-workspace.tsx) now loads and renders sanitized need-to-know directives, pickup restrictions, guardian contact data, student history context, and period attendance selection (`period_1` to `period_8`).
+3. **Office Morning Absence Follow-Up & Emergency Sheets**:
+   [`OfficeWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/office-workspace.tsx) now includes a school-wide daily unexplained absence roster with click-to-call phone links, one-click absence review & excuse, medical directives, and printable emergency roll sheets at [`/office/emergency-roll`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/app/office/emergency-roll/page.tsx).
+4. **Subject Teacher Class Assignments & Live GDPR Panel**:
+   [`SchoolAdminWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/school-admin-workspace.tsx) now features subject teacher class assignment management (`teacherClassAssignments`), overview safety & attendance KPI metrics, and a live Data Protection & GDPR panel ([`SchoolAdminGdprPanel`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/school-admin-gdpr-panel.tsx)).
+5. **Guardian Report Card Printing & Consent Management**:
+   [`src/app/reports/[id]/page.tsx`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/app/reports/%5Bid%5D/page.tsx) now authorizes verified legal guardians, and [`GuardianPortalWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/guardian-portal-workspace.tsx) embeds [`GuardianSchoolConsents`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/guardian-school-consents.tsx) for managing photo, excursion, and digital learning consents.
+6. **Platform Disaster Recovery Drills, Tenant Export & Search**:
+   [`PlatformInvitations`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/platform-invitations.tsx) now surfaces [`PlatformRestoreDrills`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/platform-restore-drills.tsx), full tenant JSON data export at [`/platform/schools/[id]/export`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/app/platform/schools/%5Bid%5D/export/route.ts), cross-school guardian account search, and platform-wide maintenance broadcasting.
 
 ---
 
-## 2. In-Depth Audit by Role
+## 2. In-Depth Audit by Role: Added vs. Pending
 
 ---
 
 ### Role 1: `safeguarding_lead` (Designated Safeguarding Lead / DSL)
 
-* **Current State**: No live dashboard. When authenticated, [`src/app/page.tsx`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/app/page.tsx#L64-L67) renders a "Live workflows still being connected" placeholder.
-* **Access Rules**: Per [`src/lib/sensitive-records.ts`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/lib/sensitive-records.ts#L114-L146), this role has clearance for `safeguarding`, `disciplinary`, and collaborative `health_medical` areas, can manage court orders, and can manage need-to-know alerts.
+* **Current Status**: **Active Live Workspace** ([`SpecialistWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/specialist-workspace.tsx)).
+* **Access Clearance**: Authorized for `["safeguarding", "disciplinary", "health_medical"]` case areas, court orders, and staff directives per [`canUserAccessCaseArea`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/lib/sensitive-records.ts#L114-L129).
 
-#### Missing Dashboard Features & Workflows:
-1. **Dedicated DSL Live Dashboard**: Missing an interactive workspace providing:
-   - Active child protection concerns and case registry.
-   - Status triage overview (`open`, `under_review`, `monitoring`, `closed`).
-   - Audit trail of case access reasons.
-2. **Encrypted Chronology & Case Note Management**:
-   - Database table [`sensitiveCaseNotes`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/db/schema.ts#L577-L590) supports AES-256-GCM encryption with IV and authentication tags.
-   - Missing live UI for the DSL to log timestamped concerns, upload/paste narratives, and view decrypted case chronologies with mandatory logged justification.
-3. **Statutory Multi-Agency Disclosure Package Generator**:
-   - [`generateDisclosurePackage()`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/lib/sensitive-records.ts#L244-L290) and [`disclosure-package-modal.tsx`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/sensitive/disclosure-package-modal.tsx) exist for generating redacted packages for child protective services, police, and family courts with cryptographic integrity checksums.
-   - This capability is completely absent from the live DSL experience.
-4. **Court Restrictions & Custody Orders**:
-   - DSLs must log and monitor restraining orders and pickup prohibitions (`courtRestrictions` table).
-   - Currently, only `school_admin` has a form to register court restrictions in live mode.
-5. **Need-to-Know Alerts Dispatcher**:
-   - DSLs need to issue sanitized directives to classroom teachers (e.g., *"Student may become distressed around raised voices; allow quiet corridor break"*) without leaking child protection details.
+#### What Has Been Added:
+1. **Live Dedicated Workspace**:
+   - Routed in [`src/app/page.tsx`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/app/page.tsx#L68-L72) to [`SpecialistWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/specialist-workspace.tsx) backed by [`getSpecialistData()`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/lib/specialist-data.ts).
+2. **Case Registry & Encrypted Chronology**:
+   - Ability to register cases in permitted areas, add AES-256-GCM encrypted notes ([`sensitiveCaseNotes`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/db/schema.ts#L577-L590)), decrypt notes with mandatory audit reasons, and manage case statuses (`open`, `under_review`, `monitoring`, `closed`).
+3. **Court Restrictions & Custody Orders**:
+   - Dedicated `Court restrictions` tab allowing the DSL to register, enforce, and deactivate restraining orders, custody restrictions, and pickup prohibitions ([`courtRestrictions`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/db/schema.ts#L625-L644)).
+4. **Staff Directives (Need-to-Know)**:
+   - Interface to create and resolve actionable classroom directives without exposing sensitive background case notes.
+5. **Workflow Action Clearance**:
+   - [`saveSchoolWorkflowAction`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/app/actions/school-workflow-actions.ts#L10) and [`saveSchoolWorkflow`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/lib/school-workflow-service.ts#L22) now authorize `safeguarding_lead`.
+6. **Statutory Multi-Agency Disclosure Package Generator**:
+   - Integrated [`generateDisclosurePackage()`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/lib/sensitive-records.ts) and [`disclosure-package-modal.tsx`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/sensitive/disclosure-package-modal.tsx) into [`SpecialistWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/specialist-workspace.tsx) under dedicated "Statutory disclosures" tab, supporting dynamic tenant branding, recipient agency metadata, digital SHA-256 integrity seal, and official print view.
+
+#### What Remains Pending:
+1. **Low-Level Concern Triage Queue**:
+   - Standard safeguarding workflow (CPOMS/MyConcern style) where teachers submit low-level concerns for DSL triage before formal case creation.
 
 ---
 
 ### Role 2: `senco` (Special Educational Needs Coordinator)
 
-* **Current State**: No live dashboard. Stranded on the placeholder page in live mode.
-* **Access Rules**: Per [`canUserAccessCaseArea`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/lib/sensitive-records.ts#L122-L123), SENCO is cleared exclusively for `special_needs` cases and barred from child protection investigations or clinical medical records.
+* **Current Status**: **Active Live Workspace** ([`SpecialistWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/specialist-workspace.tsx)).
+* **Access Clearance**: Restricted strictly to `["special_needs"]` cases; barred from child protection investigations and clinical medical records.
 
-#### Missing Dashboard Features & Workflows:
-1. **SEN Register & Caseload Overview**:
-   - No view to filter students by special educational needs tiers, EHCP (Education, Health and Care Plan), or Individual Learning Plans (ILP/IEP).
-2. **Classroom Accommodations & Need-to-Know Directives**:
-   - SENCOs must provide teachers with classroom accommodations (extra test time, front-row seating, visual timetables, sensory breaks).
-   - While [`canUserManageNeedToKnow("senco")`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/lib/sensitive-records.ts#L131-L138) returns `true`, there is no dashboard or live server action for the SENCO to dispatch or resolve alerts.
-3. **External Specialist Reports & Review Dates**:
-   - No workflow to log educational psychologist recommendations, speech & language therapy assessments, or scheduled review cycles.
-4. **Academic Performance Tracking for SEN Students**:
-   - No view to cross-reference SEN students with their gradebook trends or attendance patterns to detect early academic distress.
+#### What Has Been Added:
+1. **Live Dedicated Workspace**:
+   - SENCO dashboard active in [`SpecialistWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/specialist-workspace.tsx) labeled "SENCO workspace".
+2. **Privacy Boundary Enforcement**:
+   - Scoped strictly to `special_needs` cases; cannot view safeguarding or disciplinary files.
+3. **Case Management & Support Notes**:
+   - Create special needs cases, record encrypted intervention notes, and review access logs.
+4. **Staff Classroom Directives**:
+   - Create actionable classroom accommodations and teaching strategies for classroom teachers.
+
+#### What Remains Pending:
+1. **Formal SEN Register & Support Tiers**:
+   - Multi-tiered support tracking (Universal, Targeted, Specialist / EHCP / Tier 1-3).
+2. **Structured Individual Education Plans (IEP/ILP)**:
+   - Dedicated structured fields for exam concessions (25% extra time, reader, rest breaks, assistive tech) rather than plain-text directives.
+3. **Statutory Review Calendar & External Agency Tracking**:
+   - Review date scheduling and tracking for educational psychologist or speech & language therapy assessments.
 
 ---
 
 ### Role 3: `health_nurse` (School Nurse)
 
-* **Current State**: No live dashboard. Stranded on the placeholder page in live mode.
-* **Access Rules**: Per [`canUserAccessCaseArea`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/lib/sensitive-records.ts#L120-L121), the nurse is cleared for `health_medical` and blocked from safeguarding or SEN case notes.
+* **Current Status**: **Active Live Workspace** ([`SpecialistWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/specialist-workspace.tsx)).
+* **Access Clearance**: Restricted strictly to `["health_medical"]` cases; barred from safeguarding investigations or SEN records.
 
-#### Missing Dashboard Features & Workflows:
-1. **Medical Alerts & Individual Healthcare Plans (IHP)**:
-   - No interface to manage student allergies (e.g. EpiPen protocols), chronic conditions (asthma, diabetes, epilepsy), or emergency action plans.
-2. **Medical Need-to-Know Alerts for Staff**:
-   - Nurses must broadcast critical life-safety warnings to teachers and office staff (e.g., *"Severe nut allergy: EpiPen stored in main office and classroom pack"*). No interface exists in live mode.
-3. **Daily Clinic Visit & Triage Log**:
-   - No feature to record daily student infirmary visits: time in/out, presenting complaint, treatment administered (e.g., ice pack, paracetamol), and guardian notification status.
-4. **Medication Administration Records (MAR)**:
-   - No mechanism to track daily prescribed medications administered at school (dosage, time, administering nurse, parent permission verification).
+#### What Has Been Added:
+1. **Live Dedicated Workspace**:
+   - School nurse dashboard active in [`SpecialistWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/specialist-workspace.tsx).
+2. **Medical Cases & Care Plans**:
+   - Record chronic conditions (asthma, epilepsy, severe allergies, diabetes) and encrypted clinical notes.
+3. **Emergency Medical Directives**:
+   - Create life-safety directives (EpiPen locations, seizure action plans) which now surface directly to **Teacher class rosters** and **Office attendance dashboards**.
+4. **Daily Clinic Drop-In & Triage Log**:
+   - Dedicated "Clinic triage log" tab in [`SpecialistWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/specialist-workspace.tsx) backed by `clinicVisits` table with `clinicVisitOutcome` enum (returned to class, sent home, emergency referral, etc.), presenting symptoms, triage treatment, guardian notification logging, and institutional audit trail.
+
+#### What Remains Pending:
+1. **Medication Administration Records (MAR)**:
+   - Daily log tracking scheduled prescription medications administered on campus.
 
 ---
 
 ### Role 4: `teacher` (Classroom & Homeroom Teacher)
 
-* **Current State**: Has [`TeacherWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/teacher-workspace.tsx) backed by [`getTeacherData`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/lib/teacher-data.ts).
+* **Current Status**: **Active Live Workspace** ([`TeacherWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/teacher-workspace.tsx)).
 * **Current Tabs**: `Overview`, `My classes`, `Attendance`, `Gradebook`, `Report cards`, `Notices`.
 
-#### Missing Dashboard Features & Workflows:
-1. **CRITICAL: Classroom Need-to-Know Alerts & Court Pickup Warnings**:
-   - [`getTeacherData`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/lib/teacher-data.ts#L8-L57) **does not query `needToKnowAlerts` or `courtRestrictions`**.
-   - As a result, teachers standing in front of students have **zero visibility** if a child in their classroom has an acute medical alert (e.g. severe allergy), an active SEN accommodation, or a court-ordered pickup restriction preventing departure with an unauthorized person.
-   - The sanitizer [`sanitizeTeacherAlert()`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/lib/sensitive-records.ts#L160-L187) was specifically developed to protect student privacy while informing teachers, but is never invoked in `TeacherWorkspace`.
-2. **Subject Period Attendance**:
-   - [`TeacherWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/teacher-workspace.tsx#L82-L85) restricts attendance recording exclusively to homeroom teachers during morning roll call (`homeClasses`).
-   - Subject teachers who teach Periods 1 through 6 cannot record or view lesson attendance for their classes, despite `attendanceSessions.period` existing in the schema.
-3. **Guardian Emergency Contacts on Roster**:
-   - In the `My classes` tab, only student names and student numbers are listed. Teachers have no access to primary guardian contact info for urgent communication or field trips.
-4. **Guardian Absence Notes Awareness**:
-   - When taking roll call, teachers see whether a student is absent, but cannot see whether a parent already submitted an absence note explaining an illness or medical appointment.
-5. **Class Announcements / Messaging**:
-   - Teachers can only view school-wide notices under `Notices`. They cannot draft or publish class-level announcements to their students' guardians.
-6. **Student Academic & Attendance Profiles**:
-   - Teachers cannot view a student's prior term grades or historical attendance trends.
+#### What Has Been Added:
+1. **Classroom Safety Notices & Pickup Warnings**:
+   - Class rosters display sanitized medical/SEN alert badges and court-ordered pickup restriction alerts via [`StudentSafety`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/lib/teacher-safety.ts).
+   - Overview banner warns when students in assigned classes have active safety notices.
+2. **Student Context & Guardian Contacts**:
+   - Roster includes guardian names, emergency phone numbers, email addresses, and past attendance/report card history via `StudentContext`.
+3. **Period Attendance**:
+   - Subject teachers can take attendance for lesson periods (`period_1` through `period_8`, `afternoon_roll_call`), not just morning roll call.
+4. **Guardian Absence Notes Banner**:
+   - Attendance tab displays incoming guardian absence notes for students on that date.
+5. **Class Announcements**:
+   - Teachers can draft and publish class announcements directly to their assigned classes.
+
+#### What Remains Pending:
+1. **Praise / Behaviour Conduct Points**:
+   - Behavioural tracking and positive merit/praise logger.
+2. **Student Academic Detail Drawer**:
+   - Visual multi-term grade trend graphs and full historical academic transcript view.
 
 ---
 
 ### Role 5: `office_staff` (School Office Staff)
 
-* **Current State**: Has [`OfficeWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/office-workspace.tsx) backed by [`getOfficeData`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/lib/office-data.ts).
-* **Current Tabs**: `Overview`, `Students`, `Guardians`, `Attendance follow-up`, `CSV imports`, `Notices`.
+* **Current Status**: **Active Live Workspace** ([`OfficeWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/office-workspace.tsx)).
+* **Current Tabs**: `Overview`, `Students`, `Guardians`, `Attendance follow-up`, `Reception desk`, `CSV imports`, `Notices`.
 
-#### Missing Dashboard Features & Workflows:
+#### What Has Been Added:
 1. **Unified Daily Absence Follow-Up Call List**:
-   - In [`office-workspace.tsx`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/office-workspace.tsx#L107-L109), attendance corrections and roll calls can only be inspected **one class at a time** via a dropdown.
-   - Office staff have no unified morning call list of *all unexplained absentees across the school* with primary guardian phone numbers, contact status, and call resolution notes.
-2. **Absence Note Actionability**:
-   - When office staff mark a guardian absence note as "reviewed", it **does not alter the student's attendance record** (e.g. converting `absent` to `excused`). Staff must separately navigate to the class roll call to make the correction manually.
-3. **Medical Need-to-Know Alerts**:
-   - [`getOfficeData`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/lib/office-data.ts#L3-L37) queries `courtRestrictions` for pickup warnings, but **does not query `needToKnowAlerts`**.
-   - Front office staff (who administer first aid when the nurse is off-site and handle medication drop-offs) cannot see student health protocols.
-4. **Communications & Emergency Alerts**:
-   - Office staff can only read announcements. They cannot draft notices, trigger emergency broadcasts, or send SMS notifications to guardians, despite handling parent inquiries.
-5. **Front Desk Visitor & Late Arrivals Desk**:
-   - No log for students arriving late to sign in at the front desk or visitors entering the building.
-6. **Printable Emergency Roll Call Sheets**:
-   - No one-click export or printable PDF roster for fire drills and evacuations.
+   - Dedicated `Unexplained absences for ${date}` roster listing all absentees across all classes lacking a parent note, with click-to-call telephone and email links.
+2. **One-Click Absence Review & Excuse**:
+   - Absence note cards include a "Review and excuse" button ([`reviewAndExcuseGuardianAbsenceAction`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/app/actions/office-actions.ts)) that excuses the attendance record and reviews the note in one transaction.
+3. **Active Medical Directives Banner**:
+   - Displays critical student health directives on overview and attendance tabs.
+4. **Printable Emergency Evacuation Roll Sheets**:
+   - Added [`/office/emergency-roll`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/app/office/emergency-roll/page.tsx) with clean printable roll sheets grouped by class with checkboxes, medical notices, and pickup warnings.
+5. **Reception Desk Late-Arrival & Early Departure Desk**:
+   - Added dedicated `Reception desk` tab in [`OfficeWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/office-workspace.tsx) backed by `receptionLogs` table:
+     - Late arrival check-in automatically updates morning roll call attendance marks to `late`, records minutes tardy and reasons, and issues audited correction slips.
+     - Early departure sign-out cross-checks court pickup prohibitions (`courtRestrictions`), displaying safeguarding alerts and blocking pickup by prohibited adults.
+     - Chronological reception movement register for the date.
+
+#### What Remains Pending:
+1. **Emergency Parent SMS Broadcast Trigger**:
+   - Direct SMS dispatch interface for office staff via `smsDispatches`.
 
 ---
 
 ### Role 6: `school_admin` (School Administrator / Principal)
 
-* **Current State**: Has comprehensive [`SchoolAdminWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/school-admin-workspace.tsx) and [`SchoolAdminWorkflows`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/school-admin-workflows.tsx).
+* **Current Status**: **Active Live Workspace** ([`SchoolAdminWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/school-admin-workspace.tsx)).
 * **Current Tabs**: `Overview`, `Students`, `Guardians`, `Staff & access`, `Classes & grades`, `Subjects`, `Academic years`, `Attendance`, `Gradebook`, `Report cards`, `Communications`, `Sensitive records`, `Audit history`, `School settings`.
 
-#### Missing Dashboard Features & Workflows:
-1. **Subject Teacher Class Assignments (`teacherClassAssignments`)**:
-   - Admin can assign a `homeroomTeacherId` to a class, but there is **no UI, editor, or policy command** to assign subject teachers to classes (e.g. assigning Teacher X to teach Science to Class 9A).
-   - Because `getTeacherData` checks `teacherClassAssignments.subjectId`, non-homeroom teachers cannot grade assessments without this assignment existing.
-2. **Unrendered Data on Overview Dashboard**:
-   - [`getSchoolAdminData()`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/lib/school-admin-data.ts#L41-L52) queries `activeAlerts`, `activeRestrictions`, and `attendanceSummary`.
-   - However, [`SchoolAdminWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/school-admin-workspace.tsx#L90-L112)'s `overview` section **never displays these items**. Daily attendance rates, persistent absenteeism flags, and active safeguarding counts are absent from the main dashboard.
-3. **Guardian Absence Notes Oversight**:
-   - Absence notes submitted by guardians are rendered in the office workspace, but the school administrator cannot review absence note trends or unresolved disputes.
-4. **GDPR / SAR (Subject Access Request) Management**:
-   - The database contains [`gdprRequests`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/db/schema.ts#L646-L665) and [`gdpr-compliance-panel.tsx`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/settings/gdpr-compliance-panel.tsx) exists in the repository.
-   - However, the live `SchoolAdminWorkspace` has no GDPR tab or interface to fulfill data export requests (data portability) or erasure requests.
-5. **Emergency Broadcasts & Parent SMS**:
-   - The communications tab supports in-app announcements only. There is no trigger for emergency SMS broadcasts (`smsDispatches` table) in case of school closures or severe weather.
-6. **Academic Term Closure & Grade Lock**:
-   - No workflow to lock all gradebooks and attendance sessions at the conclusion of a term to prevent historical modifications.
+#### What Has Been Added:
+1. **Subject Teacher Class Assignments**:
+   - Added `teacher_subject_assignment` command and management UI in `Classes & grades` to assign teachers to specific subjects across classes.
+2. **Overview Safety & Attendance KPI Metrics**:
+   - Overview dashboard renders KPI cards for Active safety alerts, Enforced court restrictions, School-wide attendance rate %, and Unexcused absence totals.
+   - Guardian absence note queue displayed on the overview dashboard.
+3. **Live GDPR & SAR Data Rights Panel**:
+   - Integrated [`SchoolAdminGdprPanel`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/school-admin-gdpr-panel.tsx) into `School settings` to handle Subject Access Requests, data portability exports, and erasure requests.
+
+#### What Remains Pending:
+1. **Emergency SMS Broadcast Dispatch**:
+   - Direct SMS broadcast trigger in the communications tab via `smsDispatches`.
+2. **Term Closure & Gradebook Seal**:
+   - School-wide lock to seal all gradebooks and attendance sessions at term completion.
 
 ---
 
 ### Role 7: `guardian` (Parent / Family Portal)
 
-* **Current State**: Has [`GuardianPortalWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/guardian-portal-workspace.tsx) backed by [`getGuardianPortalData`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/lib/guardian-portal-data.ts).
-* **Current Features**: Student cards, recent attendance history, published report card breakdown, absence note submission, published notices.
+* **Current Status**: **Active Live Workspace** ([`GuardianPortalWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/guardian-portal-workspace.tsx)).
+* **Current Features**: Student cards, recent attendance, published report cards, absence notes, school notices.
 
-#### Missing Dashboard Features & Workflows:
-1. **CRITICAL: Official Printable Report Card Access**:
-   - [`src/app/reports/[id]/page.tsx`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/app/reports/%5Bid%5D/page.tsx#L13) restricts report cards with `requireStaff(["school_admin", "teacher"])`.
-   - Guardians cannot access or print their student's official PDF/report card view.
-   - Furthermore, `GuardianPortalWorkspace` only renders subject grades in an inline list without any link to open the full official report card.
-2. **Consent Management**:
-   - Database table [`guardianConsents`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/db/schema.ts#L528-L541) tracks consents (`photo_consent`, `excursion_consent`, `digital_learning_consent`, etc.), grant dates, and withdrawal dates.
-   - The Guardian Portal provides **no interface to view or sign school consents**.
-3. **Two-Way School Messaging**:
-   - Guardians can only submit absence notes. They have no channel to send general inquiries to their student's homeroom teacher or the school office.
-4. **Timetable & School Calendar**:
-   - No daily timetable view showing which classes their student has today, and no calendar of upcoming school holidays or term dates.
-5. **Profile & Emergency Contact Verification**:
-   - Guardians cannot view or request corrections to their telephone numbers, home addresses, or alternative emergency contact listings.
+#### What Has Been Added:
+1. **Printable Official Report Card Access**:
+   - [`src/app/reports/[id]/page.tsx`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/app/reports/%5Bid%5D/page.tsx) updated to authorize verified legal guardians.
+   - Portal includes "Open printable report card" links for all published report cards.
+2. **School Consent Management**:
+   - Embedded [`GuardianSchoolConsents`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/guardian-school-consents.tsx) allowing parents to grant or revoke photo, excursion, and digital learning permissions.
+
+#### What Remains Pending:
+1. **Two-Way School / Teacher Messaging**:
+   - Direct inquiry messaging with homeroom teachers beyond absence notes.
+2. **Daily Period Timetable**:
+   - Student schedule view showing periods and classroom locations.
 
 ---
 
-### Role 8: `platform_admin` (Platform Superadministrator / Multi-School Admin)
+### Role 8: `platform_admin` (Platform Superadministrator)
 
-* **Current State**: Has [`PlatformInvitations`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/platform-invitations.tsx) and [`platform/schools/[id]`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/app/platform/schools/%5Bid%5D/page.tsx).
+* **Current Status**: **Active Live Workspace** ([`PlatformInvitations`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/platform-invitations.tsx)).
 * **Current Tabs**: `Overview`, `Schools`, `Users & access`, `Audit log`, `Security`, `System health`.
 
-#### Missing Dashboard Features & Workflows:
-1. **Disaster Recovery & Backup Drills Log**:
-   - Database table [`restoreDrills`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/db/schema.ts#L667-L686) tracks backup verification, RTO (Recovery Time Objective), RPO (Recovery Point Objective), table counts, and integrity status, documented in [`docs/backup-and-restore.md`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/docs/backup-and-restore.md).
-   - There is **no UI on the platform console** to view, record, or verify disaster recovery drills.
+#### What Has Been Added:
+1. **Disaster Recovery & Restore Drills Visibility**:
+   - Embedded [`PlatformRestoreDrills`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/platform-restore-drills.tsx) on `System health` tab displaying verified table counts, RTO, RPO, and backup timestamps from `restoreDrills`.
 2. **Tenant Full Data Portability / Export**:
-   - Platform admins cannot trigger a full school data export (database archive or GDPR tenant transfer) from the UI.
+   - Added [`/platform/schools/[id]/export`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/app/platform/schools/%5Bid%5D/export/route.ts) allowing platform admins to download an audited JSON export of any school.
 3. **Cross-School Guardian Search**:
-   - The `Users & access` tab searches staff memberships only. If a parent encounters authentication problems, platform admins have no search tool for guardian accounts.
-4. **Platform-Wide Announcement / Maintenance Banner**:
-   - No facility to broadcast platform-wide maintenance notifications to staff across all schools.
+   - Added [`PlatformGuardianSearch`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/platform-guardian-search.tsx) to find guardian accounts across all schools.
+4. **Platform-Wide Announcement**:
+   - Added [`PlatformAnnouncement`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/platform-announcement.tsx) to broadcast platform maintenance notices to all schools simultaneously.
+
+#### What Remains Pending:
+1. **Automated Drill Execution from UI**:
+   - Direct button on console to trigger automated restore drills without running CLI scripts.
 
 ---
 
-## 3. Comparative Capability Matrix
+## 3. Updated Comparative Capability Matrix
 
-| Role | Dedicated Live Dashboard | Attendance Tracking | Gradebook & Reports | Sensitive Records | Communications | Staff / School Mgmt | Key Missing Capabilities |
+| Role | Dedicated Live Dashboard | Attendance Tracking | Gradebook & Reports | Sensitive Records | Communications | Staff / School Mgmt | Key Remaining Gaps |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
-| **`safeguarding_lead`** | ❌ No | ❌ | ❌ | ❌ (Blocked) | ❌ | ❌ | Complete live dashboard, case chronology, court orders, disclosure packages |
-| **`senco`** | ❌ No | ❌ | ❌ | ❌ (Blocked) | ❌ | ❌ | Complete live dashboard, SEN register, IEP accommodations, teacher directives |
-| **`health_nurse`** | ❌ No | ❌ | ❌ | ❌ (Blocked) | ❌ | ❌ | Complete live dashboard, medical care plans, clinic visit log, allergy alerts |
-| **`teacher`** | ⚠️ Partial | ⚠️ Morning only | ✅ Yes | ❌ Blocked | ⚠️ Read only | ❌ | **Need-to-know health/safety alerts**, period attendance, parent contacts |
-| **`office_staff`** | ⚠️ Partial | ⚠️ Class-by-class | ❌ | ⚠️ Pickup orders | ⚠️ Read only | ⚠️ Student intake | Unified morning absence call list, absence note resolution, SMS/broadcasts |
-| **`school_admin`** | ✅ Comprehensive | ✅ Full | ✅ Full | ⚠️ Generic only | ⚠️ In-app only | ⚠️ Homeroom only | **Subject teacher assignments**, overview alert metrics, GDPR requests |
-| **`guardian`** | ⚠️ Partial | ⚠️ Student history | ⚠️ Summary only | ❌ | ⚠️ Read notices | ❌ | **Printable report cards (`/reports/[id]`)**, consent management, messaging |
-| **`platform_admin`** | ✅ Comprehensive | ❌ (By design) | ❌ (By design) | ❌ (By design) | ❌ | ✅ Full | Disaster recovery / restore drills log, tenant export, guardian account lookup |
+| **`safeguarding_lead`** | ✅ Active | ❌ | ❌ | ✅ Active (DSL scoped) | ⚠️ Read notices | ✅ Statutory disclosures & court admin | Low-level concern triage queue |
+| **`senco`** | ✅ Active | ❌ | ❌ | ✅ Active (SEN scoped) | ⚠️ Read notices | ⚠️ Case / directive admin | Formal SEN register tiers; IEP review date scheduling |
+| **`health_nurse`** | ✅ Active | ❌ | ❌ | ✅ Active (Health scoped)| ⚠️ Read notices | ✅ Clinic triage log & health admin | Prescription medication administration record (MAR) |
+| **`teacher`** | ✅ Active | ✅ Period & morning | ✅ Yes | ⚠️ Safety alerts & pickup | ✅ Class & school notices | ❌ | Behaviour praise/incident point logging; historical transcript drawer |
+| **`office_staff`** | ✅ Active | ✅ Full absence follow-up | ❌ | ⚠️ Pickup & medical alerts | ⚠️ Read notices | ✅ Intake, emergency rolls & reception desk | SMS dispatch tool |
+| **`school_admin`** | ✅ Active | ✅ Full oversight | ✅ Full | ✅ Full | ⚠️ In-app announcements | ✅ Full + Subject assignments + GDPR | Emergency SMS broadcast trigger; bulk term-end gradebook lock |
+| **`guardian`** | ✅ Active | ⚠️ Student history | ✅ Printable report cards | ❌ | ⚠️ Read notices | ⚠️ School consents | Direct 2-way messaging with teacher; student daily period timetable view |
+| **`platform_admin`** | ✅ Active | ❌ (By design) | ❌ (By design) | ❌ (By design) | ✅ Platform-wide notice | ✅ Full + Restore drills + Tenant export | Direct UI trigger for automated restore drill execution |
 
 ---
 
 ## 4. Database Schema vs Dashboard Exposure Matrix
 
-The following database tables are defined in [`src/db/schema.ts`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/db/schema.ts) but have gaps in their dashboard exposure:
-
-| Database Table | Roles Authorized in Domain | Currently Surfaced In Dashboard | Dashboard Gap |
+| Database Table | Roles Authorized in Domain | Surfaced In Dashboard | Current Status |
 | :--- | :--- | :--- | :--- |
-| `teacherClassAssignments` | `school_admin`, `teacher` | Partial (homeroom only) | **Subject assignments cannot be created/edited in admin UI** |
-| `needToKnowAlerts` | `safeguarding_lead`, `senco`, `health_nurse`, `school_admin`, `teacher`, `office_staff` | `SchoolAdminWorkflows`, `SchoolAdminStudentDirectory` | **Never shown to Teachers, Office Staff, or Specialists** |
-| `courtRestrictions` | `safeguarding_lead`, `school_admin`, `office_staff`, `teacher` | `SchoolAdminWorkflows`, `OfficeWorkspace` | **Never loaded or shown to Teachers** |
-| `sensitiveCases` | `safeguarding_lead`, `senco`, `health_nurse`, `school_admin` | `SchoolAdminWorkflows` | **Locked out from DSL, SENCO, and Nurse** |
-| `sensitiveCaseNotes` | `safeguarding_lead`, `senco`, `health_nurse`, `school_admin` | `SchoolAdminWorkflows` | **Locked out from DSL, SENCO, and Nurse** |
-| `guardianConsents` | `guardian`, `school_admin`, `office_staff` | None | **Orphaned: No UI in Guardian Portal or Admin** |
-| `gdprRequests` | `school_admin`, `platform_admin` | Demo workspace only | **Orphaned from live School Admin settings** |
-| `restoreDrills` | `platform_admin` | None | **Orphaned: No UI on Platform console** |
-| `smsDispatches` | `school_admin`, `office_staff` | Demo workspace only | **No live broadcast/SMS trigger** |
-| `guardianAbsenceNotes` | `office_staff`, `school_admin`, `teacher`, `guardian` | `OfficeWorkspace`, `GuardianPortalWorkspace` | **Hidden from Teachers and School Admins** |
+| `teacherClassAssignments` | `school_admin`, `teacher` | `SchoolAdminWorkspace`, `TeacherWorkspace` | **Connected**: Subject teacher assignments fully editable |
+| `needToKnowAlerts` | `safeguarding_lead`, `senco`, `health_nurse`, `school_admin`, `teacher`, `office_staff` | `SpecialistWorkspace`, `TeacherWorkspace`, `OfficeWorkspace`, `SchoolAdminWorkspace` | **Connected**: Broadcasted across staff workspaces |
+| `courtRestrictions` | `safeguarding_lead`, `school_admin`, `office_staff`, `teacher` | `SpecialistWorkspace`, `TeacherWorkspace`, `OfficeWorkspace`, `SchoolAdminWorkspace` | **Connected**: Pickup prohibitions visible to staff |
+| `clinicVisits` | `health_nurse`, `school_admin` | `SpecialistWorkspace` | **Connected**: Daily drop-in triage and visit log |
+| `receptionLogs` | `office_staff`, `school_admin` | `OfficeWorkspace` | **Connected**: Front desk late arrival & early departure register |
+| `sensitiveCases` | `safeguarding_lead`, `senco`, `health_nurse`, `school_admin` | `SpecialistWorkspace`, `SchoolAdminWorkflows` | **Connected**: Scoped by role area clearance |
+| `sensitiveCaseNotes` | `safeguarding_lead`, `senco`, `health_nurse`, `school_admin` | `SpecialistWorkspace`, `SchoolAdminWorkflows` | **Connected**: Encrypted notes with access logs |
+| `guardianConsents` | `guardian`, `school_admin`, `office_staff` | `GuardianPortalWorkspace` | **Connected**: Guardians can toggle school consents |
+| `gdprRequests` | `school_admin`, `platform_admin` | `SchoolAdminWorkspace` | **Connected**: Live school data rights panel |
+| `restoreDrills` | `platform_admin` | `PlatformInvitations` | **Connected**: Disaster recovery drills visible |
+| `guardianAbsenceNotes` | `office_staff`, `school_admin`, `teacher`, `guardian` | `OfficeWorkspace`, `TeacherWorkspace`, `SchoolAdminWorkspace`, `GuardianPortalWorkspace` | **Connected**: Visible across all relevant roles |
+| `smsDispatches` | `school_admin`, `office_staff` | None (Demo only) | **Pending**: Needs live SMS broadcast trigger |
 
 ---
 
-## 5. Recommended Priority Remediation Plan
+## 5. Prioritized Roadmap for Remaining Work
 
-### High Priority (Functional & Safety Blockers)
-1. **Unblock Specialist Dashboards**:
-   - Create a specialized workspace or tabbed views for `safeguarding_lead`, `senco`, and `health_nurse` in [`src/app/page.tsx`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/app/page.tsx).
-   - Implement data loaders (`getSafeguardingData`, `getSencoData`, `getHealthNurseData`) adhering strictly to the area permissions in [`canUserAccessCaseArea`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/lib/sensitive-records.ts#L114-L129).
-   - Update [`saveSchoolWorkflowAction`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/app/actions/school-workflow-actions.ts#L10-L13) and [`saveSchoolWorkflow`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/lib/school-workflow-service.ts#L22) to authorize `safeguarding_lead`, `senco`, and `health_nurse` for sensitive records and alerts.
-2. **Inject Need-to-Know Alerts & Court Restrictions into Teacher Dashboard**:
-   - Update [`getTeacherData`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/lib/teacher-data.ts) to query active `needToKnowAlerts` and `courtRestrictions` for students enrolled in the teacher's classes.
-   - Render sanitized alert badges (medical, SEN, pickup restrictions) on student rosters in [`TeacherWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/teacher-workspace.tsx).
-3. **Fix Report Card Access for Guardians**:
-   - Update [`src/app/reports/[id]/page.tsx`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/app/reports/%5Bid%5D/page.tsx#L13) to allow guardians who have a verified legal link (`hasLegalResponsibility = true`) to the student.
-   - Add an *"Open printable report card"* link to [`GuardianPortalWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/guardian-portal-workspace.tsx).
-4. **Implement Subject Teacher Assignment Interface**:
-   - Add `teacher_subject_assignment` command to [`schoolCommandSchema`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/lib/school-admin-policy.ts#L8-L23) and [`school-admin-service.ts`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/lib/school-admin-service.ts).
-   - Add an assignment modal/table in `SchoolAdminWorkspace` under `Classes & grades` or `Subjects` so subject teachers can be granted gradebook access.
-
-### Medium Priority (Operational Efficiency)
-5. **Office Staff Unified Absence Call Sheet & Note Actionability**:
-   - Provide a unified "Today's Unexplained Absences" table with one-click guardian phone calling.
-   - Add a *"Convert note to excused absence"* action directly on guardian absence notes.
-6. **Surface Admin Overview Metrics**:
-   - Wire `data.activeAlerts`, `data.activeRestrictions`, and `data.attendanceSummary` into the KPI cards of [`SchoolAdminWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/school-admin-workspace.tsx#L90-L96).
-7. **Guardian Consent Management**:
-   - Add a "School Consents" panel to [`GuardianPortalWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/guardian-portal-workspace.tsx) querying `guardianConsents` to allow parents to grant/revoke media and excursion permissions.
-8. **Live GDPR & SAR Panel**:
-   - Integrate `gdpr-compliance-panel.tsx` into live `SchoolAdminWorkspace` under `School settings` to support data portability exports.
-
-### Low Priority (Platform & Governance)
-9. **Platform Console Disaster Recovery Drills**:
-   - Add a "Disaster Recovery" card in `PlatformInvitations` under `System health` rendering records from the `restoreDrills` table.
-10. **Period Attendance Expansion**:
-    - Extend `TeacherWorkspace` to allow selecting session periods beyond `morning_roll_call`.
+1. **[COMPLETED] Safeguarding Multi-Agency Disclosure Package**:
+   Integrated [`generateDisclosurePackage`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/lib/sensitive-records.ts) and [`disclosure-package-modal.tsx`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/sensitive/disclosure-package-modal.tsx) into [`SpecialistWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/specialist-workspace.tsx) for `safeguarding_lead`.
+2. **[COMPLETED] Health Nurse Daily Clinic Drop-In & Triage Log**:
+   Added `clinicVisits` table, triage workflow (`clinic_visit` command), and UI tab in [`SpecialistWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/specialist-workspace.tsx) for `health_nurse`.
+3. **[COMPLETED] Office Staff Reception Late-Arrival & Early Departure Desk**:
+   Added `receptionLogs` table, `reception_log` command, court restriction pickup check, automatic attendance sync, and dedicated `Reception desk` tab in [`OfficeWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/office-workspace.tsx) for `office_staff`.
+4. **Emergency SMS Broadcast Dispatch**:
+   Add a broadcast trigger in `SchoolAdminWorkspace` and `OfficeWorkspace` for urgent SMS communications via `smsDispatches`.
+5. **Guardian Two-Way Messaging & Student Timetable**:
+   Add inquiry messaging and daily class schedules to `GuardianPortalWorkspace`.

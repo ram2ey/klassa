@@ -1,16 +1,16 @@
 import { and, eq } from "drizzle-orm";
 import { db } from "@/db";
 import { academicYears, announcements, assessmentCategories, assessmentGrades, assessments,
-  attendanceCorrections, attendanceRecords, attendanceSessions, classes, enrollments, gradeCorrections,
-  gradeLevels, organizations, reportCards, reportCardSubjectGrades, sensitiveAccessLogs,
+  attendanceCorrections, attendanceRecords, attendanceSessions, classes, clinicVisits, enrollments, gradeCorrections,
+  gradeLevels, organizations, receptionLogs, reportCards, reportCardSubjectGrades, sensitiveAccessLogs,
   sensitiveCaseNotes, sensitiveCases, needToKnowAlerts, courtRestrictions, students, subjects, terms, teacherClassAssignments } from "@/db/schema";
-import { logAuditEvent } from "@/lib/audit";
+import { AuditActions, logAuditEvent } from "@/lib/audit";
 import type { requireStaff } from "@/lib/action-access";
 import { SchoolAdminError } from "@/lib/school-admin-policy";
 import { canTeacherTakeAttendance, workflowCommandSchema, type WorkflowCommand } from "@/lib/school-workflow-policy";
 import { calculateWeightedTermGrade, scoreToGrade } from "@/lib/assessments";
 import { decryptNarrative, encryptNarrative } from "@/lib/narrative-crypto";
-import { canUserAccessCaseArea } from "@/lib/sensitive-records";
+import { canUserAccessCaseArea, generateDisclosurePackage, type CourtRestrictionRecord, type DisclosurePackageResult, type SensitiveCaseRecord } from "@/lib/sensitive-records";
 import { canSpecialistRunCommand, isSpecialistRole } from "@/lib/specialist-access";
 
 type Actor = Awaited<ReturnType<typeof requireStaff>>;
@@ -23,19 +23,23 @@ function decimal(value: number) { return value.toFixed(2); }
 export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
   if (actor.role !== "school_admin" && actor.role !== "teacher" && actor.role !== "office_staff" && !isSpecialistRole(actor.role)) throw new SchoolAdminError("School staff access required.");
   const value = workflowCommandSchema.parse(raw);
-  if (actor.role === "office_staff" && value.kind !== "attendance") throw new SchoolAdminError("Office staff can only correct recorded attendance.");
+  if (actor.role === "office_staff" && value.kind !== "attendance" && value.kind !== "reception_log") throw new SchoolAdminError("Office staff can only correct recorded attendance or log reception desk movements.");
   if (isSpecialistRole(actor.role) && !canSpecialistRunCommand(actor.role, value.kind)) throw new SchoolAdminError("Your specialist role cannot change this school record.");
   const org = actor.organizationId;
   return db.transaction(async tx => {
     found((await tx.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, org)).for("update"))[0], "School");
     if (actor.role === "teacher") {
-      const permitted = ["attendance", "attendance_submit", "assessment", "assessment_publish", "grade_entry", "report_generate", "report_remarks"];
+      const permitted = ["attendance", "attendance_submit", "assessment", "assessment_publish", "grade_entry", "report_generate", "report_remarks", "announcement"];
       if (!permitted.includes(value.kind)) throw new SchoolAdminError("Teachers cannot change this school record.");
       let assignedClassId: string | null = null;
       let assignedSubjectId: string | null = null;
       let homeroomOnly = false;
       if (value.kind === "attendance" || value.kind === "attendance_submit") assignedClassId = value.classId;
       if (value.kind === "assessment") { assignedClassId = value.classId; assignedSubjectId = value.subjectId; }
+      if (value.kind === "announcement") {
+        if (value.targetType !== "class") throw new SchoolAdminError("Teachers can publish only to an assigned class.");
+        assignedClassId = value.targetId;
+      }
       if (value.kind === "assessment_publish" || value.kind === "grade_entry") {
         const row = found((await tx.select({ classId: assessments.classId, subjectId: assessments.subjectId }).from(assessments)
           .where(and(eq(assessments.id, value.assessmentId), eq(assessments.organizationId, org))))[0], "Assessment");
@@ -59,12 +63,15 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
         !canTeacherTakeAttendance(value.period, assignedClass.homeroomTeacherId === actor.userId || assignments.some(row => row.isPrimaryHomeroom), assignments.some(row => row.subjectId !== null))) {
         throw new SchoolAdminError("You are not assigned to take attendance for this class and period.");
       }
-      if (value.kind !== "attendance" && value.kind !== "attendance_submit" && assignedClass.homeroomTeacherId !== actor.userId && !assignments.some(row => homeroomOnly ? row.isPrimaryHomeroom : row.isPrimaryHomeroom || (!!assignedSubjectId && row.subjectId === assignedSubjectId))) {
+      if (value.kind !== "attendance" && value.kind !== "attendance_submit" && assignedClass.homeroomTeacherId !== actor.userId && !assignments.some(row =>
+        value.kind === "announcement" ? row.isPrimaryHomeroom || row.subjectId !== null :
+        homeroomOnly ? row.isPrimaryHomeroom : row.isPrimaryHomeroom || (!!assignedSubjectId && row.subjectId === assignedSubjectId))) {
         throw new SchoolAdminError("You are not assigned to this class or subject.");
       }
     }
     let entityId = "";
     let noteText: string[] | undefined;
+    let packageResult: DisclosurePackageResult | undefined;
     switch (value.kind) {
       case "attendance":
       case "attendance_submit": {
@@ -315,9 +322,194 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
         entityId = restriction.id;
         break;
       }
+      case "statutory_disclosure": {
+        if (actor.role !== "safeguarding_lead" && actor.role !== "school_admin") throw new SchoolAdminError("Only the Designated Safeguarding Lead or School Admin can compile a statutory disclosure package.");
+        const student = found((await tx.select().from(students).where(and(eq(students.id, value.studentId), eq(students.organizationId, org))))[0], "Student");
+        const school = found((await tx.select().from(organizations).where(eq(organizations.id, org)))[0], "School");
+        const caseRows = await tx.select().from(sensitiveCases).where(and(eq(sensitiveCases.studentId, student.id), eq(sensitiveCases.organizationId, org)));
+        const restrictionRows = await tx.select().from(courtRestrictions).where(and(eq(courtRestrictions.studentId, student.id), eq(courtRestrictions.organizationId, org), eq(courtRestrictions.isEnforced, true)));
+        const studentFullName = `${student.firstName} ${student.lastName}`;
+        const mappedCases: SensitiveCaseRecord[] = caseRows.map(row => ({
+          id: row.id,
+          organizationId: row.organizationId,
+          studentId: row.studentId,
+          studentName: studentFullName,
+          studentGrade: "",
+          caseNumber: row.caseNumber,
+          area: row.area,
+          confidentialityTier: row.confidentialityTier,
+          title: row.title,
+          status: row.status,
+          leadSpecialistId: row.leadSpecialistId || "",
+          leadSpecialistName: "",
+          hasCourtOrder: row.hasCourtOrder,
+          reviewDate: row.reviewDate,
+          encryptedNotesCount: 0,
+          latestNoteSummary: "",
+          createdAt: row.createdAt.toISOString(),
+          updatedAt: row.updatedAt.toISOString(),
+        }));
+        const mappedRestrictions: CourtRestrictionRecord[] = restrictionRows.map(row => ({
+          id: row.id,
+          organizationId: row.organizationId,
+          studentId: row.studentId,
+          studentName: studentFullName,
+          restrictedGuardianId: null,
+          restrictedPersonName: row.restrictedPersonName,
+          orderType: row.orderType,
+          docketNumber: row.docketNumber,
+          issuingCourt: row.issuingCourt,
+          summary: row.summary,
+          prohibitPickup: row.prohibitPickup,
+          prohibitDisclosure: row.prohibitDisclosure,
+          prohibitDirectContact: row.prohibitDirectContact,
+          effectiveDate: row.effectiveDate,
+          expirationDate: row.expirationDate,
+          isEnforced: row.isEnforced,
+          createdAt: row.createdAt.toISOString(),
+        }));
+        packageResult = generateDisclosurePackage(
+          { id: student.id, name: studentFullName, studentNumber: student.studentNumber },
+          mappedCases,
+          mappedRestrictions,
+          actor.role,
+          { schoolName: school.name, recipientAgency: value.recipientAgency }
+        );
+        entityId = student.id;
+        break;
+      }
+      case "clinic_visit": {
+        if (actor.role !== "health_nurse" && actor.role !== "school_admin") throw new SchoolAdminError("Only the school nurse or school admin can record clinic visits.");
+        const student = found((await tx.select().from(students).where(and(eq(students.id, value.studentId), eq(students.organizationId, org))))[0], "Student");
+        const todayStr = new Date().toISOString().slice(0, 10);
+        const [row] = await tx.insert(clinicVisits).values({
+          organizationId: org,
+          studentId: student.id,
+          attendedBy: actor.userId,
+          category: value.category,
+          symptoms: value.symptoms,
+          treatment: value.treatment,
+          outcome: value.outcome,
+          guardianNotified: value.guardianNotified,
+          guardianNotificationNotes: value.guardianNotificationNotes || null,
+          visitDate: todayStr,
+        }).returning();
+        entityId = row.id;
+        break;
+      }
+      case "reception_log": {
+        if (actor.role !== "office_staff" && actor.role !== "school_admin") throw new SchoolAdminError("Only office staff or school administrators can record reception desk movements.");
+        const student = found((await tx.select().from(students).where(and(eq(students.id, value.studentId), eq(students.organizationId, org))))[0], "Student");
+
+        if (value.logType === "early_departure") {
+          const activeCourtOrders = await tx.select().from(courtRestrictions)
+            .where(and(
+              eq(courtRestrictions.studentId, student.id),
+              eq(courtRestrictions.organizationId, org),
+              eq(courtRestrictions.isEnforced, true),
+              eq(courtRestrictions.prohibitPickup, true)
+            ));
+
+          if (activeCourtOrders.length > 0 && value.actorPersonName) {
+            const requestedCollector = value.actorPersonName.trim().toLowerCase();
+            const violation = activeCourtOrders.find(order => {
+              const restricted = order.restrictedPersonName.trim().toLowerCase();
+              return requestedCollector.includes(restricted) || restricted.includes(requestedCollector);
+            });
+            if (violation) {
+              throw new SchoolAdminError(`COURT RESTRICTION ALERT: ${violation.restrictedPersonName} is legally prohibited from picking up ${student.firstName} ${student.lastName} (Court order ref: ${violation.docketNumber}). Pickup cannot be authorized.`);
+            }
+          }
+        }
+
+        const [logRow] = await tx.insert(receptionLogs).values({
+          organizationId: org,
+          studentId: student.id,
+          logType: value.logType,
+          logDate: value.logDate,
+          timeString: value.timeString,
+          minutesLate: value.minutesLate,
+          reason: value.reason,
+          actorPersonName: value.actorPersonName || null,
+          relationship: value.relationship || null,
+          isExcused: value.isExcused,
+          recordedBy: actor.userId,
+          remarks: value.remarks || null,
+        }).returning();
+
+        if (value.logType === "late_arrival") {
+          const currentYear = (await tx.select({ id: academicYears.id }).from(academicYears).where(and(eq(academicYears.organizationId, org), eq(academicYears.isCurrent, true))))[0];
+          if (currentYear) {
+            const enrollment = (await tx.select({ classId: enrollments.classId }).from(enrollments).where(and(eq(enrollments.organizationId, org), eq(enrollments.studentId, student.id), eq(enrollments.academicYearId, currentYear.id))))[0];
+            if (enrollment?.classId) {
+              const morningSession = (await tx.select({ id: attendanceSessions.id, status: attendanceSessions.status }).from(attendanceSessions).where(and(
+                eq(attendanceSessions.organizationId, org),
+                eq(attendanceSessions.classId, enrollment.classId),
+                eq(attendanceSessions.sessionDate, value.logDate),
+                eq(attendanceSessions.period, "morning_roll_call")
+              )))[0];
+
+              if (morningSession) {
+                const existingRecord = (await tx.select({ id: attendanceRecords.id, status: attendanceRecords.status }).from(attendanceRecords).where(and(
+                  eq(attendanceRecords.organizationId, org),
+                  eq(attendanceRecords.sessionId, morningSession.id),
+                  eq(attendanceRecords.studentId, student.id)
+                )))[0];
+
+                if (existingRecord) {
+                  await tx.update(attendanceRecords).set({
+                    status: "late",
+                    arrivalMinutesLate: value.minutesLate || 1,
+                    reason: value.reason,
+                    remarks: value.remarks ? `Reception desk: ${value.remarks}` : "Checked in at reception desk",
+                    updatedAt: new Date(),
+                  }).where(and(eq(attendanceRecords.id, existingRecord.id), eq(attendanceRecords.organizationId, org)));
+
+                  if (morningSession.status === "submitted" && existingRecord.status !== "late") {
+                    await tx.insert(attendanceCorrections).values({
+                      organizationId: org,
+                      attendanceRecordId: existingRecord.id,
+                      studentId: student.id,
+                      previousStatus: existingRecord.status,
+                      newStatus: "late",
+                      reason: `Front desk late arrival sign-in at ${value.timeString}: ${value.reason}`,
+                      correctedBy: actor.userId,
+                    });
+                  }
+                } else {
+                  await tx.insert(attendanceRecords).values({
+                    organizationId: org,
+                    sessionId: morningSession.id,
+                    studentId: student.id,
+                    status: "late",
+                    arrivalMinutesLate: value.minutesLate || 1,
+                    reason: value.reason,
+                    remarks: value.remarks ? `Reception desk: ${value.remarks}` : "Checked in at reception desk",
+                  });
+                }
+              }
+            }
+          }
+        }
+
+        entityId = logRow.id;
+        break;
+      }
     }
-    await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action: `${value.kind}.saved`,
-      entityType: value.kind, entityId, metadata: "reason" in value ? { reason: value.reason } : {} }, tx);
-    return { entityId, notes: noteText };
+    if (value.kind === "statutory_disclosure" && packageResult) {
+      await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action: AuditActions.DISCLOSURE_PACKAGE_EXPORTED,
+        entityType: "student", entityId, metadata: { dossierNumber: packageResult.dossierNumber, recipientAgency: value.recipientAgency, reason: value.reason, recordCount: packageResult.includedRecords.length, withheldSafeguardingCount: packageResult.withheldSafeguardingCount, checksum: packageResult.digitalIntegrityChecksum } }, tx);
+    } else if (value.kind === "clinic_visit") {
+      await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action: AuditActions.CLINIC_VISIT_LOGGED,
+        entityType: "clinic_visit", entityId, metadata: { category: value.category, outcome: value.outcome, guardianNotified: value.guardianNotified } }, tx);
+    } else if (value.kind === "reception_log") {
+      const action = value.logType === "late_arrival" ? AuditActions.LATE_ARRIVAL_LOGGED : AuditActions.EARLY_DEPARTURE_LOGGED;
+      await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action,
+        entityType: "reception_log", entityId, metadata: { logType: value.logType, studentId: value.studentId, timeString: value.timeString, minutesLate: value.minutesLate, reason: value.reason, actorPersonName: value.actorPersonName, isExcused: value.isExcused } }, tx);
+    } else {
+      await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action: `${value.kind}.saved`,
+        entityType: value.kind, entityId, metadata: "reason" in value ? { reason: value.reason } : {} }, tx);
+    }
+    return { entityId, notes: noteText, disclosurePackage: packageResult };
   });
 }
