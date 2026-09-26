@@ -69,6 +69,39 @@ export const workflowCommandSchema = z.discriminatedUnion("kind", [
     targetId: z.string().default("all"),
     severity: z.enum(["urgent_alert", "lockdown", "school_closure", "weather_alert", "evacuation"]),
     message: z.string().trim().min(5).max(320) }),
+  z.object({ kind: z.literal("behaviour_log"),
+    studentId: id,
+    classId: id.optional().nullable(),
+    type: z.enum(["praise", "incident"]),
+    category: z.string().trim().min(2).max(60),
+    points: z.number().int().min(1).max(20).default(1),
+    description: z.string().trim().max(1000).default(""),
+    guardianVisible: z.boolean().default(true),
+    occurredAt: date }),
 ]);
+
+export const praiseCategories = [
+  "academic_excellence",
+  "outstanding_effort",
+  "helping_others",
+  "good_citizenship",
+  "creativity",
+  "teamwork",
+  "resilience",
+  "leadership",
+] as const;
+export type PraiseCategory = (typeof praiseCategories)[number];
+
+export const incidentCategories = [
+  "disruption",
+  "incomplete_work",
+  "tardiness_to_lesson",
+  "uniform_violation",
+  "defiance",
+  "inappropriate_language",
+  "technology_misuse",
+  "property_damage",
+] as const;
+export type IncidentCategory = (typeof incidentCategories)[number];
 
 export type WorkflowCommand = z.input<typeof workflowCommandSchema>;

@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { academicYears, announcements, assessmentCategories, assessmentGrades, assessments,
   attendanceCorrections, attendanceRecords, attendanceSessions, classes, clinicVisits, enrollments, gradeCorrections,
   gradeLevels, guardians, organizations, receptionLogs, reportCards, reportCardSubjectGrades, sensitiveAccessLogs,
-  sensitiveCaseNotes, sensitiveCases, needToKnowAlerts, courtRestrictions, smsDispatches, studentGuardians, students, subjects, terms, teacherClassAssignments } from "@/db/schema";
+  sensitiveCaseNotes, sensitiveCases, needToKnowAlerts, courtRestrictions, smsDispatches, studentBehaviours, studentGuardians, students, subjects, terms, teacherClassAssignments } from "@/db/schema";
 import { AuditActions, logAuditEvent } from "@/lib/audit";
 import type { requireStaff } from "@/lib/action-access";
 import { SchoolAdminError } from "@/lib/school-admin-policy";
@@ -33,7 +33,7 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
   return db.transaction(async tx => {
     found((await tx.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, org)).for("update"))[0], "School");
     if (actor.role === "teacher") {
-      const permitted = ["attendance", "attendance_submit", "assessment", "assessment_publish", "grade_entry", "report_generate", "report_remarks", "announcement"];
+      const permitted = ["attendance", "attendance_submit", "assessment", "assessment_publish", "grade_entry", "report_generate", "report_remarks", "announcement", "behaviour_log"];
       if (!permitted.includes(value.kind)) throw new SchoolAdminError("Teachers cannot change this school record.");
       let assignedClassId: string | null = null;
       let assignedSubjectId: string | null = null;
@@ -59,6 +59,23 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
         const card = found((await tx.select({ classId: reportCards.classId }).from(reportCards).where(and(eq(reportCards.id, value.reportCardId), eq(reportCards.organizationId, org))))[0], "Report card");
         assignedClassId = card.classId; homeroomOnly = true;
       }
+      if (value.kind === "behaviour_log") {
+        if (value.classId) {
+          assignedClassId = value.classId;
+        } else {
+          const teacherClasses = await tx.select({ id: classes.id }).from(classes).where(and(eq(classes.organizationId, org), eq(classes.homeroomTeacherId, actor.userId)));
+          const teacherAssignments = await tx.select({ classId: teacherClassAssignments.classId }).from(teacherClassAssignments).where(and(eq(teacherClassAssignments.organizationId, org), eq(teacherClassAssignments.teacherId, actor.userId)));
+          const allTeacherClassIds = [...new Set([...teacherClasses.map(c => c.id), ...teacherAssignments.map(a => a.classId)])];
+          const enrollment = allTeacherClassIds.length ? (await tx.select({ classId: enrollments.classId }).from(enrollments).where(and(
+            eq(enrollments.organizationId, org),
+            eq(enrollments.studentId, value.studentId),
+            inArray(enrollments.classId, allTeacherClassIds),
+            eq(enrollments.status, "active")
+          )))[0] : null;
+          if (!enrollment) throw new SchoolAdminError("You can only log behaviour for students enrolled in your assigned classes.");
+          assignedClassId = enrollment.classId;
+        }
+      }
       if (!assignedClassId) throw new SchoolAdminError("This record has no assigned class.");
       const assignments = await tx.select().from(teacherClassAssignments).where(and(eq(teacherClassAssignments.organizationId, org),
         eq(teacherClassAssignments.teacherId, actor.userId), eq(teacherClassAssignments.classId, assignedClassId)));
@@ -68,9 +85,18 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
         throw new SchoolAdminError("You are not assigned to take attendance for this class and period.");
       }
       if (value.kind !== "attendance" && value.kind !== "attendance_submit" && assignedClass.homeroomTeacherId !== actor.userId && !assignments.some(row =>
-        value.kind === "announcement" ? row.isPrimaryHomeroom || row.subjectId !== null :
+        value.kind === "announcement" || value.kind === "behaviour_log" ? row.isPrimaryHomeroom || row.subjectId !== null :
         homeroomOnly ? row.isPrimaryHomeroom : row.isPrimaryHomeroom || (!!assignedSubjectId && row.subjectId === assignedSubjectId))) {
         throw new SchoolAdminError("You are not assigned to this class or subject.");
+      }
+      if (value.kind === "behaviour_log") {
+        const studentEnrollment = (await tx.select({ id: enrollments.id }).from(enrollments).where(and(
+          eq(enrollments.organizationId, org),
+          eq(enrollments.studentId, value.studentId),
+          eq(enrollments.classId, assignedClassId),
+          eq(enrollments.status, "active")
+        )))[0];
+        if (!studentEnrollment) throw new SchoolAdminError("Student is not actively enrolled in this class.");
       }
     }
     let entityId = "";
@@ -561,6 +587,26 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
         entityId = broadcastId;
         break;
       }
+      case "behaviour_log": {
+        found((await tx.select({ id: students.id }).from(students).where(and(eq(students.id, value.studentId), eq(students.organizationId, org))))[0], "Student");
+        if (value.classId) {
+          found((await tx.select({ id: classes.id }).from(classes).where(and(eq(classes.id, value.classId), eq(classes.organizationId, org))))[0], "Class");
+        }
+        const [behaviourRecord] = await tx.insert(studentBehaviours).values({
+          organizationId: org,
+          studentId: value.studentId,
+          classId: value.classId || null,
+          recordedBy: actor.userId,
+          type: value.type,
+          category: value.category,
+          points: value.points,
+          description: value.description || null,
+          guardianVisible: value.guardianVisible,
+          occurredAt: value.occurredAt,
+        }).returning();
+        entityId = behaviourRecord.id;
+        break;
+      }
     }
     if (value.kind === "statutory_disclosure" && packageResult) {
       await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action: AuditActions.DISCLOSURE_PACKAGE_EXPORTED,
@@ -575,6 +621,10 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
     } else if (value.kind === "emergency_sms_broadcast") {
       await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action: AuditActions.EMERGENCY_BROADCAST_CONFIRMED,
         entityType: "sms_broadcast", entityId, metadata: { scope: value.scope, targetId: value.targetId, severity: value.severity, recipientCount: broadcastRecipientCount, messageLength: value.message.length } }, tx);
+    } else if (value.kind === "behaviour_log") {
+      const action = value.type === "praise" ? AuditActions.BEHAVIOUR_PRAISE_LOGGED : AuditActions.BEHAVIOUR_INCIDENT_LOGGED;
+      await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action,
+        entityType: "student_behaviour", entityId, metadata: { studentId: value.studentId, classId: value.classId, type: value.type, category: value.category, points: value.points, guardianVisible: value.guardianVisible, occurredAt: value.occurredAt } }, tx);
     } else {
       await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action: `${value.kind}.saved`,
         entityType: value.kind, entityId, metadata: "reason" in value ? { reason: value.reason } : {} }, tx);

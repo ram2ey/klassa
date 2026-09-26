@@ -88,5 +88,51 @@ describe("period attendance policy", () => {
       severity: "lockdown",
       message: "A".repeat(321),
     }).success).toBe(false);
+
+    const praise = workflowCommandSchema.parse({
+      kind: "behaviour_log",
+      studentId,
+      classId,
+      type: "praise",
+      category: "academic_excellence",
+      points: 2,
+      description: "Exceptional mathematical reasoning in group problem solving",
+      guardianVisible: true,
+      occurredAt: "2026-09-26",
+    });
+    expect(praise).toMatchObject({
+      kind: "behaviour_log",
+      type: "praise",
+      category: "academic_excellence",
+      points: 2,
+      guardianVisible: true,
+    });
+
+    const incident = workflowCommandSchema.parse({
+      kind: "behaviour_log",
+      studentId,
+      type: "incident",
+      category: "disruption",
+      occurredAt: "2026-09-26",
+    });
+    expect(incident).toMatchObject({
+      kind: "behaviour_log",
+      type: "incident",
+      category: "disruption",
+      points: 1, // default
+      guardianVisible: true, // default
+      description: "", // default
+    });
+
+    // Invalid: points > 20
+    expect(workflowCommandSchema.safeParse({
+      kind: "behaviour_log",
+      studentId,
+      type: "praise",
+      category: "academic_excellence",
+      points: 25,
+      occurredAt: "2026-09-26",
+    }).success).toBe(false);
   });
 });
+

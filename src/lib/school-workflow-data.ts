@@ -2,7 +2,7 @@ import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { attendanceSessions, attendanceRecords, assessmentCategories, assessments, assessmentGrades,
   reportCards, reportCardSubjectGrades, announcements, sensitiveCases, sensitiveCaseNotes, sensitiveAccessLogs,
-  needToKnowAlerts, courtRestrictions, smsDispatches } from "@/db/schema";
+  needToKnowAlerts, courtRestrictions, smsDispatches, studentBehaviours } from "@/db/schema";
 import { requireStaff } from "@/lib/action-access";
 
 export async function getSchoolWorkflowData(section: string, sessionDate: string) {
@@ -13,6 +13,7 @@ export async function getSchoolWorkflowData(section: string, sessionDate: string
     grades: [] as (typeof assessmentGrades.$inferSelect)[], reports: [] as (typeof reportCards.$inferSelect)[],
     reportSubjects: [] as (typeof reportCardSubjectGrades.$inferSelect)[], announcements: [] as (typeof announcements.$inferSelect)[],
     dispatches: [] as (typeof smsDispatches.$inferSelect)[],
+    behaviours: [] as (typeof studentBehaviours.$inferSelect)[],
     cases: [] as (typeof sensitiveCases.$inferSelect)[], notes: [] as Pick<typeof sensitiveCaseNotes.$inferSelect, "id" | "caseId" | "noteType" | "createdAt">[],
     accessLogs: [] as Pick<typeof sensitiveAccessLogs.$inferSelect, "id" | "caseId" | "action" | "accessReason" | "accessedAt">[],
     alerts: [] as (typeof needToKnowAlerts.$inferSelect)[], restrictions: [] as (typeof courtRestrictions.$inferSelect)[] };
@@ -50,6 +51,13 @@ export async function getSchoolWorkflowData(section: string, sessionDate: string
       db.select().from(courtRestrictions).where(eq(courtRestrictions.organizationId, org)).orderBy(desc(courtRestrictions.createdAt)),
     ]);
     return { ...empty, cases, notes, accessLogs, alerts, restrictions };
+  }
+  if (section === "behaviour") {
+    const behaviourRows = await db.select().from(studentBehaviours)
+      .where(eq(studentBehaviours.organizationId, org))
+      .orderBy(desc(studentBehaviours.occurredAt), desc(studentBehaviours.createdAt))
+      .limit(200);
+    return { ...empty, behaviours: behaviourRows };
   }
   return empty;
 }

@@ -78,4 +78,31 @@ describe("teacher class information", () => {
     expect(screen.getByText("Morgan Lee", { exact: false })).toBeTruthy();
     expect(screen.getByText("Recent morning attendance: 1/2 present")).toBeTruthy();
   });
+
+  it("renders behaviour and praise section and displays conduct logging panel", () => {
+    const enriched = {
+      ...data,
+      behaviours: [
+        {
+          id: "beh-1",
+          organizationId: "school-a",
+          studentId,
+          classId,
+          recordedBy: "teacher-1",
+          type: "praise",
+          category: "academic_excellence",
+          points: 2,
+          description: "Superb analytical skills",
+          guardianVisible: true,
+          occurredAt: "2026-09-26",
+          createdAt: new Date(),
+          updatedAt: new Date(),
+        },
+      ],
+    } as unknown as TeacherData;
+    render(<TeacherWorkspace data={enriched} notices={[]} section="behaviour" date="2026-09-26" />);
+    expect(screen.getByText("Praise & Merits Awarded")).toBeTruthy();
+    expect(screen.getByText("Superb analytical skills")).toBeTruthy();
+  });
 });
+

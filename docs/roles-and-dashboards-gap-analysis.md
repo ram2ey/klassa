@@ -136,11 +136,14 @@ flowchart TD
    - Attendance tab displays incoming guardian absence notes for students on that date.
 5. **Class Announcements**:
    - Teachers can draft and publish class announcements directly to their assigned classes.
+6. **Praise & Incident Behaviour Logging**:
+   - Conduct tracking interface in [`TeacherWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/teacher-workspace.tsx) via `studentBehaviours` table and `behaviour_log` command:
+     - Log positive merits (Academic Excellence, Helpful Citizen, Leadership, Creativity) and negative sanctions (Disruption, Incomplete Homework, Disrespect, Safety Infraction).
+     - Point modifiers (+1 to +5, -1 to -5) and guardian portal visibility toggle.
+     - Merits badge on student roster rows and summary metrics on Overview.
 
 #### What Remains Pending:
-1. **Praise / Behaviour Conduct Points**:
-   - Behavioural tracking and positive merit/praise logger.
-2. **Student Academic Detail Drawer**:
+1. **Student Academic Detail Drawer**:
    - Visual multi-term grade trend graphs and full historical academic transcript view.
 
 ---
@@ -243,7 +246,7 @@ flowchart TD
 | **`safeguarding_lead`** | ✅ Active | ❌ | ❌ | ✅ Active (DSL scoped) | ⚠️ Read notices | ✅ Statutory disclosures & court admin | Low-level concern triage queue |
 | **`senco`** | ✅ Active | ❌ | ❌ | ✅ Active (SEN scoped) | ⚠️ Read notices | ⚠️ Case / directive admin | Formal SEN register tiers; IEP review date scheduling |
 | **`health_nurse`** | ✅ Active | ❌ | ❌ | ✅ Active (Health scoped)| ⚠️ Read notices | ✅ Clinic triage log & health admin | Prescription medication administration record (MAR) |
-| **`teacher`** | ✅ Active | ✅ Period & morning | ✅ Yes | ⚠️ Safety alerts & pickup | ✅ Class & school notices | ❌ | Behaviour praise/incident point logging; historical transcript drawer |
+| **`teacher`** | ✅ Active | ✅ Period & morning | ✅ Yes | ⚠️ Safety alerts & pickup | ✅ Class & school notices | ❌ | Historical transcript drawer |
 | **`office_staff`** | ✅ Active | ✅ Full absence follow-up | ❌ | ⚠️ Pickup & medical alerts | ✅ Emergency SMS trigger | ✅ Intake, emergency rolls & reception desk | Front desk clinic medication intake log |
 | **`school_admin`** | ✅ Active | ✅ Full oversight | ✅ Full | ✅ Full | ✅ Emergency SMS trigger | ✅ Full + Subject assignments + GDPR | Bulk term-end gradebook lock |
 | **`guardian`** | ✅ Active | ⚠️ Student history | ✅ Printable report cards | ❌ | ⚠️ Read notices | ⚠️ School consents | Direct 2-way messaging with teacher; student daily period timetable view |
@@ -260,6 +263,7 @@ flowchart TD
 | `courtRestrictions` | `safeguarding_lead`, `school_admin`, `office_staff`, `teacher` | `SpecialistWorkspace`, `TeacherWorkspace`, `OfficeWorkspace`, `SchoolAdminWorkspace` | **Connected**: Pickup prohibitions visible to staff |
 | `clinicVisits` | `health_nurse`, `school_admin` | `SpecialistWorkspace` | **Connected**: Daily drop-in triage and visit log |
 | `receptionLogs` | `office_staff`, `school_admin` | `OfficeWorkspace` | **Connected**: Front desk late arrival & early departure register |
+| `studentBehaviours` | `teacher`, `school_admin` | `TeacherWorkspace`, `SchoolAdminWorkspace` | **Connected**: Praise merit points & incident sanction logging |
 | `sensitiveCases` | `safeguarding_lead`, `senco`, `health_nurse`, `school_admin` | `SpecialistWorkspace`, `SchoolAdminWorkflows` | **Connected**: Scoped by role area clearance |
 | `sensitiveCaseNotes` | `safeguarding_lead`, `senco`, `health_nurse`, `school_admin` | `SpecialistWorkspace`, `SchoolAdminWorkflows` | **Connected**: Encrypted notes with access logs |
 | `guardianConsents` | `guardian`, `school_admin`, `office_staff` | `GuardianPortalWorkspace` | **Connected**: Guardians can toggle school consents |
@@ -280,7 +284,7 @@ flowchart TD
    Added `receptionLogs` table, `reception_log` command, court restriction pickup check, automatic attendance sync, and dedicated `Reception desk` tab in [`OfficeWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/office-workspace.tsx) for `office_staff`.
 4. **[COMPLETED] Emergency SMS Broadcast Dispatch**:
    Added `emergency_sms_broadcast` policy & workflow service, [`EmergencySmsBroadcast`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/emergency-sms-broadcast.tsx) component, and dispatch integration into [`SchoolAdminWorkflows`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/school-admin-workflows.tsx) and [`OfficeWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/office-workspace.tsx) for `school_admin` and `office_staff`.
-5. **Teacher Behaviour Praise & Incident Point Logging**:
-   Add student behaviour conduct log (positive merits and negative sanctions) with guardian visibility flag and teacher classroom logger.
+5. **[COMPLETED] Teacher Behaviour Praise & Incident Point Logging**:
+   Added `studentBehaviours` table, `behaviour_log` command & service, and interactive conduct logger in [`TeacherWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/teacher-workspace.tsx) and [`SchoolAdminWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/school-admin-workspace.tsx).
 6. **Guardian Two-Way Messaging & Student Timetable**:
    Add inquiry messaging and daily class schedules to `GuardianPortalWorkspace`.

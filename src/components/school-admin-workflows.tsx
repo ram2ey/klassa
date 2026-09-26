@@ -9,6 +9,7 @@ import type { SchoolWorkflowData } from "@/lib/school-workflow-data";
 import type { WorkflowCommand } from "@/lib/school-workflow-policy";
 import { formatGMTDateTime } from "@/lib/timezone";
 import { EmergencySmsBroadcast } from "@/components/emergency-sms-broadcast";
+import { TeacherBehaviourPanel } from "@/components/teacher-behaviour-panel";
 
 const field = "min-h-11 w-full border border-slate-300 bg-white px-3 py-2 text-sm";
 const button = "min-h-11 bg-blue-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50";
@@ -186,5 +187,18 @@ export function SchoolAdminWorkflows({ section, date, base, data }: { section: s
       </form><div className="space-y-2">{data.restrictions.map(row => <article key={row.id} className="flex flex-wrap items-start justify-between gap-3 border border-slate-200 p-3 text-sm"><div><strong>{name(row.studentId)} · {row.restrictedPersonName}</strong><p>{words(row.orderType)} · {row.issuingCourt} · {row.docketNumber}</p><p className="mt-1">{row.summary}</p><p className="mt-1 text-xs text-slate-500">{row.isEnforced ? "Enforced" : "Inactive"} · Effective {row.effectiveDate}{row.expirationDate ? ` to ${row.expirationDate}` : ""}</p></div><button className={secondary} disabled={pending} onClick={() => { const reason = window.prompt(`Reason to ${row.isEnforced ? "deactivate" : "reactivate"} this restriction`); if (reason) send({ kind: "court_restriction_status", restrictionId: row.id, isEnforced: !row.isEnforced, reason }); }}>{row.isEnforced ? "Deactivate" : "Reactivate"}</button></article>)}</div></Box>
       <Box title="Recent sensitive access"><ul className="space-y-2 text-sm">{data.accessLogs.map(row => <li key={row.id}>{data.cases.find(item => item.id === row.caseId)?.caseNumber ?? "Case"} · {row.action} · {row.accessReason}</li>)}</ul></Box>
     </>}
+    {section === "behaviour" && (
+      <TeacherBehaviourPanel
+        classes={classes}
+        students={base.students}
+        enrollments={base.enrollments}
+        behaviours={data.behaviours ?? []}
+        defaultDate={date}
+        pending={pending}
+        onSave={send}
+        isAdmin={true}
+      />
+    )}
   </div>;
 }
+

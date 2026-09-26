@@ -36,6 +36,7 @@ export const drillStatus = pgEnum("drill_status", ["passed", "failed", "partial"
 export const platformIncidentSeverity = pgEnum("platform_incident_severity", ["warning", "critical"]);
 export const clinicVisitOutcome = pgEnum("clinic_visit_outcome", ["returned_to_class", "resting_in_clinic", "sent_home", "collected_by_guardian", "emergency_referral"]);
 export const receptionLogType = pgEnum("reception_log_type", ["late_arrival", "early_departure"]);
+export const behaviourType = pgEnum("behaviour_type", ["praise", "incident"]);
 
 export const organizations = pgTable("organizations", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -685,6 +686,25 @@ export const receptionLogs = pgTable("reception_logs", {
   index("reception_logs_student_idx").on(table.organizationId, table.studentId),
 ]);
 
+export const studentBehaviours = pgTable("student_behaviours", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  studentId: uuid("student_id").notNull().references(() => students.id, { onDelete: "cascade" }),
+  classId: uuid("class_id").references(() => classes.id, { onDelete: "set null" }),
+  recordedBy: text("recorded_by").references(() => users.id, { onDelete: "set null" }),
+  type: behaviourType("type").notNull(),
+  category: varchar("category", { length: 60 }).notNull(),
+  points: integer("points").default(1).notNull(),
+  description: text("description"),
+  guardianVisible: boolean("guardian_visible").default(true).notNull(),
+  occurredAt: date("occurred_at").notNull(),
+  ...timestamps,
+}, (table) => [
+  index("student_behaviours_org_date_idx").on(table.organizationId, table.occurredAt),
+  index("student_behaviours_student_idx").on(table.organizationId, table.studentId),
+  index("student_behaviours_class_idx").on(table.organizationId, table.classId),
+]);
+
 export const gdprRequests = pgTable("gdpr_requests", {
   id: uuid("id").defaultRandom().primaryKey(),
   organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
@@ -823,6 +843,9 @@ export const schema = {
   sensitiveAccessLogs,
   needToKnowAlerts,
   courtRestrictions,
+  clinicVisits,
+  receptionLogs,
+  studentBehaviours,
   gdprRequests,
   restoreDrills,
   rateLimitLogs,

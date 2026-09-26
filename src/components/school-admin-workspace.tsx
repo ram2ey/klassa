@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState, useTransition, type ReactNode } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { BookOpen, CalendarDays, Check, ChevronRight, ClipboardList, FileClock, GraduationCap, Megaphone, ShieldAlert, NotebookPen, ClipboardCheck,
+import { Award, BookOpen, CalendarDays, Check, ChevronRight, ClipboardList, FileClock, GraduationCap, Megaphone, ShieldAlert, NotebookPen, ClipboardCheck,
   LayoutDashboard, Menu, Plus, Search, Settings, Users, UsersRound, X } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { AccountSignOut } from "@/components/account-sign-out";
@@ -32,6 +32,7 @@ const sections = [
   { id: "attendance", label: "Attendance", icon: ClipboardCheck },
   { id: "gradebook", label: "Gradebook", icon: NotebookPen },
   { id: "reports", label: "Report cards", icon: FileClock },
+  { id: "behaviour", label: "Behaviour & conduct", icon: Award },
   { id: "communications", label: "Communications", icon: Megaphone },
   { id: "sensitive", label: "Sensitive records", icon: ShieldAlert },
   { id: "audit", label: "Audit history", icon: FileClock },
@@ -92,10 +93,10 @@ export function SchoolAdminWorkspace({ data, workflow, gdpr, section, date: sele
       </header>
       <main id="school-content" className="mx-auto max-w-[1500px] space-y-6 p-4 sm:p-8">
         <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-medium text-slate-500">School administration</p><h1 className="mt-1 text-2xl font-bold tracking-tight">{current.label}</h1></div>
-          {!["overview", "settings", "attendance", "gradebook", "reports", "communications", "sensitive"].includes(current.id) && <label className="relative block"><span className="sr-only">Search {current.label}</span><Search size={16} className="absolute left-3 top-3.5 text-slate-400" /><input value={query} onChange={event => setQuery(event.target.value)} placeholder={`Search ${current.label.toLowerCase()}`} className="min-h-11 w-72 max-w-full border border-slate-300 bg-white pl-9 pr-3 text-sm" /></label>}
+          {!["overview", "settings", "attendance", "gradebook", "reports", "behaviour", "communications", "sensitive"].includes(current.id) && <label className="relative block"><span className="sr-only">Search {current.label}</span><Search size={16} className="absolute left-3 top-3.5 text-slate-400" /><input value={query} onChange={event => setQuery(event.target.value)} placeholder={`Search ${current.label.toLowerCase()}`} className="min-h-11 w-72 max-w-full border border-slate-300 bg-white pl-9 pr-3 text-sm" /></label>}
         </div>
         {notice && <div role="status" className="flex items-start justify-between gap-4 border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800"><span>{notice}</span><button aria-label="Dismiss notification" onClick={() => setNotice("")}><X size={18} /></button></div>}
-        {workflow && ["attendance", "gradebook", "reports", "communications", "sensitive"].includes(current.id) && <SchoolAdminWorkflows section={current.id} date={selectedDate ?? new Date().toISOString().slice(0, 10)} base={data} data={workflow} />}
+        {workflow && ["attendance", "gradebook", "reports", "behaviour", "communications", "sensitive"].includes(current.id) && <SchoolAdminWorkflows section={current.id} date={selectedDate ?? new Date().toISOString().slice(0, 10)} base={data} data={workflow} />}
 
         {current.id === "overview" && <>
           <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">

@@ -35,6 +35,8 @@ export const AuditActions = {
   CLINIC_VISIT_LOGGED: "clinic_visit.logged",
   LATE_ARRIVAL_LOGGED: "reception.late_arrival",
   EARLY_DEPARTURE_LOGGED: "reception.early_departure",
+  BEHAVIOUR_PRAISE_LOGGED: "behaviour.praise_logged",
+  BEHAVIOUR_INCIDENT_LOGGED: "behaviour.incident_logged",
   GDPR_PORTABILITY_EXPORTED: "gdpr.portability_exported",
   GDPR_STUDENT_ANONYMIZED: "gdpr.student_anonymized",
   GDPR_RECTIFICATION_APPLIED: "gdpr.rectification_applied",

@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { academicYears, assessmentCategories, assessmentGrades, assessments, attendanceRecords, attendanceSessions,
   classes, enrollments, gradeLevels, organizations, reportCards, reportCardSubjectGrades, students, subjects,
   teacherClassAssignments, terms, needToKnowAlerts, courtRestrictions, guardians, studentGuardians,
-  guardianAbsenceNotes } from "@/db/schema";
+  guardianAbsenceNotes, studentBehaviours } from "@/db/schema";
 import { requireStaff } from "@/lib/action-access";
 import { buildTeacherSafetyNotices } from "@/lib/teacher-safety";
 
@@ -94,11 +94,14 @@ export async function getTeacherData(section: string, sessionDate: string) {
   const sessionIds = sessionRows.map(row => row.id);
   const recordRows = sessionIds.length ? await db.select().from(attendanceRecords)
     .where(and(eq(attendanceRecords.organizationId, org), inArray(attendanceRecords.sessionId, sessionIds))) : [];
+  const behaviourRows = studentIds.length ? await db.select().from(studentBehaviours)
+    .where(and(eq(studentBehaviours.organizationId, org), inArray(studentBehaviours.studentId, studentIds)))
+    .orderBy(desc(studentBehaviours.occurredAt), desc(studentBehaviours.createdAt)).limit(150) : [];
   return { actor, school, currentYear, classes: classRows, assignments, homeroomClassIds: homeIds, gradeLevels: gradeLevelsRows,
     subjects: subjectsRows, terms: termRows, enrollments: enrollmentRows, students: studentRows,
     assessments: permittedAssessments, grades: gradeRows, categories: categoryRows, reports: reportRows, reportSubjects,
     sessions: sessionRows, records: recordRows, safety, guardianContacts, absenceNotes,
-    historySessions, historyRecords, publishedReports };
+    historySessions, historyRecords, publishedReports, behaviours: behaviourRows };
 }
 
 export type TeacherData = Awaited<ReturnType<typeof getTeacherData>>;
