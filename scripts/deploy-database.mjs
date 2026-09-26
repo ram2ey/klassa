@@ -79,6 +79,83 @@ try {
   await migrate(db, { migrationsFolder: "./drizzle" });
   console.log("[deploy] Database migrations applied successfully!");
 
+  // The web container must never connect as the migration/table-owner role.
+  const appPassword = process.env.KLASSO_APP_DATABASE_PASSWORD ?? "";
+  if (!/^[A-Za-z0-9]{32,128}$/.test(appPassword)) {
+    throw new Error("KLASSO_APP_DATABASE_PASSWORD must be a generated 32-128 character alphanumeric secret.");
+  }
+  await client.unsafe(`ALTER ROLE klassa_app LOGIN PASSWORD '${appPassword}'`);
+  const missingPolicies = await client`
+    SELECT tables.relname AS table_name
+    FROM pg_class AS tables
+    JOIN pg_namespace AS schemas ON schemas.oid = tables.relnamespace
+    JOIN pg_attribute AS columns ON columns.attrelid = tables.oid
+    WHERE schemas.nspname = 'public' AND tables.relkind = 'r'
+      AND columns.attname = 'organization_id' AND NOT columns.attisdropped
+      AND tables.relname NOT IN (
+        'organizations', 'users', 'organization_memberships',
+        'invitations', 'sms_invitations', 'invitation_sms_limits', 'rate_limit_logs'
+      )
+      AND (NOT tables.relrowsecurity OR NOT EXISTS (
+        SELECT 1 FROM pg_policies AS policies
+        WHERE policies.schemaname = 'public' AND policies.tablename = tables.relname
+      ))
+  `;
+  if (missingPolicies.length) {
+    throw new Error(`Tenant RLS is missing on: ${missingPolicies.map(row => row.table_name).join(", ")}`);
+  }
+  const appClient = pgUser && pgPassword
+    ? postgres({ host: pgHost, port: pgPort, database: pgDatabase,
+      username: "klassa_app", password: appPassword, max: 1, connect_timeout: 10 })
+    : (() => {
+      const url = new URL(databaseUrl);
+      url.username = "klassa_app";
+      url.password = appPassword;
+      return postgres(url.toString(), { max: 1, connect_timeout: 10 });
+    })();
+  try {
+    const [probe] = await appClient`
+      SELECT current_user AS role, row_security_active('public.students'::regclass) AS rls_active
+    `;
+    if (probe?.role !== "klassa_app" || probe.rls_active !== true) {
+      throw new Error("The web database role is not subject to student row security.");
+    }
+  } finally {
+    await appClient.end();
+  }
+  const probeSchoolA = randomUUID();
+  const probeSchoolB = randomUUID();
+  const probeStudentA = randomUUID();
+  const probeStudentB = randomUUID();
+  const rollbackProbe = new Error("RLS_PROBE_ROLLBACK");
+  try {
+    await client.begin(async sql => {
+      await sql`INSERT INTO organizations (id, name, slug) VALUES
+        (${probeSchoolA}, 'RLS Probe A', ${`rls-probe-${probeSchoolA}`}),
+        (${probeSchoolB}, 'RLS Probe B', ${`rls-probe-${probeSchoolB}`})`;
+      await sql`INSERT INTO students (id, organization_id, student_number, first_name, last_name, date_of_birth) VALUES
+        (${probeStudentA}, ${probeSchoolA}, 'RLS-A', 'Probe', 'A', '2010-01-01'),
+        (${probeStudentB}, ${probeSchoolB}, 'RLS-B', 'Probe', 'B', '2010-01-01')`;
+      await sql.unsafe("SET LOCAL ROLE klassa_app");
+      const withoutScope = await sql`SELECT id FROM students WHERE id IN (${probeStudentA}, ${probeStudentB})`;
+      if (withoutScope.length !== 0) throw new Error("RLS allowed school data without context.");
+      await sql`SELECT set_config('app.organization_ids', ${probeSchoolA}, true)`;
+      const visible = await sql`SELECT id FROM students WHERE id IN (${probeStudentA}, ${probeStudentB})`;
+      if (visible.length !== 1 || visible[0].id !== probeStudentA) {
+        throw new Error("RLS did not isolate the selected school.");
+      }
+      const foreignUpdate = await sql`UPDATE students SET first_name = 'Blocked' WHERE id = ${probeStudentB} RETURNING id`;
+      if (foreignUpdate.length !== 0) throw new Error("RLS permitted a cross-school update.");
+      await sql`SELECT set_config('app.platform_access', 'true', true)`;
+      const platformVisible = await sql`SELECT id FROM students WHERE id IN (${probeStudentA}, ${probeStudentB})`;
+      if (platformVisible.length !== 2) throw new Error("Platform scope could not read both schools.");
+      throw rollbackProbe;
+    });
+  } catch (error) {
+    if (error !== rollbackProbe) throw error;
+  }
+  console.log("[deploy] Restricted web database role and tenant policies verified.");
+
   // 4. Platform administrator bootstrap
   console.log("[deploy] Checking platform administrator status...");
   const existingAdmins = await client`
@@ -142,4 +219,3 @@ try {
   delete process.env.KLASSO_BOOTSTRAP_PASSWORD;
   await client.end();
 }
-

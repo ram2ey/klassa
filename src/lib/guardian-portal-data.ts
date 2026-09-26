@@ -1,4 +1,4 @@
-import { and, asc, desc, eq, gte, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { academicYears, announcements, attendanceRecords, attendanceSessions, classes, classTimetablePeriods, enrollments, gradeLevels,
   guardianAbsenceNotes, guardianConsents, guardianInquiries, guardianInquiryMessages, guardians, organizations, reportCardSubjectGrades, reportCards, studentGuardians, students, subjects, terms, users } from "@/db/schema";
@@ -22,7 +22,7 @@ export async function getGuardianPortalData() {
   const [studentRows, schoolRows, guardianRows, consentRows, yearRows, classRows, gradeRows, termRows, enrollmentRows] = await Promise.all([
     db.select({ id: students.id, organizationId: students.organizationId, firstName: students.firstName,
       preferredName: students.preferredName, lastName: students.lastName, studentNumber: students.studentNumber, status: students.status })
-      .from(students).where(inArray(students.id, studentIds)),
+      .from(students).where(and(inArray(students.id, studentIds), inArray(students.organizationId, orgIds))),
     db.select({ id: organizations.id, name: organizations.name }).from(organizations).where(inArray(organizations.id, orgIds)),
     db.select({ id: guardians.id, organizationId: guardians.organizationId, firstName: guardians.firstName, lastName: guardians.lastName })
       .from(guardians).where(inArray(guardians.id, guardianIds)),
@@ -33,7 +33,7 @@ export async function getGuardianPortalData() {
     db.select().from(classes).where(inArray(classes.organizationId, orgIds)),
     db.select().from(gradeLevels).where(inArray(gradeLevels.organizationId, orgIds)),
     db.select().from(terms).where(inArray(terms.organizationId, orgIds)),
-    db.select().from(enrollments).where(inArray(enrollments.studentId, studentIds)),
+    db.select().from(enrollments).where(and(inArray(enrollments.studentId, studentIds), inArray(enrollments.organizationId, orgIds))),
   ]);
   const authorizedStudentRows = studentRows.filter(student => legalLinks.some(link => link.studentId === student.id && link.organizationId === student.organizationId));
   const currentYearIds = new Set(yearRows.map(year => year.id));
@@ -51,13 +51,16 @@ export async function getGuardianPortalData() {
       classIds: schoolClass ? [schoolClass.id] : [], gradeIds: grade ? [grade.id] : [] };
   });
 
-  const attendanceStart = new Date(); attendanceStart.setUTCDate(attendanceStart.getUTCDate() - 120);
+  const attendanceEnd = new Date();
+  const attendanceStart = new Date(attendanceEnd);
+  attendanceStart.setUTCDate(attendanceStart.getUTCDate() - 119);
   const [attendanceRows, publishedCards, noticeRows, absenceNotes, inquiryRows] = await Promise.all([
     db.select({ studentId: attendanceRecords.studentId, date: attendanceSessions.sessionDate,
       status: attendanceRecords.status, arrivalMinutesLate: attendanceRecords.arrivalMinutesLate })
       .from(attendanceRecords).innerJoin(attendanceSessions, eq(attendanceRecords.sessionId, attendanceSessions.id))
       .where(and(inArray(attendanceRecords.studentId, studentIds), inArray(attendanceRecords.organizationId, orgIds),
         inArray(attendanceSessions.organizationId, orgIds), gte(attendanceSessions.sessionDate, attendanceStart.toISOString().slice(0, 10)),
+        lte(attendanceSessions.sessionDate, attendanceEnd.toISOString().slice(0, 10)),
         inArray(attendanceSessions.status, ["submitted", "locked"])))
       .orderBy(desc(attendanceSessions.sessionDate)),
     db.select({ id: reportCards.id, studentId: reportCards.studentId, termId: reportCards.termId,
@@ -115,7 +118,7 @@ export async function getGuardianPortalData() {
     const cards = publishedCards.filter(card => card.studentId === child.id).map(card => ({ ...card,
       termName: termRows.find(term => term.id === card.termId)?.name ?? "Term",
       subjects: publishedSubjects.filter(subject => subject.reportCardId === card.id) }));
-    const attendance = attendanceRows.filter(row => row.studentId === child.id).slice(0, 30);
+    const attendance = attendanceRows.filter(row => row.studentId === child.id);
     const attendedCount = attendance.filter(row => row.status === "present" || row.status === "late").length;
     const timetable: TimetablePeriodItem[] = timetableRows
       .filter(row => child.classIds.includes(row.classId))

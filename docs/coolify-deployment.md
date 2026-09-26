@@ -81,11 +81,14 @@ Coolify should automatically create and persist these values from the Compose de
 
 - `SERVICE_USER_POSTGRES`
 - `SERVICE_PASSWORD_64_POSTGRES`
+- `SERVICE_PASSWORD_64_APP` (restricted web database role)
 - `SERVICE_REALBASE64_64_AUTH`
 - `SERVICE_REALBASE64_64_RECORDS`
 - `SERVICE_URL_WEB_3000`
 
 Do not replace them with placeholders. Confirm that each generated value is non-empty. The authentication and sensitive-record keys must remain stable across redeployments. In particular, losing or changing `SERVICE_REALBASE64_64_RECORDS` makes existing encrypted narratives unreadable.
+
+The migration container uses the PostgreSQL owner credentials to apply schema changes and configure `klassa_app`. The web container receives only the restricted role password. Migration `0028_tenant_row_security` applies tenant policies; startup verifies policy coverage and runs a two-school read/write probe that rolls back. If this verification fails, `web` does not start. Keep the generated app password stable across redeployments unless the migration container is also run to update the role password.
 
 Store encrypted copies of the two generated secrets in your password manager or secrets vault before admitting production data.
 

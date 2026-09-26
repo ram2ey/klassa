@@ -1,8 +1,7 @@
-import { describe, expect, it, vi } from "vitest";
+import { describe, expect, it } from "vitest";
 import {
   formatPeriodLabel,
   saveTimetablePeriod,
-  deleteTimetablePeriod,
   TimetableError,
 } from "./timetable-service";
 
@@ -20,9 +19,7 @@ describe("timetable service", () => {
       organizationId: "org-1",
       role: "school_admin",
       name: "Admin",
-      username: "admin",
-      memberships: [],
-    } as any;
+    } satisfies Parameters<typeof saveTimetablePeriod>[0];
 
     await expect(
       saveTimetablePeriod(mockActor, {
@@ -41,9 +38,7 @@ describe("timetable service", () => {
       organizationId: "org-1",
       role: "school_admin",
       name: "Admin",
-      username: "admin",
-      memberships: [],
-    } as any;
+    } satisfies Parameters<typeof saveTimetablePeriod>[0];
 
     await expect(
       saveTimetablePeriod(mockActor, {

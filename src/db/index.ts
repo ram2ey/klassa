@@ -1,6 +1,7 @@
 import { drizzle } from "drizzle-orm/postgres-js";
 import postgres from "postgres";
 import * as tables from "@/db/schema";
+import { createScopedClient } from "./scoped-client";
 
 const poolSize = Number(process.env.DATABASE_POOL_SIZE ?? 10);
 const pgUser = process.env.PGUSER || process.env.SERVICE_USER_POSTGRES;
@@ -25,5 +26,4 @@ export const databaseClient = pgUser && pgPassword
       prepare: false,
     });
 
-export const db = drizzle(databaseClient, { schema: tables });
-
+export const db = drizzle(createScopedClient(databaseClient), { schema: tables });

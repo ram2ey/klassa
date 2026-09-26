@@ -190,6 +190,7 @@ describe("guardian inquiry service", () => {
       );
       expect(updateCall).toBeDefined();
       expect(updateCall![1]).toContain("open");
+      expect(updateCall![1]).toContain(schoolId);
     });
   });
 
@@ -290,6 +291,15 @@ describe("guardian inquiry service", () => {
       );
       expect(updateCall![1]).toContain("resolved");
       expect(updateCall![1]).toContain("teacher-user-1");
+      expect(updateCall![1]).toContain(schoolId);
+      const readCall = mocks.execute.mock.calls.find(([query]) => query.includes('from "guardian_inquiries"'))!;
+      expect(readCall[0]).toContain('"guardian_inquiries"."organization_id"');
+      expect(readCall[1]).toContain(schoolId);
+    });
+    it("rejects callers with no school scope before reading an inquiry", async () => {
+      await expect(updateInquiryStatus({ userId: "outsider" }, { inquiryId, status: "resolved" }))
+        .rejects.toThrow("Access denied");
+      expect(mocks.execute).not.toHaveBeenCalled();
     });
   });
 });

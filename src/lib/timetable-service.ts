@@ -175,7 +175,8 @@ export async function saveTimetablePeriod(
           building: input.building ?? null,
           updatedAt: new Date(),
         })
-        .where(eq(classTimetablePeriods.id, existing.id));
+        .where(and(eq(classTimetablePeriods.id, existing.id),
+          eq(classTimetablePeriods.organizationId, actor.organizationId)));
 
       savedId = existing.id;
       isUpdate = true;
@@ -187,6 +188,7 @@ export async function saveTimetablePeriod(
         .where(
           and(
             eq(classTimetablePeriods.classId, input.classId),
+            eq(classTimetablePeriods.organizationId, actor.organizationId),
             eq(classTimetablePeriods.dayOfWeek, input.dayOfWeek),
             eq(classTimetablePeriods.period, input.period)
           )
@@ -206,7 +208,8 @@ export async function saveTimetablePeriod(
             building: input.building ?? null,
             updatedAt: new Date(),
           })
-          .where(eq(classTimetablePeriods.id, conflict.id));
+          .where(and(eq(classTimetablePeriods.id, conflict.id),
+            eq(classTimetablePeriods.organizationId, actor.organizationId)));
 
         savedId = conflict.id;
         isUpdate = true;
@@ -289,7 +292,8 @@ export async function deleteTimetablePeriod(
 
     await tx
       .delete(classTimetablePeriods)
-      .where(eq(classTimetablePeriods.id, period.id));
+      .where(and(eq(classTimetablePeriods.id, period.id),
+        eq(classTimetablePeriods.organizationId, actor.organizationId)));
 
     await logAuditEvent(
       {

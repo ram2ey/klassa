@@ -15,7 +15,7 @@ This document provides formal security verification evidence for **Klassa (Insti
 ## 1. ASVS Chapter Verification Evidence
 
 ### V1: Architecture, Design and Threat Modeling
-- **Multi-Tenant Scoping:** All database transactions run within explicit organization boundary queries using PostgreSQL session configuration (`src/db/tenant.ts` and `withOrganizationScope`).
+- **Multi-Tenant Scoping:** School access is checked against database memberships, and school data queries filter by organization ID. Migration `0028_tenant_row_security` adds PostgreSQL row level security for school-owned records. The web service uses the restricted `klassa_app` role and sets verified organization context inside each query transaction. The migration container tests that an unscoped role sees no students, one school cannot read or update another, and platform context can read both. Deployment and the migration probe must succeed before treating database enforcement as verified in an environment.
 - **Cryptographic Storage Architecture:** Separation of database metadata from encrypted sensitive narratives (`aes-256-gcm` in `src/lib/sensitive-records.ts`).
 - **Separation of Concerns:** Need-to-know directives are structurally separated from raw case records (`needToKnowAlerts` vs `sensitiveCases`). Classroom teachers have zero database read capability for sensitive cases.
 

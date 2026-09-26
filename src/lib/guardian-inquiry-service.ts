@@ -204,7 +204,7 @@ export async function replyGuardianInquiry(
         closedBy: isReopening ? null : inquiry.closedBy,
         updatedAt: new Date(),
       })
-      .where(eq(guardianInquiries.id, inquiry.id));
+      .where(and(eq(guardianInquiries.id, inquiry.id), eq(guardianInquiries.organizationId, inquiry.organizationId)));
 
     await logAuditEvent(
       {
@@ -276,7 +276,7 @@ export async function replyStaffInquiry(
         status: newStatus,
         updatedAt: new Date(),
       })
-      .where(eq(guardianInquiries.id, inquiry.id));
+      .where(and(eq(guardianInquiries.id, inquiry.id), eq(guardianInquiries.organizationId, actor.organizationId)));
 
     await logAuditEvent(
       {
@@ -307,12 +307,17 @@ export async function updateInquiryStatus(
   raw: UpdateInquiryStatusInput
 ) {
   const input = updateInquiryStatusSchema.parse(raw);
+  const authorizedOrgIds = [...new Set([
+    ...(actor.organizationId ? [actor.organizationId] : []),
+    ...(actor.guardians?.map(guardian => guardian.organizationId) ?? []),
+  ])];
+  if (!authorizedOrgIds.length) throw new GuardianInquiryError("Access denied to update this inquiry.");
 
   return db.transaction(async (tx) => {
     const [inquiry] = await tx
       .select()
       .from(guardianInquiries)
-      .where(eq(guardianInquiries.id, input.inquiryId))
+      .where(and(eq(guardianInquiries.id, input.inquiryId), inArray(guardianInquiries.organizationId, authorizedOrgIds)))
       .for("update");
 
     if (!inquiry) {
@@ -339,7 +344,7 @@ export async function updateInquiryStatus(
         closedBy: isResolving ? actor.userId : null,
         updatedAt: new Date(),
       })
-      .where(eq(guardianInquiries.id, inquiry.id));
+      .where(and(eq(guardianInquiries.id, inquiry.id), eq(guardianInquiries.organizationId, inquiry.organizationId)));
 
     await logAuditEvent(
       {

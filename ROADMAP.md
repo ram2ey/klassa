@@ -14,6 +14,10 @@ The live office workspace covers student intake and placement, guardian relation
 
 The live guardian portal now supports manually provisioned guardian accounts, linked legal-student access, submitted attendance, published report cards, targeted notices and category-only absence notes for office review. Email/SMS invitations and messaging, SMS and emergency delivery, delivery of specialist directives, operational enforcement of court restrictions, and GDPR still need production integration. The historical phase checklists below describe the demo implementation and must not be read as production completion. See README.md for current live boundaries.
 
+### Tenant isolation work still required
+
+Migration `0028_tenant_row_security` introduces row level security for school-owned records and a restricted web database role. The application places the verified staff school or guardian schools in transaction-local PostgreSQL settings; platform administrators use a separate verified context. The migration container runs a rollback-only two-school probe before the web service starts. This protection is **not active in an existing deployment until the new Compose configuration and migration are deployed successfully**. Authentication and invitation tables remain outside the school RLS policies because they are queried before a school context exists; application authorization still protects those workflows.
+
 ### Historical demo roadmap
 
 - **Active Phase**: Preparing for **Phase 4 — School Communications**
@@ -49,7 +53,7 @@ npm run build       # Verify Next.js production build
   - Design guidelines in [`docs/design-system.md`](docs/design-system.md).
   - Primitives: [`Button`](src/components/ui/button.tsx), [`Badge`](src/components/ui/badge.tsx).
 - [x] **PostgreSQL & Drizzle Multi-Tenant Architecture**:
-  - Multi-tenant isolation with `organizationId` foreign keys and `withOrganizationScope` RLS helper ([`src/db/tenant.ts`](src/db/tenant.ts)).
+  - School-owned records have `organizationId` foreign keys. Migration `0028_tenant_row_security` adds PostgreSQL row level security and a restricted runtime role; application queries also enforce tenant access. Deployment verification is required before considering RLS active.
   - Schema covering `organizations`, `users`, `sessions`, `accounts`, `verifications`, `twoFactors`, `academicYears`, `terms`, `gradeLevels`, `classes`, `subjects`, `invitations`, `students`, `guardians`, `studentGuardians`, `enrollments`, `importJobs`, `auditEvents` in [`src/db/schema.ts`](src/db/schema.ts).
   - Migrations: `drizzle/0000_pink_karma.sql`, `drizzle/0001_phase1_subjects_invitations.sql`.
 - [x] **Authentication & Staff MFA**:
