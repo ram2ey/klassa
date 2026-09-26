@@ -87,14 +87,14 @@ flowchart TD
    - Create special needs cases, record encrypted intervention notes, and review access logs.
 4. **Staff Classroom Directives**:
    - Create actionable classroom accommodations and teaching strategies for classroom teachers.
+5. **Formal SEN Multi-Tiered Register & Exam Concessions**:
+   - Multi-tiered support categorization: Tier 1 (Universal Provision), Tier 2 (Targeted Support), and Tier 3 (Specialist / EHCP).
+   - Dedicated structured fields for exam access arrangements (25% extra time, rest breaks, reader pen, separate room).
+6. **Statutory Review Scheduler & Review Chronology**:
+   - Termly/annual statutory review scheduler with overdue review alerts, attendee logging, SMART targets evaluated, and next cycle review dates.
 
 #### What Remains Pending:
-1. **Formal SEN Register & Support Tiers**:
-   - Multi-tiered support tracking (Universal, Targeted, Specialist / EHCP / Tier 1-3).
-2. **Structured Individual Education Plans (IEP/ILP)**:
-   - Dedicated structured fields for exam concessions (25% extra time, reader, rest breaks, assistive tech) rather than plain-text directives.
-3. **Statutory Review Calendar & External Agency Tracking**:
-   - Review date scheduling and tracking for educational psychologist or speech & language therapy assessments.
+None (All core SEN coordinator workflows fully implemented and active).
 
 ---
 
@@ -276,7 +276,7 @@ flowchart TD
 | Role | Dedicated Live Dashboard | Attendance Tracking | Gradebook & Reports | Sensitive Records | Communications | Staff / School Mgmt | Key Remaining Gaps |
 | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
 | **`safeguarding_lead`** | ✅ Active | ❌ | ❌ | ✅ Active (DSL scoped) | ⚠️ Read notices | ✅ Statutory disclosures & court admin | Low-level concern triage queue |
-| **`senco`** | ✅ Active | ❌ | ❌ | ✅ Active (SEN scoped) | ⚠️ Read notices | ⚠️ Case / directive admin | Formal SEN register tiers; IEP review date scheduling |
+| **`senco`** | ✅ Active | ❌ | ❌ | ✅ Active (SEN scoped) | ⚠️ Read notices | ✅ Case, SEN register tiers & review admin | None |
 | **`health_nurse`** | ✅ Active | ❌ | ❌ | ✅ Active (Health scoped)| ⚠️ Read notices | ✅ Clinic triage log & health admin | Prescription medication administration record (MAR) |
 | **`teacher`** | ✅ Active | ✅ Period & morning | ✅ Yes + Drawer | ⚠️ Safety alerts & pickup | ✅ Notices & 2-way guardian inquiries | ❌ | Teacher assignment preferences |
 | **`office_staff`** | ✅ Active | ✅ Full absence follow-up | ❌ | ⚠️ Pickup & medical alerts | ✅ Emergency SMS trigger | ✅ Intake, emergency rolls & reception desk | Front desk clinic medication intake log |
@@ -307,6 +307,8 @@ flowchart TD
 | `guardianInquiries` | `guardian`, `teacher`, `school_admin`, `office_staff` | `GuardianPortalWorkspace`, `TeacherWorkspace`, `SchoolAdminWorkspace` | **Connected**: Two-way inquiry messaging threads with category & status lifecycle |
 | `guardianInquiryMessages` | `guardian`, `teacher`, `school_admin`, `office_staff` | `GuardianPortalWorkspace`, `TeacherWorkspace`, `SchoolAdminWorkspace` | **Connected**: Chronological message thread communication |
 | `classTimetablePeriods` | `guardian`, `teacher`, `school_admin` | `GuardianPortalWorkspace`, `TeacherWorkspace`, `SchoolAdminWorkspace` | **Connected**: Period-by-period class timetables, teachers, and classroom locations |
+| `senProfiles` | `senco`, `school_admin`, `teacher` | `SpecialistWorkspace`, `StudentAcademicDrawer` | **Connected**: Multi-tiered SEN register (Universal, Targeted, Specialist), exam accommodations & review scheduling |
+| `senReviews` | `senco`, `school_admin` | `SpecialistWorkspace` | **Connected**: Statutory progress review chronology, attendees, SMART targets & tier decisions |
 
 ---
 
@@ -330,5 +332,6 @@ flowchart TD
    Added `classTimetablePeriods` table, `day_of_week` enum, `timetable-service`, `timetable-actions`, [`StudentDailyTimetable`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/student-daily-timetable.tsx) in [`GuardianPortalWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/guardian-portal-workspace.tsx), and timetable inspection tab in [`StudentAcademicDrawer`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/student-academic-drawer.tsx).
 9. **[COMPLETED] Term Closure & Gradebook Lock**:
    Added `terms.isLocked`, `lockedAt`, `lockedById`, `lockNotes`, migration `0026`, tamper guards across gradebooks and attendance, `term_lock` and `term_unlock` workflow commands, audit logging, and interactive term lock modal in [`SchoolAdminWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/school-admin-workspace.tsx).
-10. **SENCO Tiered Register & Review Scheduler**:
-    Tiered SEN categorization, review scheduler, and overdue review alerts for SEN coordinator.
+10. **[COMPLETED] SENCO Tiered Register & Review Scheduler**:
+    Added `senProfiles` and `senReviews` tables, `sen_tier` enum, migration `0027`, `sen_profile_save` and `sen_review_complete` workflow commands, institutional audit logging, [`SencoRegisterPanel`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/senco-register-panel.tsx) with multi-tier filters (Universal, Targeted, Specialist), overdue countdown alerts, exam access arrangements, review history chronology, and SEN status badge visibility in [`StudentAcademicDrawer`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/student-academic-drawer.tsx).
+

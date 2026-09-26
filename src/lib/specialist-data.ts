@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { clinicVisits, courtRestrictions, needToKnowAlerts, organizations, sensitiveAccessLogs, sensitiveCaseNotes,
-  sensitiveCases, students } from "@/db/schema";
+  sensitiveCases, senProfiles, senReviews, students } from "@/db/schema";
 import { requireStaff } from "@/lib/action-access";
 import { isSpecialistRole, specialistAreas } from "@/lib/specialist-access";
 
@@ -21,7 +21,7 @@ export async function getSpecialistData() {
   ]);
   if (!school) throw new Error("School not found.");
   const caseIds = cases.map(row => row.id);
-  const [notes, accessLogs, alerts, restrictions, visits] = await Promise.all([
+  const [notes, accessLogs, alerts, restrictions, visits, profiles, reviews] = await Promise.all([
     caseIds.length ? db.select({ id: sensitiveCaseNotes.id, caseId: sensitiveCaseNotes.caseId,
       noteType: sensitiveCaseNotes.noteType, createdAt: sensitiveCaseNotes.createdAt })
       .from(sensitiveCaseNotes).where(and(eq(sensitiveCaseNotes.organizationId, org), inArray(sensitiveCaseNotes.caseId, caseIds)))
@@ -41,8 +41,12 @@ export async function getSpecialistData() {
       .where(eq(courtRestrictions.organizationId, org)).orderBy(desc(courtRestrictions.createdAt)) : [],
     actor.role === "health_nurse" ? db.select().from(clinicVisits)
       .where(eq(clinicVisits.organizationId, org)).orderBy(desc(clinicVisits.visitDate), desc(clinicVisits.createdAt)).limit(100) : [],
+    actor.role === "senco" ? db.select().from(senProfiles)
+      .where(eq(senProfiles.organizationId, org)).orderBy(senProfiles.nextReviewDate) : [],
+    actor.role === "senco" ? db.select().from(senReviews)
+      .where(eq(senReviews.organizationId, org)).orderBy(desc(senReviews.reviewDate)).limit(100) : [],
   ]);
-  return { actor, school, areas: specialistAreas(actor.role), students: studentRows, cases, notes, accessLogs, alerts, restrictions, clinicVisits: visits };
+  return { actor, school, areas: specialistAreas(actor.role), students: studentRows, cases, notes, accessLogs, alerts, restrictions, clinicVisits: visits, senProfiles: profiles, senReviews: reviews };
 }
 
 export type SpecialistData = Awaited<ReturnType<typeof getSpecialistData>>;

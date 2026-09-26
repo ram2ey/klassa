@@ -133,6 +133,55 @@ describe("period attendance policy", () => {
       points: 25,
       occurredAt: "2026-09-26",
     }).success).toBe(false);
+
+    // SEN profile save valid
+    const senProfile = workflowCommandSchema.parse({
+      kind: "sen_profile_save",
+      studentId,
+      tier: "targeted",
+      primaryNeed: "Cognition and Learning",
+      secondaryNeeds: "Dyslexia",
+      supportPlanSummary: "1-to-1 reading support twice weekly, visual timetable",
+      examAccessArrangements: "25% extra time, rest breaks",
+      nextReviewDate: "2026-12-15",
+      reviewFrequencyWeeks: 12,
+    });
+    expect(senProfile).toMatchObject({
+      kind: "sen_profile_save",
+      tier: "targeted",
+      primaryNeed: "Cognition and Learning",
+      status: "active",
+      reviewFrequencyWeeks: 12,
+    });
+
+    // SEN review complete valid
+    const senReview = workflowCommandSchema.parse({
+      kind: "sen_review_complete",
+      profileId: "00000000-0000-4000-8000-000000000003",
+      reviewDate: "2026-09-26",
+      reviewType: "termly",
+      attendees: "Dr. Bell (SENCO), Mrs. Smith (Teacher), Guardians",
+      targetsMetSummary: "Phonics score improved by 20%, completed writing tasks",
+      newTargets: "Independent writing for 15 minutes",
+      tierDecision: "targeted",
+      nextReviewDate: "2026-12-15",
+      notes: "Progress is consistent with term expectations",
+    });
+    expect(senReview).toMatchObject({
+      kind: "sen_review_complete",
+      reviewType: "termly",
+      tierDecision: "targeted",
+    });
+
+    // SEN profile save invalid: missing required primaryNeed or summary
+    expect(workflowCommandSchema.safeParse({
+      kind: "sen_profile_save",
+      studentId,
+      tier: "targeted",
+      primaryNeed: "",
+      supportPlanSummary: "",
+      nextReviewDate: "2026-12-15",
+    }).success).toBe(false);
   });
 });
 

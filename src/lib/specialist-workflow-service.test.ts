@@ -150,4 +150,67 @@ describe("live specialist workflow authorization", () => {
     const auditCall = mocks.execute.mock.calls.find(([query]) => query.startsWith('insert into "audit_events"'));
     expect(auditCall).toBeDefined();
   });
+  it("prevents a nurse from saving a SEN profile", async () => {
+    await expect(saveSchoolWorkflow(actor, {
+      kind: "sen_profile_save",
+      studentId: record,
+      tier: "targeted",
+      primaryNeed: "Cognition and Learning",
+      supportPlanSummary: "1-to-1 reading support",
+      nextReviewDate: "2026-12-15",
+      reviewFrequencyWeeks: 12,
+    })).rejects.toThrow("specialist role");
+  });
+  it("lets a SENCO create an audited SEN profile", async () => {
+    const sencoActor = { organizationId: org, userId: "senco-1", name: "SENCO Lead", role: "senco" as const };
+    mocks.execute.mockImplementation(async query => {
+      if (query.includes('from "organizations"')) return [[org]];
+      if (query.includes('from "students"')) return [[record, org, "ST-100", null, "Ada", null, "Lovelace", null, "2010-01-01", "active", new Date(), new Date()]];
+      if (query.includes('from "sen_profiles"')) return []; // no existing profile
+      if (query.startsWith('insert into "sen_profiles"')) return [[record, org, record, null, "targeted", "Cognition and Learning", null, "Support plan", null, sencoActor.userId, 12, "2026-12-15", null, "active", new Date(), new Date()]];
+      if (query.startsWith('insert into "audit_events"')) return [[record, org, sencoActor.userId, "sen_profile.created", "sen_profile", record, null, {}, new Date()]];
+      return [];
+    });
+    const result = await saveSchoolWorkflow(sencoActor, {
+      kind: "sen_profile_save",
+      studentId: record,
+      tier: "targeted",
+      primaryNeed: "Cognition and Learning",
+      supportPlanSummary: "1-to-1 reading support",
+      nextReviewDate: "2026-12-15",
+      reviewFrequencyWeeks: 12,
+    });
+    expect(result.entityId).toBe(record);
+    expect(mocks.commit).toHaveBeenCalledOnce();
+    const auditCall = mocks.execute.mock.calls.find(([query]) => query.startsWith('insert into "audit_events"'));
+    expect(auditCall).toBeDefined();
+  });
+  it("lets a SENCO complete an audited SEN review", async () => {
+    const sencoActor = { organizationId: org, userId: "senco-1", name: "SENCO Lead", role: "senco" as const };
+    mocks.execute.mockImplementation(async query => {
+      if (query.includes('from "organizations"')) return [[org]];
+      if (query.includes('from "sen_profiles"')) return [[record, org, record, null, "targeted", "Cognition and Learning", null, "Support plan", null, sencoActor.userId, 12, "2026-09-26", null, "active", new Date(), new Date()]];
+      if (query.startsWith('insert into "sen_reviews"')) return [[record, org, record, record, sencoActor.userId, "2026-09-26", "termly", "Dr. Bell", "Targets met", "New targets", "targeted", "2026-12-15", null, new Date(), new Date()]];
+      if (query.startsWith('update "sen_profiles"')) return [[record]];
+      if (query.startsWith('insert into "audit_events"')) return [[record, org, sencoActor.userId, "sen_review.completed", "sen_review", record, null, {}, new Date()]];
+      return [];
+    });
+    const result = await saveSchoolWorkflow(sencoActor, {
+      kind: "sen_review_complete",
+      profileId: record,
+      reviewDate: "2026-09-26",
+      reviewType: "termly",
+      attendees: "Dr. Bell, Teacher, Guardian",
+      targetsMetSummary: "Met reading target",
+      newTargets: "Writing stamina target",
+      tierDecision: "targeted",
+      nextReviewDate: "2026-12-15",
+    });
+    expect(result.entityId).toBe(record);
+    expect(mocks.commit).toHaveBeenCalledOnce();
+    const updateCall = mocks.execute.mock.calls.find(([query]) => query.startsWith('update "sen_profiles"'));
+    expect(updateCall).toBeDefined();
+    const auditCall = mocks.execute.mock.calls.find(([query]) => query.startsWith('insert into "audit_events"'));
+    expect(auditCall).toBeDefined();
+  });
 });

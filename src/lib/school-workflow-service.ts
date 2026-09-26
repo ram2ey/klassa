@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { academicYears, announcements, assessmentCategories, assessmentGrades, assessments,
   attendanceCorrections, attendanceRecords, attendanceSessions, classes, clinicVisits, enrollments, gradeCorrections,
   gradeLevels, guardians, organizations, receptionLogs, reportCards, reportCardSubjectGrades, sensitiveAccessLogs,
-  sensitiveCaseNotes, sensitiveCases, needToKnowAlerts, courtRestrictions, smsDispatches, studentBehaviours, studentGuardians, students, subjects, terms, teacherClassAssignments } from "@/db/schema";
+  sensitiveCaseNotes, sensitiveCases, needToKnowAlerts, courtRestrictions, senProfiles, senReviews, smsDispatches, studentBehaviours, studentGuardians, students, subjects, terms, teacherClassAssignments } from "@/db/schema";
 import { AuditActions, logAuditEvent } from "@/lib/audit";
 import type { requireStaff } from "@/lib/action-access";
 import { SchoolAdminError } from "@/lib/school-admin-policy";
@@ -620,6 +620,78 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
         entityId = behaviourRecord.id;
         break;
       }
+      case "sen_profile_save": {
+        if (actor.role !== "senco" && actor.role !== "school_admin") {
+          throw new SchoolAdminError("Only the SENCO or school administrator can manage SEN profiles.");
+        }
+        found((await tx.select({ id: students.id }).from(students).where(and(eq(students.id, value.studentId), eq(students.organizationId, org))))[0], "Student");
+
+        const existingProfile = value.profileId
+          ? (await tx.select().from(senProfiles).where(and(eq(senProfiles.id, value.profileId), eq(senProfiles.organizationId, org))))[0]
+          : (await tx.select().from(senProfiles).where(and(eq(senProfiles.studentId, value.studentId), eq(senProfiles.organizationId, org))))[0];
+
+        if (existingProfile) {
+          const [updated] = await tx.update(senProfiles).set({
+            tier: value.tier,
+            primaryNeed: value.primaryNeed,
+            secondaryNeeds: value.secondaryNeeds || null,
+            supportPlanSummary: value.supportPlanSummary,
+            examAccessArrangements: value.examAccessArrangements || null,
+            nextReviewDate: value.nextReviewDate,
+            reviewFrequencyWeeks: value.reviewFrequencyWeeks,
+            status: value.status,
+            updatedAt: new Date(),
+          }).where(and(eq(senProfiles.id, existingProfile.id), eq(senProfiles.organizationId, org))).returning();
+          entityId = updated.id;
+        } else {
+          const [inserted] = await tx.insert(senProfiles).values({
+            organizationId: org,
+            studentId: value.studentId,
+            tier: value.tier,
+            primaryNeed: value.primaryNeed,
+            secondaryNeeds: value.secondaryNeeds || null,
+            supportPlanSummary: value.supportPlanSummary,
+            examAccessArrangements: value.examAccessArrangements || null,
+            leadSpecialistId: actor.userId,
+            reviewFrequencyWeeks: value.reviewFrequencyWeeks,
+            nextReviewDate: value.nextReviewDate,
+            status: value.status,
+          }).returning();
+          entityId = inserted.id;
+        }
+        break;
+      }
+      case "sen_review_complete": {
+        if (actor.role !== "senco" && actor.role !== "school_admin") {
+          throw new SchoolAdminError("Only the SENCO or school administrator can complete SEN reviews.");
+        }
+        const profile = found((await tx.select().from(senProfiles).where(and(eq(senProfiles.id, value.profileId), eq(senProfiles.organizationId, org))))[0], "SEN profile");
+
+        const [reviewRecord] = await tx.insert(senReviews).values({
+          organizationId: org,
+          profileId: profile.id,
+          studentId: profile.studentId,
+          reviewerId: actor.userId,
+          reviewDate: value.reviewDate,
+          reviewType: value.reviewType,
+          attendees: value.attendees,
+          targetsMetSummary: value.targetsMetSummary,
+          newTargets: value.newTargets,
+          tierDecision: value.tierDecision,
+          nextReviewDate: value.nextReviewDate,
+          notes: value.notes || null,
+        }).returning();
+
+        await tx.update(senProfiles).set({
+          tier: value.tierDecision,
+          lastReviewedAt: new Date(),
+          nextReviewDate: value.nextReviewDate,
+          updatedAt: new Date(),
+        }).where(and(eq(senProfiles.id, profile.id), eq(senProfiles.organizationId, org)));
+
+        entityId = reviewRecord.id;
+        break;
+      }
     }
     if (value.kind === "statutory_disclosure" && packageResult) {
       await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action: AuditActions.DISCLOSURE_PACKAGE_EXPORTED,
@@ -638,6 +710,24 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
       const action = value.type === "praise" ? AuditActions.BEHAVIOUR_PRAISE_LOGGED : AuditActions.BEHAVIOUR_INCIDENT_LOGGED;
       await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action,
         entityType: "student_behaviour", entityId, metadata: { studentId: value.studentId, classId: value.classId, type: value.type, category: value.category, points: value.points, guardianVisible: value.guardianVisible, occurredAt: value.occurredAt } }, tx);
+    } else if (value.kind === "sen_profile_save") {
+      await logAuditEvent({
+        organizationId: org,
+        actorUserId: actor.userId,
+        action: value.profileId ? AuditActions.SEN_PROFILE_UPDATED : AuditActions.SEN_PROFILE_CREATED,
+        entityType: "sen_profile",
+        entityId,
+        metadata: { studentId: value.studentId, tier: value.tier, primaryNeed: value.primaryNeed, nextReviewDate: value.nextReviewDate }
+      }, tx);
+    } else if (value.kind === "sen_review_complete") {
+      await logAuditEvent({
+        organizationId: org,
+        actorUserId: actor.userId,
+        action: AuditActions.SEN_REVIEW_COMPLETED,
+        entityType: "sen_review",
+        entityId,
+        metadata: { profileId: value.profileId, reviewType: value.reviewType, tierDecision: value.tierDecision, nextReviewDate: value.nextReviewDate }
+      }, tx);
     } else {
       await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action: `${value.kind}.saved`,
         entityType: value.kind, entityId, metadata: "reason" in value ? { reason: value.reason } : {} }, tx);

@@ -13,6 +13,7 @@ const data = {
   school: { id: "school-a", name: "Northfield School" }, areas: ["health_medical"],
   students: [{ id: "student-a", firstName: "Ada", lastName: "Lee", studentNumber: "100" }],
   cases: [], notes: [], accessLogs: [], alerts: [], restrictions: [], clinicVisits: [],
+  senProfiles: [], senReviews: [],
 } as SpecialistData;
 
 beforeEach(() => { mocks.save.mockReset().mockResolvedValue({ success: true, entityId: "case-a" }); mocks.refresh.mockClear(); });
@@ -90,6 +91,90 @@ describe("live specialist workspace", () => {
       studentId: "student-a",
       recipientAgency: "Reykjavik CPS",
       reason: "Section 47 investigation",
+    }));
+  });
+  it("renders SENCO workspace with SEN register navigation and allows adding profile", async () => {
+    const sencoData = {
+      ...data,
+      actor: { organizationId: "school-a", userId: "senco-1", name: "Dr. Arthur Bell", role: "senco" },
+      areas: ["special_needs"],
+      senProfiles: [],
+      senReviews: [],
+    } as SpecialistData;
+
+    render(<SpecialistWorkspace data={sencoData} notices={[]} section="sen" />);
+    expect(screen.getByText("Special Educational Needs Register & Reviews")).toBeTruthy();
+    expect(screen.getByRole("button", { name: /Add student to register/i })).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /Add student to register/i }));
+    fireEvent.change(screen.getByLabelText("Student"), { target: { value: "student-a" } });
+    fireEvent.change(screen.getByLabelText("Support Tier"), { target: { value: "targeted" } });
+    fireEvent.change(screen.getByLabelText("Primary Area of Need"), { target: { value: "Cognition & Learning" } });
+    fireEvent.change(screen.getByLabelText("Support Plan Summary & Classroom Interventions"), { target: { value: "1-to-1 reading support twice weekly" } });
+    fireEvent.change(screen.getByLabelText("Exam Access Arrangements & Accommodations"), { target: { value: "25% Extra Time" } });
+    fireEvent.change(screen.getByLabelText("Next Scheduled Review Date"), { target: { value: "2026-12-15" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create SEN profile" }));
+
+    await waitFor(() => expect(mocks.save).toHaveBeenCalledWith({
+      kind: "sen_profile_save",
+      studentId: "student-a",
+      tier: "targeted",
+      primaryNeed: "Cognition & Learning",
+      supportPlanSummary: "1-to-1 reading support twice weekly",
+      examAccessArrangements: "25% Extra Time",
+      nextReviewDate: "2026-12-15",
+      reviewFrequencyWeeks: 12,
+      status: "active",
+    }));
+  });
+  it("allows SENCO to log a statutory review for an existing profile", async () => {
+    const sencoData = {
+      ...data,
+      actor: { organizationId: "school-a", userId: "senco-1", name: "Dr. Arthur Bell", role: "senco" },
+      areas: ["special_needs"],
+      senProfiles: [{
+        id: "prof-1",
+        organizationId: "school-a",
+        studentId: "student-a",
+        caseId: null,
+        tier: "targeted" as const,
+        primaryNeed: "Cognition & Learning",
+        secondaryNeeds: null,
+        supportPlanSummary: "1-to-1 reading support",
+        examAccessArrangements: "25% Extra Time",
+        leadSpecialistId: "senco-1",
+        reviewFrequencyWeeks: 12,
+        nextReviewDate: "2026-09-01", // overdue
+        lastReviewedAt: null,
+        status: "active",
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      }],
+      senReviews: [],
+    } as SpecialistData;
+
+    render(<SpecialistWorkspace data={sencoData} notices={[]} section="sen" />);
+    expect(screen.getByText("Overdue: 2026-09-01")).toBeTruthy();
+
+    fireEvent.click(screen.getByRole("button", { name: /Log review/i }));
+    expect(screen.getByText("Log Statutory SEN Review")).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText("Attendees Present"), { target: { value: "Dr. Bell, Mrs. Smith, Guardians" } });
+    fireEvent.change(screen.getByLabelText("Targets Met & Progress Review"), { target: { value: "Phonics score improved by 20%" } });
+    fireEvent.change(screen.getByLabelText("New SMART Targets for Next Cycle"), { target: { value: "Independent writing for 15 minutes" } });
+    fireEvent.change(screen.getByLabelText("Next Scheduled Review Date"), { target: { value: "2026-12-15" } });
+    fireEvent.click(screen.getByRole("button", { name: "Complete and record review" }));
+
+    await waitFor(() => expect(mocks.save).toHaveBeenCalledWith({
+      kind: "sen_review_complete",
+      profileId: "prof-1",
+      reviewDate: expect.any(String),
+      reviewType: "termly",
+      attendees: "Dr. Bell, Mrs. Smith, Guardians",
+      targetsMetSummary: "Phonics score improved by 20%",
+      newTargets: "Independent writing for 15 minutes",
+      tierDecision: "targeted",
+      nextReviewDate: "2026-12-15",
     }));
   });
 });

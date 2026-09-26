@@ -78,7 +78,38 @@ export const workflowCommandSchema = z.discriminatedUnion("kind", [
     description: z.string().trim().max(1000).default(""),
     guardianVisible: z.boolean().default(true),
     occurredAt: date }),
+  z.object({
+    kind: z.literal("sen_profile_save"),
+    profileId: id.optional().nullable(),
+    studentId: id,
+    tier: z.enum(["universal", "targeted", "specialist"]),
+    primaryNeed: z.string().trim().min(2).max(120),
+    secondaryNeeds: z.string().trim().max(500).optional().nullable(),
+    supportPlanSummary: z.string().trim().min(3).max(5000),
+    examAccessArrangements: z.string().trim().max(1000).optional().nullable(),
+    nextReviewDate: date,
+    reviewFrequencyWeeks: z.number().int().min(1).max(52).default(12),
+    status: z.enum(["active", "monitoring", "graduated"]).default("active"),
+  }),
+  z.object({
+    kind: z.literal("sen_review_complete"),
+    profileId: id,
+    reviewDate: date,
+    reviewType: z.enum(["termly", "annual_ehcp", "interim", "emergency"]).default("termly"),
+    attendees: z.string().trim().min(3).max(1000),
+    targetsMetSummary: z.string().trim().min(3).max(5000),
+    newTargets: z.string().trim().min(3).max(5000),
+    tierDecision: z.enum(["universal", "targeted", "specialist"]),
+    nextReviewDate: date,
+    notes: z.string().trim().max(2000).optional().nullable(),
+  }),
 ]);
+
+export const senTiers = ["universal", "targeted", "specialist"] as const;
+export type SenTier = (typeof senTiers)[number];
+
+export const senReviewTypes = ["termly", "annual_ehcp", "interim", "emergency"] as const;
+export type SenReviewType = (typeof senReviewTypes)[number];
 
 export const praiseCategories = [
   "academic_excellence",

@@ -20,5 +20,9 @@ describe("specialist permissions", () => {
     expect(canSpecialistRunCommand("health_nurse", "clinic_visit")).toBe(true);
     expect(canSpecialistRunCommand("senco", "clinic_visit")).toBe(false);
     expect(canSpecialistRunCommand("safeguarding_lead", "clinic_visit")).toBe(false);
+    expect(canSpecialistRunCommand("senco", "sen_profile_save")).toBe(true);
+    expect(canSpecialistRunCommand("senco", "sen_review_complete")).toBe(true);
+    expect(canSpecialistRunCommand("health_nurse", "sen_profile_save")).toBe(false);
+    expect(canSpecialistRunCommand("safeguarding_lead", "sen_review_complete")).toBe(false);
   });
 });

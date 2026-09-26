@@ -54,4 +54,18 @@ describe("specialist dashboard data", () => {
       expect(query[1]).toContain(caseId);
     }
   });
+  it("loads SEN profiles and reviews for the SENCO", async () => {
+    mocks.authorize.mockResolvedValue({ organizationId: org, role: "senco", userId: "senco", name: "SENCO" });
+    mocks.execute.mockImplementation(async query => {
+      if (query.includes('from "organizations"')) return [[org, "School A"]];
+      if (query.includes('from "sen_profiles"')) return [[caseId, org, caseId, null, "targeted", "Cognition", null, "Plan", null, "senco", 12, "2026-11-20", null, "active", new Date(), new Date()]];
+      if (query.includes('from "sen_reviews"')) return [[caseId, org, caseId, caseId, "senco", "2026-09-26", "termly", "Dr. Bell", "Met", "Next", "targeted", "2026-11-20", null, new Date(), new Date()]];
+      return [];
+    });
+    const data = await getSpecialistData();
+    expect(data.senProfiles).toBeDefined();
+    expect(data.senReviews).toBeDefined();
+    expect(mocks.execute.mock.calls.some(([sql]) => sql.includes('from "sen_profiles"'))).toBe(true);
+    expect(mocks.execute.mock.calls.some(([sql]) => sql.includes('from "sen_reviews"'))).toBe(true);
+  });
 });

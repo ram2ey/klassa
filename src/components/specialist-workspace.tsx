@@ -11,6 +11,7 @@ import type { announcements } from "@/db/schema";
 import { formatGMTDateTime } from "@/lib/timezone";
 import { DisclosurePackageModal } from "@/components/sensitive/disclosure-package-modal";
 import type { DisclosurePackageResult } from "@/lib/sensitive-records";
+import { SencoRegisterPanel } from "@/components/senco-register-panel";
 
 const input = "mt-1 block min-h-11 w-full border border-slate-300 bg-white px-3 py-2 text-sm";
 const primary = "min-h-11 bg-blue-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50";
@@ -38,6 +39,7 @@ export function SpecialistWorkspace({ data, notices, section }: { data: Speciali
   const [disclosurePackage, setDisclosurePackage] = useState<DisclosurePackageResult | null>(null);
   const isDsl = data.actor.role === "safeguarding_lead";
   const isNurse = data.actor.role === "health_nurse";
+  const isSenco = data.actor.role === "senco";
   const roleName = data.actor.role === "safeguarding_lead" ? "Safeguarding lead" : data.actor.role === "senco" ? "SENCO" : "School nurse";
   const tabs = [
     { id: "overview", label: "Overview" },
@@ -48,6 +50,7 @@ export function SpecialistWorkspace({ data, notices, section }: { data: Speciali
       { id: "disclosures", label: "Statutory disclosures" },
     ] : []),
     ...(isNurse ? [{ id: "clinic", label: "Clinic triage log" }] : []),
+    ...(isSenco ? [{ id: "sen", label: "SEN register & reviews" }] : []),
     { id: "notices", label: "Notices" },
   ];
   const current = tabs.find(tab => tab.id === section) ?? tabs[0];
@@ -78,14 +81,28 @@ export function SpecialistWorkspace({ data, notices, section }: { data: Speciali
     <div className="min-w-0"><header className="flex items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4 sm:px-8"><div><p className="text-xs font-semibold uppercase tracking-wide text-blue-700">{roleName}</p><p className="font-bold">{data.school.name}</p></div><AccountSignOut /></header>
       <main id="specialist-content" className="mx-auto max-w-6xl space-y-6 p-4 sm:p-8"><div><h1 className="text-2xl font-bold">{current.label}</h1><p className="mt-1 text-sm text-slate-600">{data.actor.name} · {data.areas.map(words).join(", ")}</p></div>
         {message && <p role="status" className="border border-blue-200 bg-blue-50 p-3 text-sm text-blue-950">{message}</p>}
-        {current.id === "overview" && <><div className={`grid gap-4 ${isNurse ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}>{[
+        {current.id === "overview" && <><div className={`grid gap-4 ${isNurse || isSenco ? "sm:grid-cols-4" : "sm:grid-cols-3"}`}>{[
           { label: "Open cases", value: data.cases.filter(row => row.status === "open").length, href: "cases" },
           { label: "Under review", value: data.cases.filter(row => row.status === "under_review").length, href: "cases" },
           { label: "Active directives", value: data.alerts.filter(row => row.isActive && (!row.expiresAt || row.expiresAt > new Date())).length, href: "directives" },
           ...(isNurse ? [{ label: "Clinic visits logged", value: data.clinicVisits?.length ?? 0, href: "clinic" }] : []),
+          ...(isSenco ? [{ label: "SEN register", value: data.senProfiles?.length ?? 0, href: "sen" }] : []),
         ].map(item => <Link key={item.label} href={`/?section=${item.href}`} className="border border-slate-200 bg-white p-5"><p className="text-xs uppercase text-slate-500">{item.label}</p><p className="mt-2 text-3xl font-bold">{item.value}</p></Link>)}</div>
           <Box title="Recent cases">{data.cases.slice(0, 8).map(row => <p key={row.id} className="border-b border-slate-100 py-2 text-sm"><strong>{row.caseNumber}</strong> · {studentName(row.studentId)} · {words(row.area)} · {words(row.status)}</p>)}{!data.cases.length && <p className="text-sm text-slate-500">No cases in your permitted areas.</p>}</Box>
-          {isDsl && <Box title="Enforced court restrictions"><p className="text-sm">{data.restrictions.filter(row => row.isEnforced).length} restrictions are currently marked enforced. Review dates and details before relying on an order.</p><Link href="/?section=court" className="inline-flex min-h-11 items-center font-semibold text-blue-700 underline">Review restrictions</Link></Box>}</>}
+          {isDsl && <Box title="Enforced court restrictions"><p className="text-sm">{data.restrictions.filter(row => row.isEnforced).length} restrictions are currently marked enforced. Review dates and details before relying on an order.</p><Link href="/?section=court" className="inline-flex min-h-11 items-center font-semibold text-blue-700 underline">Review restrictions</Link></Box>}
+          {isSenco && (data.senProfiles?.filter(p => p.status === "active" && p.nextReviewDate < new Date().toISOString().slice(0, 10)).length ?? 0) > 0 && (
+            <div className="border border-red-300 bg-red-50 p-4 text-red-950 flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="font-bold">Statutory SEN reviews are overdue</p>
+                <p className="text-xs text-red-800 mt-0.5">
+                  {data.senProfiles?.filter(p => p.status === "active" && p.nextReviewDate < new Date().toISOString().slice(0, 10)).length} student(s) require an updated progress review meeting to maintain compliance.
+                </p>
+              </div>
+              <Link href="/?section=sen" className="bg-red-700 text-white font-semibold text-xs px-3 py-2 hover:bg-red-800">
+                Open SEN register
+              </Link>
+            </div>
+          )}</>}
         {current.id === "cases" && <><Box title="Create case"><form className="grid gap-3 sm:grid-cols-2" onSubmit={event => submit(event, form => ({ kind: "sensitive_case", studentId: value(form, "studentId"), caseNumber: value(form, "caseNumber"), area: value(form, "area") as SpecialistData["areas"][number], confidentialityTier: value(form, "tier") as "confidential", title: value(form, "title") }))}>
           <Select name="studentId" label="Student" options={studentOptions} /><Field name="caseNumber" label="Case number" /><Select name="area" label="Case area" options={data.areas.map(area => ({ id: area, name: words(area) }))} /><Select name="tier" label="Confidentiality" options={["standard_sensitive", "confidential", "strictly_confidential"].map(item => ({ id: item, name: words(item) }))} /><Field name="title" label="Case title" /><button className={primary} disabled={pending || !data.students.length}>Create case</button>
         </form></Box><Box title="Case register"><div className="space-y-4">{data.cases.map(row => <article key={row.id} className="space-y-4 border border-slate-200 p-4"><div><h3 className="font-bold">{row.caseNumber} · {row.title}</h3><p className="text-sm text-slate-600">{studentName(row.studentId)} · {words(row.area)} · {words(row.status)} · {data.notes.filter(note => note.caseId === row.id).length} encrypted notes</p></div>
@@ -201,6 +218,15 @@ export function SpecialistWorkspace({ data, notices, section }: { data: Speciali
             )}
           </div>
         </Box></>}
+        {current.id === "sen" && isSenco && (
+          <SencoRegisterPanel
+            profiles={data.senProfiles ?? []}
+            reviews={data.senReviews ?? []}
+            students={data.students.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName}`, studentNumber: s.studentNumber }))}
+            isPending={pending}
+            onSaveCommand={save}
+          />
+        )}
         {current.id === "notices" && <Box title="School notices">{notices.map(row => <article key={row.id} className="border-b border-slate-100 py-3"><h3 className="font-semibold">{row.title}</h3><p className="mt-1 whitespace-pre-wrap text-sm">{row.content}</p></article>)}{!notices.length && <p className="text-sm text-slate-500">No published notices.</p>}</Box>}
       </main>
     </div>

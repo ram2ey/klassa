@@ -109,6 +109,12 @@ export type StudentAcademicDrawerProps = {
   timetablePeriods?: TimetablePeriodItem[];
   guardians?: StudentDrawerGuardian[];
   safetyNotices?: StudentDrawerSafetyNotice[];
+  senProfile?: {
+    tier: "universal" | "targeted" | "specialist";
+    primaryNeed: string;
+    examAccessArrangements?: string | null;
+    supportPlanSummary?: string | null;
+  } | null;
   onClose: () => void;
   onEditStudent?: () => void;
 };
@@ -132,6 +138,7 @@ export function StudentAcademicDrawer({
   timetablePeriods = [],
   guardians = [],
   safetyNotices = [],
+  senProfile,
   onClose,
   onEditStudent,
 }: StudentAcademicDrawerProps) {
@@ -256,6 +263,24 @@ export function StudentAcademicDrawer({
                 >
                   {student.status.toUpperCase()}
                 </span>
+                {senProfile && (
+                  <span
+                    className={`border px-2 py-0.5 text-[11px] font-semibold ${
+                      senProfile.tier === "specialist"
+                        ? "border-purple-300 bg-purple-50 text-purple-800"
+                        : senProfile.tier === "targeted"
+                        ? "border-amber-300 bg-amber-50 text-amber-800"
+                        : "border-sky-300 bg-sky-50 text-sky-800"
+                    }`}
+                  >
+                    SEN {senProfile.tier.toUpperCase()}: {senProfile.primaryNeed}
+                  </span>
+                )}
+                {senProfile?.examAccessArrangements && (
+                  <span className="border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-900">
+                    Exam Concessions: {senProfile.examAccessArrangements}
+                  </span>
+                )}
               </div>
               <h2 id="student-profile-title" className="mt-1.5 text-2xl font-bold text-slate-950">
                 {student.firstName} {student.lastName}
