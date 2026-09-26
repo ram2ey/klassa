@@ -1,11 +1,12 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { academicYears, assessmentCategories, assessmentGrades, assessments, attendanceRecords, attendanceSessions,
-  classes, enrollments, gradeLevels, organizations, reportCards, reportCardSubjectGrades, students, subjects,
+  classes, classTimetablePeriods, enrollments, gradeLevels, organizations, reportCards, reportCardSubjectGrades, students, subjects,
   teacherClassAssignments, terms, needToKnowAlerts, courtRestrictions, guardians, studentGuardians,
   guardianAbsenceNotes, studentBehaviours, guardianInquiries, guardianInquiryMessages } from "@/db/schema";
 import { requireStaff } from "@/lib/action-access";
 import { buildTeacherSafetyNotices } from "@/lib/teacher-safety";
+import { formatPeriodLabel, type TimetablePeriodItem } from "@/lib/timetable-service";
 
 export async function getTeacherData(section: string, sessionDate: string) {
   const actor = await requireStaff(["teacher"]);
@@ -137,11 +138,44 @@ export async function getTeacherData(section: string, sessionDate: string) {
       })),
     };
   });
+  const timetableRows = classIds.length ? await db
+    .select({
+      id: classTimetablePeriods.id,
+      classId: classTimetablePeriods.classId,
+      dayOfWeek: classTimetablePeriods.dayOfWeek,
+      period: classTimetablePeriods.period,
+      startTime: classTimetablePeriods.startTime,
+      endTime: classTimetablePeriods.endTime,
+      subjectId: classTimetablePeriods.subjectId,
+      teacherId: classTimetablePeriods.teacherId,
+      room: classTimetablePeriods.room,
+      building: classTimetablePeriods.building,
+    })
+    .from(classTimetablePeriods)
+    .where(
+      and(
+        eq(classTimetablePeriods.organizationId, org),
+        inArray(classTimetablePeriods.classId, classIds)
+      )
+    )
+    .orderBy(asc(classTimetablePeriods.startTime)) : [];
+  const timetable: TimetablePeriodItem[] = timetableRows.map(row => {
+    const subject = subjectsRows.find(s => s.id === row.subjectId);
+    const klass = classRows.find(c => c.id === row.classId);
+    return {
+      ...row,
+      className: klass?.name,
+      periodLabel: formatPeriodLabel(row.period),
+      subjectName: subject?.name,
+      subjectCode: subject?.code,
+      teacherName: row.teacherId === actor.userId ? actor.name : undefined,
+    };
+  });
   return { actor, school, currentYear, classes: classRows, assignments, homeroomClassIds: homeIds, gradeLevels: gradeLevelsRows,
     subjects: subjectsRows, terms: termRows, enrollments: enrollmentRows, students: studentRows,
     assessments: permittedAssessments, grades: gradeRows, categories: categoryRows, reports: reportRows, reportSubjects,
     sessions: sessionRows, records: recordRows, safety, guardianContacts, absenceNotes,
-    historySessions, historyRecords, publishedReports, behaviours: behaviourRows, inquiries };
+    historySessions, historyRecords, publishedReports, behaviours: behaviourRows, inquiries, timetable };
 }
 
 export type TeacherData = Awaited<ReturnType<typeof getTeacherData>>;

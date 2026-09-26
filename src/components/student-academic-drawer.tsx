@@ -7,6 +7,7 @@ import {
   Award,
   BookOpen,
   CalendarCheck,
+  Clock,
   ExternalLink,
   GraduationCap,
   Mail,
@@ -17,6 +18,8 @@ import {
   TrendingUp,
   X,
 } from "lucide-react";
+import { StudentDailyTimetable } from "@/components/student-daily-timetable";
+import type { TimetablePeriodItem } from "@/lib/timetable-service";
 
 export type StudentDrawerProfile = {
   id: string;
@@ -103,13 +106,14 @@ export type StudentAcademicDrawerProps = {
   attendance?: StudentDrawerAttendance;
   historyMarks?: Array<{ studentId?: string; status: string; sessionDate?: string }>;
   behaviours?: StudentDrawerBehaviour[];
+  timetablePeriods?: TimetablePeriodItem[];
   guardians?: StudentDrawerGuardian[];
   safetyNotices?: StudentDrawerSafetyNotice[];
   onClose: () => void;
   onEditStudent?: () => void;
 };
 
-type DrawerTab = "transcript" | "subjects" | "attendance" | "conduct" | "guardians";
+type DrawerTab = "transcript" | "subjects" | "attendance" | "conduct" | "timetable" | "guardians";
 
 export function StudentAcademicDrawer({
   student,
@@ -125,6 +129,7 @@ export function StudentAcademicDrawer({
   attendance,
   historyMarks = [],
   behaviours = [],
+  timetablePeriods = [],
   guardians = [],
   safetyNotices = [],
   onClose,
@@ -362,6 +367,7 @@ export function StudentAcademicDrawer({
               { id: "subjects", label: "Subject Grades", icon: BookOpen },
               { id: "attendance", label: "Attendance", icon: CalendarCheck },
               { id: "conduct", label: "Behaviour & Merits", icon: Award },
+              { id: "timetable", label: "Daily Timetable", icon: Clock },
               { id: "guardians", label: "Guardians & Contacts", icon: GraduationCap },
             ].map((tab) => {
               const Icon = tab.icon;
@@ -743,7 +749,31 @@ export function StudentAcademicDrawer({
             </div>
           )}
 
-          {/* TAB 5: GUARDIANS & SAFETY */}
+          {/* TAB 5: DAILY PERIOD TIMETABLE */}
+          {activeTab === "timetable" && (
+            <div className="space-y-6">
+              <section className="border border-slate-200 bg-white p-5 shadow-xs">
+                <div className="flex items-center justify-between border-b border-slate-100 pb-3">
+                  <div>
+                    <h3 className="font-bold text-slate-900">Daily Period Timetable</h3>
+                    <p className="mt-0.5 text-xs text-slate-500">
+                      Weekly period schedule, subjects, assigned teachers, and classroom locations.
+                    </p>
+                  </div>
+                  <Clock className="h-5 w-5 text-blue-600" />
+                </div>
+                <div className="mt-4">
+                  <StudentDailyTimetable
+                    timetable={timetablePeriods}
+                    studentName={`${student.firstName} ${student.lastName}`}
+                    className={classPlacement}
+                  />
+                </div>
+              </section>
+            </div>
+          )}
+
+          {/* TAB 6: GUARDIANS & SAFETY */}
           {activeTab === "guardians" && (
             <div className="space-y-6">
               {/* Linked Guardian Contacts */}

@@ -142,6 +142,7 @@ export function SchoolAdminStudentDirectory({ data, query, currentYearId, onEnro
         reportSubjects={data.reportSubjects ?? []}
         attendance={attendance ? { total: Number(attendance.total), attended: Number(attendance.attended), absent: Number(attendance.absent) } : undefined}
         behaviours={(data.behaviours ?? []).filter(b => b.studentId === student.id)}
+        timetablePeriods={(data.timetable ?? []).filter(p => p.classId === currentEnrollment?.classId)}
         guardians={guardianLinks.map(link => {
           const guardian = data.guardians.find(row => row.id === link.guardianId);
           return {

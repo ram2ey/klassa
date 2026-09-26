@@ -39,6 +39,7 @@ export const receptionLogType = pgEnum("reception_log_type", ["late_arrival", "e
 export const behaviourType = pgEnum("behaviour_type", ["praise", "incident"]);
 export const guardianInquiryStatus = pgEnum("guardian_inquiry_status", ["open", "in_progress", "resolved"]);
 export const guardianInquirySenderType = pgEnum("guardian_inquiry_sender_type", ["guardian", "teacher", "school_admin", "office_staff"]);
+export const dayOfWeek = pgEnum("day_of_week", ["monday", "tuesday", "wednesday", "thursday", "friday"]);
 
 export const organizations = pgTable("organizations", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -741,6 +742,25 @@ export const guardianInquiryMessages = pgTable("guardian_inquiry_messages", {
   index("guardian_inquiry_messages_org_inquiry_idx").on(table.organizationId, table.inquiryId),
 ]);
 
+export const classTimetablePeriods = pgTable("class_timetable_periods", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  classId: uuid("class_id").notNull().references(() => classes.id, { onDelete: "cascade" }),
+  dayOfWeek: dayOfWeek("day_of_week").notNull(),
+  period: varchar("period", { length: 50 }).notNull(),
+  startTime: varchar("start_time", { length: 8 }).notNull(),
+  endTime: varchar("end_time", { length: 8 }).notNull(),
+  subjectId: uuid("subject_id").references(() => subjects.id, { onDelete: "set null" }),
+  teacherId: text("teacher_id").references(() => users.id, { onDelete: "set null" }),
+  room: varchar("room", { length: 80 }),
+  building: varchar("building", { length: 80 }),
+  ...timestamps,
+}, (table) => [
+  index("class_timetable_org_class_idx").on(table.organizationId, table.classId),
+  index("class_timetable_class_day_idx").on(table.classId, table.dayOfWeek),
+  uniqueIndex("class_timetable_class_day_period_unique").on(table.classId, table.dayOfWeek, table.period),
+]);
+
 export const gdprRequests = pgTable("gdpr_requests", {
   id: uuid("id").defaultRandom().primaryKey(),
   organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
@@ -884,6 +904,7 @@ export const schema = {
   studentBehaviours,
   guardianInquiries,
   guardianInquiryMessages,
+  classTimetablePeriods,
   gdprRequests,
   restoreDrills,
   rateLimitLogs,

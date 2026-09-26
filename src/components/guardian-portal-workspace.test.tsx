@@ -15,19 +15,26 @@ const child = {
   className: "Class A", classIds: ["class-a"], gradeIds: ["grade-a"], attendance: [], attendanceRate: null,
   absenceNotes: [], reports: [{ id: reportId, studentId: "student-a", termId: "term-a", version: 1,
     overallPercentage: "80", gpa: "3.0", publishedAt: new Date(), termName: "Autumn", subjects: [] }],
+  timetable: [],
 };
 
 describe("guardian portal report links", () => {
   it("links each published report card to its printable page", () => {
-    const data = { guardianName: "Parent", students: [child], announcements: [], consents: [], inquiries: [] } as GuardianPortalData;
+    const data = { guardianName: "Parent", students: [child], announcements: [], consents: [], inquiries: [] } as unknown as GuardianPortalData;
     const html = renderToStaticMarkup(<GuardianPortalWorkspace data={data} />);
     expect(html).toContain(`href="/reports/${reportId}"`);
     expect(html).toContain("Open printable report card");
   });
 
   it("does not show a printable link when there are no published reports", () => {
-    const data = { guardianName: "Parent", students: [{ ...child, reports: [] }], announcements: [], consents: [], inquiries: [] } as GuardianPortalData;
+    const data = { guardianName: "Parent", students: [{ ...child, reports: [] }], announcements: [], consents: [], inquiries: [] } as unknown as GuardianPortalData;
     const html = renderToStaticMarkup(<GuardianPortalWorkspace data={data} />);
     expect(html).not.toContain("Open printable report card");
+  });
+
+  it("renders daily period timetable section for linked students", () => {
+    const data = { guardianName: "Parent", students: [child], announcements: [], consents: [], inquiries: [] } as unknown as GuardianPortalData;
+    const html = renderToStaticMarkup(<GuardianPortalWorkspace data={data} />);
+    expect(html).toContain("View daily period timetable");
   });
 });

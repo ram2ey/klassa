@@ -1,9 +1,10 @@
-import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
+import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { academicYears, attendanceRecords, attendanceSessions, auditEvents, classes, courtRestrictions, enrollments, gradeLevels, guardians, needToKnowAlerts, organizationMemberships,
+import { academicYears, attendanceRecords, attendanceSessions, auditEvents, classes, classTimetablePeriods, courtRestrictions, enrollments, gradeLevels, guardians, needToKnowAlerts, organizationMemberships,
   organizations, reportCards, reportCardSubjectGrades, studentBehaviours, studentGuardians, students, subjects, teacherClassAssignments, terms, users,
   guardianAbsenceNotes, guardianInquiries, guardianInquiryMessages } from "@/db/schema";
 import { requireStaff } from "@/lib/action-access";
+import { formatPeriodLabel, type TimetablePeriodItem } from "@/lib/timetable-service";
 
 export async function getSchoolAdminData() {
   const actor = await requireStaff(["school_admin"]);
@@ -50,7 +51,7 @@ export async function getSchoolAdminData() {
       .from(courtRestrictions).where(and(eq(courtRestrictions.organizationId, org), eq(courtRestrictions.isEnforced, true))),
   ]);
   const publishedReportIds = publishedReports.map((r) => r.id);
-  const [reportSubjects, behaviours, absenceNotes, inquiryRows] = await Promise.all([
+  const [reportSubjects, behaviours, absenceNotes, inquiryRows, timetableRows] = await Promise.all([
     publishedReportIds.length
       ? db.select().from(reportCardSubjectGrades).where(and(eq(reportCardSubjectGrades.organizationId, org), inArray(reportCardSubjectGrades.reportCardId, publishedReportIds)))
       : Promise.resolve([]),
@@ -62,6 +63,19 @@ export async function getSchoolAdminData() {
       .orderBy(desc(guardianAbsenceNotes.createdAt)).limit(100),
     db.select().from(guardianInquiries).where(eq(guardianInquiries.organizationId, org))
       .orderBy(desc(guardianInquiries.updatedAt), desc(guardianInquiries.createdAt)).limit(200),
+    db.select({
+      id: classTimetablePeriods.id,
+      classId: classTimetablePeriods.classId,
+      dayOfWeek: classTimetablePeriods.dayOfWeek,
+      period: classTimetablePeriods.period,
+      startTime: classTimetablePeriods.startTime,
+      endTime: classTimetablePeriods.endTime,
+      subjectId: classTimetablePeriods.subjectId,
+      teacherId: classTimetablePeriods.teacherId,
+      room: classTimetablePeriods.room,
+      building: classTimetablePeriods.building,
+    }).from(classTimetablePeriods).where(eq(classTimetablePeriods.organizationId, org))
+      .orderBy(asc(classTimetablePeriods.startTime)),
   ]);
   const inquiryIds = inquiryRows.map(r => r.id);
   const inquiryMessages = inquiryIds.length ? await db.select().from(guardianInquiryMessages)
@@ -100,9 +114,22 @@ export async function getSchoolAdminData() {
       })),
     };
   });
+  const timetable: TimetablePeriodItem[] = timetableRows.map((row) => {
+    const subject = subjectRows.find((s) => s.id === row.subjectId);
+    const teacher = staff.find((st) => st.userId === row.teacherId);
+    const klass = classRows.find((c) => c.id === row.classId);
+    return {
+      ...row,
+      className: klass?.name,
+      periodLabel: formatPeriodLabel(row.period),
+      subjectName: subject?.name,
+      subjectCode: subject?.code,
+      teacherName: teacher?.name,
+    };
+  });
   return { school, actor, students: studentRows, guardians: guardianRows, links, staff, classes: classRows, assignments,
     grades, years, terms: termRows, subjects: subjectRows, enrollments: enrollmentRows, audit, absenceNotes,
-    attendanceSummary, publishedReports, reportSubjects, behaviours, inquiries, activeAlerts: activeAlerts.filter(alert => !alert.expiresAt || alert.expiresAt > new Date()),
+    attendanceSummary, publishedReports, reportSubjects, behaviours, inquiries, timetable, activeAlerts: activeAlerts.filter(alert => !alert.expiresAt || alert.expiresAt > new Date()),
     activeRestrictions: activeRestrictions.filter(restriction => restriction.effectiveDate <= new Date().toISOString().slice(0, 10) &&
       (!restriction.expirationDate || restriction.expirationDate >= new Date().toISOString().slice(0, 10))) };
 }

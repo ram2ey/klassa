@@ -13,7 +13,7 @@ const data: SchoolAdminData = {
   school: { id: "school-1", name: "Northfield School", slug: "northfield", timezone: "Etc/GMT" },
   actor: { organizationId: "school-1", userId: "admin-1", name: "School Admin", role: "school_admin" },
   students: [], guardians: [], links: [], staff: [], classes: [], assignments: [], grades: [], years: [], terms: [], subjects: [], enrollments: [], audit: [], absenceNotes: [],
-  attendanceSummary: [], publishedReports: [], reportSubjects: [], behaviours: [], inquiries: [], activeAlerts: [], activeRestrictions: [],
+  attendanceSummary: [], publishedReports: [], reportSubjects: [], behaviours: [], inquiries: [], timetable: [], activeAlerts: [], activeRestrictions: [],
 };
 const assignmentData = {
   ...data,

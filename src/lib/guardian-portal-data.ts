@@ -1,8 +1,9 @@
-import { and, desc, eq, gte, inArray } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray } from "drizzle-orm";
 import { db } from "@/db";
-import { academicYears, announcements, attendanceRecords, attendanceSessions, classes, enrollments, gradeLevels,
-  guardianAbsenceNotes, guardianConsents, guardianInquiries, guardianInquiryMessages, guardians, organizations, reportCardSubjectGrades, reportCards, studentGuardians, students, subjects, terms } from "@/db/schema";
+import { academicYears, announcements, attendanceRecords, attendanceSessions, classes, classTimetablePeriods, enrollments, gradeLevels,
+  guardianAbsenceNotes, guardianConsents, guardianInquiries, guardianInquiryMessages, guardians, organizations, reportCardSubjectGrades, reportCards, studentGuardians, students, subjects, terms, users } from "@/db/schema";
 import { requireGuardian } from "@/lib/action-access";
+import { formatPeriodLabel, type TimetablePeriodItem } from "@/lib/timetable-service";
 
 export async function getGuardianPortalData() {
   const account = await requireGuardian();
@@ -82,14 +83,49 @@ export async function getGuardianPortalData() {
     .from(reportCardSubjectGrades).innerJoin(subjects, eq(subjects.id, reportCardSubjectGrades.subjectId))
     .where(and(inArray(reportCardSubjectGrades.reportCardId, publishedCards.map(card => card.id)), inArray(reportCardSubjectGrades.organizationId, orgIds))) : [];
 
+  const enrolledClassIds = [...new Set(visibleChildren.flatMap(c => c.classIds))];
+  const timetableRows = enrolledClassIds.length ? await db
+    .select({
+      id: classTimetablePeriods.id,
+      classId: classTimetablePeriods.classId,
+      dayOfWeek: classTimetablePeriods.dayOfWeek,
+      period: classTimetablePeriods.period,
+      startTime: classTimetablePeriods.startTime,
+      endTime: classTimetablePeriods.endTime,
+      subjectId: classTimetablePeriods.subjectId,
+      subjectName: subjects.name,
+      subjectCode: subjects.code,
+      teacherId: classTimetablePeriods.teacherId,
+      teacherName: users.name,
+      room: classTimetablePeriods.room,
+      building: classTimetablePeriods.building,
+    })
+    .from(classTimetablePeriods)
+    .leftJoin(subjects, eq(subjects.id, classTimetablePeriods.subjectId))
+    .leftJoin(users, eq(users.id, classTimetablePeriods.teacherId))
+    .where(
+      and(
+        inArray(classTimetablePeriods.classId, enrolledClassIds),
+        inArray(classTimetablePeriods.organizationId, orgIds)
+      )
+    )
+    .orderBy(asc(classTimetablePeriods.startTime)) : [];
+
   const studentsWithDetails = visibleChildren.map(child => {
     const cards = publishedCards.filter(card => card.studentId === child.id).map(card => ({ ...card,
       termName: termRows.find(term => term.id === card.termId)?.name ?? "Term",
       subjects: publishedSubjects.filter(subject => subject.reportCardId === card.id) }));
     const attendance = attendanceRows.filter(row => row.studentId === child.id).slice(0, 30);
     const attendedCount = attendance.filter(row => row.status === "present" || row.status === "late").length;
+    const timetable: TimetablePeriodItem[] = timetableRows
+      .filter(row => child.classIds.includes(row.classId))
+      .map(row => ({
+        ...row,
+        periodLabel: formatPeriodLabel(row.period),
+      }));
     return { ...child, attendance, attendanceRate: attendance.length ? Math.round(attendedCount / attendance.length * 100) : null, reports: cards,
-      absenceNotes: absenceNotes.filter(note => note.studentId === child.id) };
+      absenceNotes: absenceNotes.filter(note => note.studentId === child.id),
+      timetable };
   });
 
   const visibleNotices = noticeRows.filter(notice => notice.channels !== "sms" && studentsWithDetails.some(child => {

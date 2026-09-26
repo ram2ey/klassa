@@ -115,6 +115,7 @@ export function TeacherWorkspace({ data, notices, section, date }: { data: Teach
   const drawerStudentReportSubjects = drawerStudent ? (data.reportSubjects ?? []).filter(rs => drawerStudentReports.some(r => r.id === rs.reportCardId)) : [];
   const drawerStudentMarks = drawerStudent ? (data.historyRecords?.filter(m => m.studentId === drawerStudent.id) ?? []) : [];
   const drawerStudentBehaviours = drawerStudent ? (data.behaviours?.filter(b => b.studentId === drawerStudent.id) ?? []) : [];
+  const drawerStudentTimetable = drawerStudent && drawerStudentClass ? (data.timetable ?? []).filter(p => p.classId === drawerStudentClass.id) : [];
   const save = (command: WorkflowCommand) => start(async () => {
     setMessage("");
     const result = await saveTeacherWorkflowAction(command);
@@ -194,6 +195,7 @@ export function TeacherWorkspace({ data, notices, section, date }: { data: Teach
         reportSubjects={drawerStudentReportSubjects}
         historyMarks={drawerStudentMarks}
         behaviours={drawerStudentBehaviours}
+        timetablePeriods={drawerStudentTimetable}
         guardians={drawerStudentGuardians}
         safetyNotices={drawerStudentSafety}
         onClose={() => setDrawerStudentId(null)}

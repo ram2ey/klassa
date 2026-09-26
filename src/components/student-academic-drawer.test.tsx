@@ -229,6 +229,36 @@ describe("StudentAcademicDrawer component", () => {
     expect(screen.getByText("EpiPen in classroom cabinet")).toBeTruthy();
   });
 
+  it("renders daily timetable tab with period schedule", () => {
+    const mockTimetable = [
+      {
+        id: "p-1",
+        classId: "class-1",
+        dayOfWeek: "monday" as const,
+        period: "period_1",
+        periodLabel: "Period 1",
+        startTime: "08:50",
+        endTime: "09:40",
+        subjectName: "Mathematics",
+        teacherName: "Mr. Turing",
+        room: "Room 101",
+      },
+    ];
+
+    render(
+      <StudentAcademicDrawer
+        student={mockStudent}
+        timetablePeriods={mockTimetable}
+        onClose={vi.fn()}
+      />
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: /Daily Timetable/i }));
+
+    expect(screen.getByText("Daily Period Timetable")).toBeTruthy();
+    expect(screen.getByText("Weekly period schedule, subjects, assigned teachers, and classroom locations.")).toBeTruthy();
+  });
+
   it("handles close button click and escape key", () => {
     const onClose = vi.fn();
     render(
