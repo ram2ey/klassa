@@ -33,6 +33,27 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("school administration workspace", () => {
+  it("shows live safety and submitted attendance metrics on the overview", () => {
+    const overviewData = { ...data,
+      activeAlerts: [{ studentId: "student-1" }, { studentId: "student-1" }, { studentId: "student-2" }],
+      activeRestrictions: [{ studentId: "student-2" }],
+      attendanceSummary: [
+        { studentId: "student-1", total: 10, attended: 8, absent: 2 },
+        { studentId: "student-2", total: 5, attended: 4, absent: 1 },
+      ],
+    } as SchoolAdminData;
+    render(<SchoolAdminWorkspace data={overviewData} section="overview" />);
+    expect(screen.getByRole("heading", { name: "Active alerts" }).closest("article")?.textContent).toContain("3");
+    expect(screen.getByRole("heading", { name: "Active alerts" }).closest("article")?.textContent).toContain("2 students");
+    expect(screen.getByRole("heading", { name: "Current restrictions" }).closest("article")?.textContent).toContain("1 student");
+    expect(screen.getByRole("heading", { name: "Attendance rate" }).closest("article")?.textContent).toContain("80%");
+    expect(screen.getByRole("heading", { name: "Attendance rate" }).closest("article")?.textContent).toContain("15 submitted or locked marks");
+    expect(screen.getByRole("heading", { name: "Unexcused absences" }).closest("article")?.textContent).toContain("3");
+  });
+  it("does not show a misleading attendance rate before any marks are submitted", () => {
+    render(<SchoolAdminWorkspace data={data} section="overview" />);
+    expect(screen.getByRole("heading", { name: "Attendance rate" }).closest("article")?.textContent).toContain("No submitted attendance marks yet");
+  });
   it.each([
     ["overview", "Overview"], ["students", "Students"], ["guardians", "Guardians"],
     ["staff", "Staff & access"], ["classes", "Classes & grades"], ["subjects", "Subjects"],

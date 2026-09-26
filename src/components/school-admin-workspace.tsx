@@ -51,6 +51,14 @@ export function SchoolAdminWorkspace({ data, workflow, section, date: selectedDa
   const [showEnrollment, setShowEnrollment] = useState(false);
   const [notice, setNotice] = useState("");
   const currentYear = data.years.find(year => year.isCurrent);
+  const attendanceTotals = data.attendanceSummary.reduce((totals, row) => ({
+    marks: totals.marks + Number(row.total),
+    attended: totals.attended + Number(row.attended),
+    absent: totals.absent + Number(row.absent),
+  }), { marks: 0, attended: 0, absent: 0 });
+  const attendanceRate = attendanceTotals.marks ? `${Math.round(attendanceTotals.attended / attendanceTotals.marks * 100)}%` : "—";
+  const alertedStudents = new Set(data.activeAlerts.map(alert => alert.studentId)).size;
+  const restrictedStudents = new Set(data.activeRestrictions.map(restriction => restriction.studentId)).size;
   const date = (value: string | Date) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: SCHOOL_TIME_ZONE }).format(new Date(value));
   const matches = (...values: unknown[]) => values.join(" ").toLowerCase().includes(query.toLowerCase());
   const yearName = (id: string) => data.years.find(year => year.id === id)?.name ?? "Unknown year";
@@ -93,6 +101,10 @@ export function SchoolAdminWorkspace({ data, workflow, section, date: selectedDa
             <Metric label="Staff" value={data.staff.length} detail={`${data.staff.filter(member => member.role === "teacher").length} teachers`} icon={<Users size={22} />} />
             <Metric label="Classes" value={data.classes.filter(item => item.academicYearId === currentYear?.id).length} detail={currentYear?.name ?? "Choose a current academic year"} icon={<ClipboardList size={22} />} />
             <Metric label="Guardians" value={data.guardians.length} detail={`${new Set(data.links.map(link => link.studentId)).size} students with linked guardians`} icon={<UsersRound size={22} />} />
+            <Metric label="Active alerts" value={data.activeAlerts.length} detail={`${alertedStudents} student${alertedStudents === 1 ? "" : "s"} with staff directives`} icon={<ShieldAlert size={22} />} />
+            <Metric label="Current restrictions" value={data.activeRestrictions.length} detail={`${restrictedStudents} student${restrictedStudents === 1 ? "" : "s"} with court restrictions`} icon={<ShieldAlert size={22} />} />
+            <Metric label="Attendance rate" value={attendanceRate} detail={attendanceTotals.marks ? `Across ${attendanceTotals.marks} submitted or locked marks` : "No submitted attendance marks yet"} icon={<ClipboardCheck size={22} />} />
+            <Metric label="Unexcused absences" value={attendanceTotals.absent} detail="Across submitted or locked attendance marks" icon={<CalendarDays size={22} />} />
           </div>
           <div className="grid gap-6 xl:grid-cols-[1fr_1.4fr]">
             <section className={panelStyle}><PanelHeading title="School setup" description="Build the foundations for your school year." />
@@ -196,7 +208,7 @@ function StaffAccessAction({ membershipId, staffName }: { membershipId: string; 
     }}>{pending ? "Removing…" : "Remove access"}</Button>{message && <span role="status" className="max-w-48 text-xs text-slate-600">{message}</span>}</span>;
 }
 
-function Metric({ label, value, detail, icon }: { label: string; value: number; detail: string; icon: ReactNode }) {
+function Metric({ label, value, detail, icon }: { label: string; value: string | number; detail: string; icon: ReactNode }) {
   return <article className={`${panelStyle} p-5`}><div className="flex justify-between gap-3"><div><h2 className="text-xs font-semibold uppercase tracking-wider text-slate-500">{label}</h2><p className="mt-3 text-3xl font-bold tabular-nums">{value}</p></div><span className="grid h-11 w-11 place-items-center bg-blue-50 text-blue-700">{icon}</span></div><p className="mt-3 text-xs text-slate-500">{detail}</p></article>;
 }
 function PanelHeading({ title, description, action }: { title: string; description?: string; action?: ReactNode }) {
