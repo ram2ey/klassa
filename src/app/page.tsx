@@ -9,6 +9,7 @@ import Link from "next/link";
 import { AccountSignOut } from "@/components/account-sign-out";
 import { SchoolAdminWorkspace } from "@/components/school-admin-workspace";
 import { getSchoolAdminData } from "@/lib/school-admin-data";
+import { getSchoolGdprData } from "@/lib/school-gdpr-data";
 import { getSchoolWorkflowData } from "@/lib/school-workflow-data";
 import { getStaffAnnouncements } from "@/lib/school-announcements";
 import { SchoolNoticeBoard } from "@/components/school-notice-board";
@@ -46,8 +47,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
     const { section, date } = await searchParams;
     const selected = section ?? "overview";
     const selectedDate = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : new Date().toISOString().slice(0, 10);
-    const [data, workflow] = await Promise.all([getSchoolAdminData(), getSchoolWorkflowData(selected, selectedDate)]);
-    return <SchoolAdminWorkspace key={data.school.id} data={data} workflow={workflow} section={selected} date={selectedDate} />;
+    const [data, workflow, gdpr] = await Promise.all([getSchoolAdminData(), getSchoolWorkflowData(selected, selectedDate),
+      selected === "settings" ? getSchoolGdprData() : Promise.resolve(undefined)]);
+    return <SchoolAdminWorkspace key={data.school.id} data={data} workflow={workflow} gdpr={gdpr} section={selected} date={selectedDate} />;
   }
   if (actor.role === "teacher") {
     const { section, date } = await searchParams;

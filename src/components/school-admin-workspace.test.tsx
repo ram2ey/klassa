@@ -54,6 +54,11 @@ describe("school administration workspace", () => {
     render(<SchoolAdminWorkspace data={data} section="overview" />);
     expect(screen.getByRole("heading", { name: "Attendance rate" }).closest("article")?.textContent).toContain("No submitted attendance marks yet");
   });
+  it("shows the live data rights panel in school settings", () => {
+    render(<SchoolAdminWorkspace data={data} gdpr={{ requests: [] }} section="settings" />);
+    expect(screen.getByRole("heading", { name: "Data rights requests" })).toBeTruthy();
+    expect(screen.getByText("No data rights requests have been recorded for this school.")).toBeTruthy();
+  });
   it.each([
     ["overview", "Overview"], ["students", "Students"], ["guardians", "Guardians"],
     ["staff", "Staff & access"], ["classes", "Classes & grades"], ["subjects", "Subjects"],

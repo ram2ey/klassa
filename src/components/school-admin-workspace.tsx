@@ -12,6 +12,8 @@ import { removeSchoolStaffAccessAction, saveSchoolRecordAction } from "@/app/act
 import { provisionStaffForCurrentSchoolAction } from "@/app/actions/school-access-actions";
 import type { SchoolAdminData } from "@/lib/school-admin-data";
 import type { SchoolWorkflowData } from "@/lib/school-workflow-data";
+import type { SchoolGdprData } from "@/lib/school-gdpr-data";
+import { SchoolAdminGdprPanel } from "@/components/school-admin-gdpr-panel";
 import { SchoolAdminWorkflows } from "@/components/school-admin-workflows";
 import { StudentCsvImport } from "@/components/student-csv-import";
 import { StudentEnrollmentFlow } from "@/components/student-enrollment-flow";
@@ -43,7 +45,7 @@ type Editor = { kind: Exclude<SchoolCommand["kind"], "teacher_subject_assignment
 type Option = { value: string; label: string };
 type Field = { name: string; label: string; type?: "text" | "date" | "email" | "password" | "number" | "checkbox"; required?: boolean; options?: Option[]; hint?: string; max?: number; min?: number; disabled?: boolean };
 
-export function SchoolAdminWorkspace({ data, workflow, section, date: selectedDate }: { data: SchoolAdminData; workflow?: SchoolWorkflowData; section: string; date?: string }) {
+export function SchoolAdminWorkspace({ data, workflow, gdpr, section, date: selectedDate }: { data: SchoolAdminData; workflow?: SchoolWorkflowData; gdpr?: SchoolGdprData; section: string; date?: string }) {
   const current = sections.find(item => item.id === section) ?? sections[0];
   const [query, setQuery] = useState("");
   const [mobileNav, setMobileNav] = useState(false);
@@ -161,10 +163,10 @@ export function SchoolAdminWorkspace({ data, workflow, section, date: selectedDa
           <DataTable caption="School audit history" headers={["Event", "Actor", "Record type", "Record ID", "Time"]} rows={data.audit.filter(event => matches(event.action, event.actorName, event.entityType, event.entityId)).map(event => ({ key: event.id, cells: [event.action, event.actorName ?? "System", words(event.entityType), <span key="id" className="break-all font-mono text-xs">{event.entityId}</span>, formatGMTDateTime(event.createdAt)] }))} empty="No audit events match this view." />
         </section>}
 
-        {current.id === "settings" && <section className={`${panelStyle} max-w-3xl`}><PanelHeading title="School details" description="Manage your school's name. The timezone is fixed at GMT." action={<Button variant="secondary" className="min-h-11" onClick={() => edit("settings", "Edit school settings", { name: data.school.name })}>Edit settings</Button>} />
+        {current.id === "settings" && <div className="space-y-6"><section className={`${panelStyle} max-w-3xl`}><PanelHeading title="School details" description="Manage your school's name. The timezone is fixed at GMT." action={<Button variant="secondary" className="min-h-11" onClick={() => edit("settings", "Edit school settings", { name: data.school.name })}>Edit settings</Button>} />
           <dl className="grid gap-6 p-5 sm:grid-cols-2">{[["School name", data.school.name], ["Tenant ID", data.school.slug], ["Timezone", SCHOOL_TIME_ZONE_LABEL], ["Current academic year", currentYear?.name ?? "Not set"]].map(([label, value]) => <div key={label}><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</dt><dd className="mt-2 font-medium">{value}</dd></div>)}</dl>
           <p className="border-t border-slate-200 px-5 py-4 text-sm text-slate-500">Your tenant ID is used to sign in. Contact your platform administrator if it needs to change.</p>
-        </section>}
+        </section>{gdpr && <SchoolAdminGdprPanel data={gdpr} students={data.students} />}</div>}
       </main>
     </div>
     {editor && <RecordEditor editor={editor} data={data} onClose={() => setEditor(null)} onSaved={message => { setNotice(message); setEditor(null); }} />}
