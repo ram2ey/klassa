@@ -15,6 +15,8 @@ export const schoolCommandSchema = z.discriminatedUnion("kind", [
     relationship: z.enum(["parent", "guardian", "foster_carer", "other"]), isPrimary: z.boolean(), hasLegalResponsibility: z.boolean() }),
   z.object({ kind: z.literal("grade"), id: id.optional(), name: name.max(80), position: z.number().int().min(0).max(100) }),
   z.object({ kind: z.literal("class"), id: id.optional(), name: name.max(80), academicYearId: id, gradeLevelId: id, homeroomTeacherId: z.string().max(200).optional() }),
+  z.object({ kind: z.literal("teacher_subject_assignment"), id: id.optional(), classId: id, subjectId: id, teacherId: z.string().min(1).max(200) }),
+  z.object({ kind: z.literal("teacher_subject_assignment_remove"), id }),
   z.object({ kind: z.literal("subject"), id: id.optional(), code: z.string().trim().min(1).max(30), name: name.max(100), department: z.string().trim().max(80) }),
   z.object({ kind: z.literal("year"), id: id.optional(), name: name.max(50), ...dates, isCurrent: z.boolean() }),
   z.object({ kind: z.literal("term"), id: id.optional(), academicYearId: id, name: name.max(80), ...dates, position: z.number().int().min(1).max(20) }),

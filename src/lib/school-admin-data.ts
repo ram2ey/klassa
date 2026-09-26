@@ -1,7 +1,7 @@
 import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { academicYears, attendanceRecords, attendanceSessions, auditEvents, classes, courtRestrictions, enrollments, gradeLevels, guardians, needToKnowAlerts, organizationMemberships,
-  organizations, reportCards, studentGuardians, students, subjects, terms, users } from "@/db/schema";
+  organizations, reportCards, studentGuardians, students, subjects, teacherClassAssignments, terms, users } from "@/db/schema";
 import { requireStaff } from "@/lib/action-access";
 
 export async function getSchoolAdminData() {
@@ -10,7 +10,7 @@ export async function getSchoolAdminData() {
   const [school] = await db.select({ id: organizations.id, name: organizations.name, slug: organizations.slug, timezone: organizations.timezone })
     .from(organizations).where(eq(organizations.id, org)).limit(1);
   if (!school) throw new Error("School not found.");
-  const [studentRows, guardianRows, links, staff, classRows, grades, years, termRows, subjectRows, enrollmentRows, audit, attendanceSummary, publishedReports, activeAlerts, activeRestrictions] = await Promise.all([
+  const [studentRows, guardianRows, links, staff, classRows, assignments, grades, years, termRows, subjectRows, enrollmentRows, audit, attendanceSummary, publishedReports, activeAlerts, activeRestrictions] = await Promise.all([
     db.select().from(students).where(eq(students.organizationId, org)).orderBy(students.lastName, students.firstName),
     db.select().from(guardians).where(eq(guardians.organizationId, org)).orderBy(guardians.lastName, guardians.firstName),
     db.select().from(studentGuardians).where(eq(studentGuardians.organizationId, org)),
@@ -20,6 +20,9 @@ export async function getSchoolAdminData() {
       .from(organizationMemberships).innerJoin(users, eq(users.id, organizationMemberships.userId))
       .where(eq(organizationMemberships.organizationId, org)).orderBy(users.name),
     db.select().from(classes).where(eq(classes.organizationId, org)).orderBy(classes.name),
+    db.select({ id: teacherClassAssignments.id, classId: teacherClassAssignments.classId,
+      subjectId: teacherClassAssignments.subjectId, teacherId: teacherClassAssignments.teacherId })
+      .from(teacherClassAssignments).where(and(eq(teacherClassAssignments.organizationId, org), eq(teacherClassAssignments.isPrimaryHomeroom, false))),
     db.select().from(gradeLevels).where(eq(gradeLevels.organizationId, org)).orderBy(gradeLevels.position, gradeLevels.name),
     db.select().from(academicYears).where(eq(academicYears.organizationId, org)).orderBy(desc(academicYears.startsOn)),
     db.select().from(terms).where(eq(terms.organizationId, org)).orderBy(terms.position),
@@ -45,7 +48,7 @@ export async function getSchoolAdminData() {
       prohibitDisclosure: courtRestrictions.prohibitDisclosure, effectiveDate: courtRestrictions.effectiveDate, expirationDate: courtRestrictions.expirationDate })
       .from(courtRestrictions).where(and(eq(courtRestrictions.organizationId, org), eq(courtRestrictions.isEnforced, true))),
   ]);
-  return { school, actor, students: studentRows, guardians: guardianRows, links, staff, classes: classRows,
+  return { school, actor, students: studentRows, guardians: guardianRows, links, staff, classes: classRows, assignments,
     grades, years, terms: termRows, subjects: subjectRows, enrollments: enrollmentRows, audit,
     attendanceSummary, publishedReports, activeAlerts: activeAlerts.filter(alert => !alert.expiresAt || alert.expiresAt > new Date()),
     activeRestrictions: activeRestrictions.filter(restriction => restriction.effectiveDate <= new Date().toISOString().slice(0, 10) &&

@@ -61,6 +61,65 @@ describe("live school administration boundaries", () => {
     expect(mocks.execute.mock.calls[1][1]).toEqual([record, org]);
     expect(mocks.commit).not.toHaveBeenCalled();
   });
+  it("rejects a subject assignment when its class is outside the school", async () => {
+    await expect(saveSchoolRecord(actor, { kind: "teacher_subject_assignment", classId: record, subjectId: other,
+      teacherId: "teacher-a" })).rejects.toThrow("Class was not found");
+    expect(mocks.execute.mock.calls[1][1]).toEqual([record, org]);
+    expect(mocks.commit).not.toHaveBeenCalled();
+  });
+  it("requires an active teacher membership before assigning a subject", async () => {
+    mocks.execute.mockImplementation(async query => {
+      if (query.includes('from "organizations"')) return [[org]];
+      if (query.includes('from "classes"') || query.includes('from "subjects"')) return [[record]];
+      if (query.includes('from "organization_memberships"')) return [["office_staff"]];
+      return [];
+    });
+    await expect(saveSchoolRecord(actor, { kind: "teacher_subject_assignment", classId: record, subjectId: other,
+      teacherId: "office-a" })).rejects.toThrow("teacher role");
+    expect(mocks.execute.mock.calls.some(([query]) => query.startsWith('insert into "teacher_class_assignments"'))).toBe(false);
+  });
+  it("creates an audited class and subject assignment", async () => {
+    mocks.execute.mockImplementation(async query => {
+      if (query.includes('from "organizations"')) return [[org]];
+      if (query.includes('from "classes"') || query.includes('from "subjects"')) return [[record]];
+      if (query.includes('from "organization_memberships"')) return [["teacher"]];
+      if (query.startsWith('insert into "teacher_class_assignments"')) return [[other]];
+      if (query.startsWith('insert into "audit_events"')) return [[record]];
+      return [];
+    });
+    await expect(saveSchoolRecord(actor, { kind: "teacher_subject_assignment", classId: record, subjectId: other,
+      teacherId: "teacher-a" })).resolves.toEqual({ entityId: other });
+    const insert = mocks.execute.mock.calls.find(([query]) => query.startsWith('insert into "teacher_class_assignments"'))!;
+    expect(insert[1]).toEqual(expect.arrayContaining([org, record, other, "teacher-a", false]));
+    expect(mocks.execute.mock.calls.some(([query]) => query.startsWith('insert into "audit_events"'))).toBe(true);
+    expect(mocks.commit).toHaveBeenCalledOnce();
+  });
+  it("prevents duplicate class, subject, and teacher assignments", async () => {
+    mocks.execute.mockImplementation(async query => {
+      if (query.includes('from "organizations"')) return [[org]];
+      if (query.includes('from "classes"') || query.includes('from "subjects"')) return [[record]];
+      if (query.includes('from "organization_memberships"')) return [["teacher"]];
+      if (query.includes('from "teacher_class_assignments"')) return [[other]];
+      return [];
+    });
+    await expect(saveSchoolRecord(actor, { kind: "teacher_subject_assignment", classId: record, subjectId: other,
+      teacherId: "teacher-a" })).rejects.toThrow("already has");
+    expect(mocks.execute.mock.calls.some(([query]) => query.startsWith('insert into "teacher_class_assignments"'))).toBe(false);
+  });
+  it("cannot remove a homeroom assignment through the subject editor", async () => {
+    mocks.execute.mockResolvedValueOnce([[org]]).mockResolvedValueOnce([[record, true]]);
+    await expect(saveSchoolRecord(actor, { kind: "teacher_subject_assignment_remove", id: record })).rejects.toThrow("homeroom teachers");
+    expect(mocks.execute.mock.calls.some(([query]) => query.startsWith('delete from "teacher_class_assignments"'))).toBe(false);
+  });
+  it("removes a subject assignment within the school", async () => {
+    mocks.execute.mockResolvedValueOnce([[org]]).mockResolvedValueOnce([[record, false]])
+      .mockResolvedValueOnce([]).mockResolvedValueOnce([[record]]);
+    await expect(saveSchoolRecord(actor, { kind: "teacher_subject_assignment_remove", id: record })).resolves.toEqual({ entityId: record });
+    const removal = mocks.execute.mock.calls.find(([query]) => query.startsWith('delete from "teacher_class_assignments"'))!;
+    expect(removal[1]).toContain(org);
+    expect(removal[1]).toContain(false);
+    expect(mocks.commit).toHaveBeenCalledOnce();
+  });
   it("does not report an out-of-school guardian update as saved", async () => {
     await expect(saveSchoolRecord(actor, { kind: "guardian", id: record, firstName: "Alex", lastName: "Smith", email: "", phone: "" })).rejects.toThrow("Guardian was not found");
     const [query, params] = mocks.execute.mock.calls[1];

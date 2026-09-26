@@ -39,7 +39,7 @@ const roles = ["school_admin", "office_staff", "teacher", "safeguarding_lead", "
 const fieldStyle = "mt-1.5 block min-h-11 w-full border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-600";
 const panelStyle = "border border-slate-200 bg-white";
 const words = (value: string) => value.replaceAll("_", " ").replace(/\b\w/g, letter => letter.toUpperCase());
-type Editor = { kind: SchoolCommand["kind"] | "staff"; title: string; values?: Record<string, string | number | boolean | null> };
+type Editor = { kind: Exclude<SchoolCommand["kind"], "teacher_subject_assignment_remove"> | "staff"; title: string; values?: Record<string, string | number | boolean | null> };
 type Option = { value: string; label: string };
 type Field = { name: string; label: string; type?: "text" | "date" | "email" | "password" | "number" | "checkbox"; required?: boolean; options?: Option[]; hint?: string; max?: number; min?: number; disabled?: boolean };
 
@@ -59,7 +59,7 @@ export function SchoolAdminWorkspace({ data, workflow, section, date: selectedDa
   const guardianName = (id: string) => { const guardian = data.guardians.find(guardian => guardian.id === id); return guardian ? `${guardian.firstName} ${guardian.lastName}` : "Unknown guardian"; };
   const edit = (kind: Editor["kind"], title: string, values?: Editor["values"]) => setEditor({ kind, title, values });
   const add = (kind: Editor["kind"], title: string) => <Button aria-label={title} className="min-h-11" onClick={() => edit(kind, title)}><Plus size={16} />{title}</Button>;
-  const editButton = (kind: Editor["kind"], title: string, values: NonNullable<Editor["values"]>) => <Button variant="secondary" className="min-h-11" onClick={() => edit(kind, title, values)}>Edit<span className="sr-only"> {title}</span></Button>;
+  const editButton = (kind: Editor["kind"], title: string, values: NonNullable<Editor["values"]>) => <Button variant="secondary" aria-label={title} className="min-h-11" onClick={() => edit(kind, title, values)}>Edit</Button>;
 
   return <div className="min-h-screen bg-slate-50 text-slate-900 lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">
     <a href="#school-content" className="sr-only z-50 bg-white p-3 focus:not-sr-only focus:fixed">Skip to content</a>
@@ -129,6 +129,8 @@ export function SchoolAdminWorkspace({ data, workflow, section, date: selectedDa
 
         {current.id === "classes" && <div className="space-y-6"><section className={panelStyle}><PanelHeading title="Classes" description="Organize classes by year and grade, and assign homeroom teachers." action={add("class", "Add class")} />
           <DataTable caption="School classes" headers={["Class", "Grade", "Academic year", "Homeroom teacher", "Students", "Actions"]} rows={data.classes.filter(item => matches(item.name, gradeName(item.gradeLevelId), yearName(item.academicYearId))).map(item => ({ key: item.id, cells: [<strong key="name">{item.name}</strong>, gradeName(item.gradeLevelId), yearName(item.academicYearId), data.staff.find(member => member.userId === item.homeroomTeacherId)?.name ?? "Not assigned", data.enrollments.filter(enrollment => enrollment.classId === item.id && ["active", "pending"].includes(enrollment.status)).length, editButton("class", `Edit class ${item.name}`, { id: item.id, name: item.name, academicYearId: item.academicYearId, gradeLevelId: item.gradeLevelId, homeroomTeacherId: item.homeroomTeacherId })] }))} empty="Create an academic year and a grade, then add your first class." />
+        </section><section className={panelStyle}><PanelHeading title="Subject teachers" description="Assign teachers to a class and subject so they can manage its gradebook." action={add("teacher_subject_assignment", "Assign subject teacher")} />
+          <DataTable caption="Subject teacher assignments" headers={["Class", "Academic year", "Subject", "Teacher", "Actions"]} rows={data.assignments.filter(item => item.subjectId && matches(data.classes.find(klass => klass.id === item.classId)?.name, data.subjects.find(subject => subject.id === item.subjectId)?.name, data.staff.find(member => member.userId === item.teacherId)?.name)).map(item => { const klass = data.classes.find(row => row.id === item.classId); const subject = data.subjects.find(row => row.id === item.subjectId); const teacher = data.staff.find(row => row.userId === item.teacherId); const label = `${teacher?.name ?? "Teacher"} · ${subject?.name ?? "Subject"} · ${klass?.name ?? "Class"}`; return { key: item.id, cells: [klass?.name ?? "Class", klass ? yearName(klass.academicYearId) : "Unknown year", subject?.name ?? "Subject", teacher?.name ?? "Teacher", <div key="actions" className="flex flex-wrap gap-2">{editButton("teacher_subject_assignment", `Edit ${label}`, { id: item.id, classId: item.classId, subjectId: item.subjectId, teacherId: item.teacherId })}<SubjectAssignmentRemove assignmentId={item.id} label={label} onRemoved={() => setNotice("Subject teacher assignment removed.")} /></div>] }; })} empty="No subject teachers assigned yet. Add a class, subject, and teacher first." />
         </section><section className={panelStyle}><PanelHeading title="Grade levels" description="The grade levels offered by your school." action={add("grade", "Add grade")} />
           <DataTable caption="Grade levels" headers={["Grade", "Sort order", "Actions"]} rows={data.grades.filter(grade => matches(grade.name)).map(grade => ({ key: grade.id, cells: [grade.name, grade.position, editButton("grade", `Edit ${grade.name}`, { id: grade.id, name: grade.name, position: grade.position })] }))} empty="Add your school's grade levels." />
         </section></div>}
@@ -158,6 +160,23 @@ export function SchoolAdminWorkspace({ data, workflow, section, date: selectedDa
       existingGuardians={data.guardians.map(item => ({ id: item.id, label: `${item.firstName} ${item.lastName}${item.email ? ` · ${item.email}` : ""}` }))}
       onClose={() => setShowEnrollment(false)} onSaved={message => { setNotice(message); setShowEnrollment(false); }} />}
   </div>;
+}
+
+function SubjectAssignmentRemove({ assignmentId, label, onRemoved }: { assignmentId: string; label: string; onRemoved: () => void }) {
+  const [pending, startTransition] = useTransition();
+  const [error, setError] = useState("");
+  const router = useRouter();
+  return <span className="inline-flex flex-col items-start gap-1"><Button variant="secondary" aria-label={`Remove ${label}`} className="min-h-11 border-red-200 text-red-800 hover:bg-red-50" disabled={pending}
+    onClick={() => {
+      if (!window.confirm(`Remove the subject teacher assignment for ${label}?`)) return;
+      setError("");
+      startTransition(async () => {
+        const result = await saveSchoolRecordAction({ kind: "teacher_subject_assignment_remove", id: assignmentId });
+        if (!result.success) { setError(result.error); return; }
+        onRemoved();
+        router.refresh();
+      });
+    }}>Remove</Button>{error && <span role="alert" className="text-xs text-red-700">{error}</span>}</span>;
 }
 
 function StaffAccessAction({ membershipId, staffName }: { membershipId: string; staffName: string }) {
@@ -208,6 +227,9 @@ function RecordEditor({ editor, data, onClose, onSaved }: { editor: Editor; data
     guardian_link: [{ name: "studentId", label: "Student", required: true, disabled: !!editor.values, options: data.students.map(student => ({ value: student.id, label: `${student.firstName} ${student.lastName} (${student.studentNumber})` })) }, { name: "guardianId", label: "Guardian", required: true, disabled: !!editor.values, options: data.guardians.map(guardian => ({ value: guardian.id, label: `${guardian.firstName} ${guardian.lastName}` })) }, { name: "relationship", label: "Relationship", options: ["parent", "guardian", "foster_carer", "other"].map(value => ({ value, label: words(value) })) }, { name: "isPrimary", label: "Primary contact for this student", type: "checkbox", hint: "Selecting this replaces the student's previous primary contact." }, { name: "hasLegalResponsibility", label: "Has legal responsibility", type: "checkbox" }],
     grade: [{ name: "name", label: "Grade name", required: true, max: 80 }, { name: "position", label: "Sort order", type: "number", required: true, min: 0, max: 100 }],
     class: [{ name: "name", label: "Class name", required: true, max: 80 }, { name: "academicYearId", label: "Academic year", required: true, disabled: !!editor.values?.id, options: yearOptions }, { name: "gradeLevelId", label: "Grade", required: true, options: data.grades.map(grade => ({ value: grade.id, label: grade.name })) }, { name: "homeroomTeacherId", label: "Homeroom teacher", options: [{ value: "", label: "Not assigned" }, ...data.staff.filter(member => member.role === "teacher" || member.role === "school_admin").map(member => ({ value: member.userId, label: member.name }))] }],
+    teacher_subject_assignment: [{ name: "classId", label: "Class", required: true, options: data.classes.map(item => ({ value: item.id, label: `${data.grades.find(grade => grade.id === item.gradeLevelId)?.name ?? "Grade"} / ${item.name} · ${data.years.find(year => year.id === item.academicYearId)?.name ?? "Year"}` })) },
+      { name: "subjectId", label: "Subject", required: true, options: data.subjects.map(subject => ({ value: subject.id, label: subject.name })) },
+      { name: "teacherId", label: "Teacher", required: true, options: data.staff.filter(member => member.role === "teacher").map(member => ({ value: member.userId, label: member.name })) }],
     subject: [{ name: "code", label: "Subject code", required: true, max: 30 }, { name: "name", label: "Subject name", required: true, max: 100 }, { name: "department", label: "Department (optional)", max: 80 }],
     year: [{ name: "name", label: "Academic year name", required: true, max: 50 }, { name: "startsOn", label: "Start date", type: "date", required: true }, { name: "endsOn", label: "End date", type: "date", required: true }, { name: "isCurrent", label: "Use as the current academic year", type: "checkbox", hint: "Only one academic year can be current. Existing enrollments stay in their original year." }],
     term: [{ name: "name", label: "Term name", required: true, max: 80 }, { name: "academicYearId", label: "Academic year", required: true, disabled: !!editor.values?.id, options: yearOptions }, { name: "startsOn", label: "Start date", type: "date", required: true }, { name: "endsOn", label: "End date", type: "date", required: true }, { name: "position", label: "Term order", type: "number", required: true, min: 1, max: 20 }],

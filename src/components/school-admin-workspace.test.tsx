@@ -12,9 +12,18 @@ vi.mock("@/app/actions/school-access-actions", () => ({ provisionStaffForCurrent
 const data: SchoolAdminData = {
   school: { id: "school-1", name: "Northfield School", slug: "northfield", timezone: "Etc/GMT" },
   actor: { organizationId: "school-1", userId: "admin-1", name: "School Admin", role: "school_admin" },
-  students: [], guardians: [], links: [], staff: [], classes: [], grades: [], years: [], terms: [], subjects: [], enrollments: [], audit: [],
+  students: [], guardians: [], links: [], staff: [], classes: [], assignments: [], grades: [], years: [], terms: [], subjects: [], enrollments: [], audit: [],
   attendanceSummary: [], publishedReports: [], activeAlerts: [], activeRestrictions: [],
 };
+const assignmentData = {
+  ...data,
+  years: [{ id: "year-1", name: "2026/27", isCurrent: true }],
+  grades: [{ id: "grade-1", name: "Grade 9", position: 9 }],
+  classes: [{ id: "class-1", name: "9A", academicYearId: "year-1", gradeLevelId: "grade-1", homeroomTeacherId: null }],
+  subjects: [{ id: "subject-1", name: "Science", code: "SCI", department: null }],
+  staff: [{ id: "member-1", userId: "teacher-1", name: "Avery Lee", role: "teacher", username: "avery" }],
+  assignments: [{ id: "assignment-1", classId: "class-1", subjectId: "subject-1", teacherId: "teacher-1" }],
+} as SchoolAdminData;
 
 beforeEach(() => {
   mocks.save.mockReset().mockResolvedValue({ success: true, entityId: "saved-record" });
@@ -60,5 +69,34 @@ describe("school administration workspace", () => {
     expect(await screen.findByRole("alert")).toHaveProperty("textContent", "Subject code is already in use.");
     expect(screen.getByLabelText("Subject name")).toHaveProperty("value", "Mathematics");
     expect(mocks.refresh).not.toHaveBeenCalled();
+  });
+  it("shows subject assignments and submits the selected class, subject, and teacher", async () => {
+    render(<SchoolAdminWorkspace data={{ ...assignmentData, assignments: [] }} section="classes" />);
+    fireEvent.click(screen.getByRole("button", { name: "Assign subject teacher" }));
+    expect(screen.getByRole("option", { name: "Avery Lee" })).toBeTruthy();
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(mocks.save).toHaveBeenCalledWith({ kind: "teacher_subject_assignment",
+      classId: "class-1", subjectId: "subject-1", teacherId: "teacher-1" }));
+    await waitFor(() => expect(mocks.refresh).toHaveBeenCalledOnce());
+  });
+  it("removes an existing subject assignment after confirmation", async () => {
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    try {
+      render(<SchoolAdminWorkspace data={assignmentData} section="classes" />);
+      expect(screen.getByText("Science")).toBeTruthy();
+      fireEvent.click(screen.getByRole("button", { name: /Remove Avery Lee/ }));
+      await waitFor(() => expect(mocks.save).toHaveBeenCalledWith({ kind: "teacher_subject_assignment_remove", id: "assignment-1" }));
+      await waitFor(() => expect(mocks.refresh).toHaveBeenCalledOnce());
+    } finally { confirm.mockRestore(); }
+  });
+  it("opens an existing assignment for editing", async () => {
+    render(<SchoolAdminWorkspace data={assignmentData} section="classes" />);
+    fireEvent.click(screen.getByRole("button", { name: /Edit Avery Lee/ }));
+    expect(screen.getByLabelText("Class")).toHaveProperty("value", "class-1");
+    expect(screen.getByLabelText("Subject")).toHaveProperty("value", "subject-1");
+    expect(screen.getByLabelText("Teacher")).toHaveProperty("value", "teacher-1");
+    fireEvent.click(screen.getByRole("button", { name: "Save changes" }));
+    await waitFor(() => expect(mocks.save).toHaveBeenCalledWith({ kind: "teacher_subject_assignment", id: "assignment-1",
+      classId: "class-1", subjectId: "subject-1", teacherId: "teacher-1" }));
   });
 });

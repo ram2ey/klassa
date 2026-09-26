@@ -107,6 +107,40 @@ export async function saveSchoolRecord(actor: Actor, raw: SchoolCommand) {
         if (value.homeroomTeacherId) await tx.insert(teacherClassAssignments).values({ organizationId: org, classId: entityId, teacherId: value.homeroomTeacherId, isPrimaryHomeroom: true });
         break;
       }
+      case "teacher_subject_assignment": {
+        found((await tx.select({ id: classes.id }).from(classes).where(and(eq(classes.id, value.classId), eq(classes.organizationId, org))))[0], "Class");
+        found((await tx.select({ id: subjects.id }).from(subjects).where(and(eq(subjects.id, value.subjectId), eq(subjects.organizationId, org))))[0], "Subject");
+        const member = found((await tx.select({ role: organizationMemberships.role }).from(organizationMemberships).where(and(
+          eq(organizationMemberships.userId, value.teacherId), eq(organizationMemberships.organizationId, org))))[0], "Teacher");
+        if (member.role !== "teacher") throw new SchoolAdminError("Choose a staff member with the teacher role.");
+        if (value.id) {
+          const previous = found((await tx.select({ isPrimaryHomeroom: teacherClassAssignments.isPrimaryHomeroom })
+            .from(teacherClassAssignments).where(and(eq(teacherClassAssignments.id, value.id), eq(teacherClassAssignments.organizationId, org))))[0], "Subject assignment");
+          if (previous.isPrimaryHomeroom) throw new SchoolAdminError("Edit homeroom teachers through the class record.");
+        }
+        const [duplicate] = await tx.select({ id: teacherClassAssignments.id }).from(teacherClassAssignments).where(and(
+          eq(teacherClassAssignments.organizationId, org), eq(teacherClassAssignments.classId, value.classId),
+          eq(teacherClassAssignments.subjectId, value.subjectId), eq(teacherClassAssignments.teacherId, value.teacherId),
+          value.id ? ne(teacherClassAssignments.id, value.id) : undefined));
+        if (duplicate) throw new SchoolAdminError("This teacher already has that class and subject assignment.");
+        const fields = { classId: value.classId, subjectId: value.subjectId, teacherId: value.teacherId, isPrimaryHomeroom: false };
+        const [saved] = value.id
+          ? await tx.update(teacherClassAssignments).set({ ...fields, updatedAt: new Date() })
+            .where(and(eq(teacherClassAssignments.id, value.id), eq(teacherClassAssignments.organizationId, org),
+              eq(teacherClassAssignments.isPrimaryHomeroom, false))).returning({ id: teacherClassAssignments.id })
+          : await tx.insert(teacherClassAssignments).values({ ...fields, organizationId: org }).returning({ id: teacherClassAssignments.id });
+        entityId = found(saved, "Subject assignment").id;
+        break;
+      }
+      case "teacher_subject_assignment_remove": {
+        const assignment = found((await tx.select({ id: teacherClassAssignments.id, isPrimaryHomeroom: teacherClassAssignments.isPrimaryHomeroom })
+          .from(teacherClassAssignments).where(and(eq(teacherClassAssignments.id, value.id), eq(teacherClassAssignments.organizationId, org))))[0], "Subject assignment");
+        if (assignment.isPrimaryHomeroom) throw new SchoolAdminError("Edit homeroom teachers through the class record.");
+        await tx.delete(teacherClassAssignments).where(and(eq(teacherClassAssignments.id, assignment.id),
+          eq(teacherClassAssignments.organizationId, org), eq(teacherClassAssignments.isPrimaryHomeroom, false)));
+        entityId = assignment.id;
+        break;
+      }
       case "subject": {
         const fields = { code: value.code, name: value.name, department: value.department || null };
         const [saved] = value.id
