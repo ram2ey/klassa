@@ -1,24 +1,33 @@
 import { and, desc, eq, gte, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { academicYears, announcements, attendanceRecords, attendanceSessions, classes, enrollments, gradeLevels,
-  guardianAbsenceNotes, organizations, reportCardSubjectGrades, reportCards, studentGuardians, students, subjects, terms } from "@/db/schema";
+  guardianAbsenceNotes, guardianConsents, guardians, organizations, reportCardSubjectGrades, reportCards, studentGuardians, students, subjects, terms } from "@/db/schema";
 import { requireGuardian } from "@/lib/action-access";
 
 export async function getGuardianPortalData() {
   const account = await requireGuardian();
   const guardianIds = account.guardians.map(guardian => guardian.id);
-  const legalLinks = await db.select({ guardianId: studentGuardians.guardianId, studentId: studentGuardians.studentId,
+  const linkedRows = await db.select({ guardianId: studentGuardians.guardianId, studentId: studentGuardians.studentId,
     organizationId: studentGuardians.organizationId, relationship: studentGuardians.relationship })
-    .from(studentGuardians).where(and(inArray(studentGuardians.guardianId, guardianIds), eq(studentGuardians.hasLegalResponsibility, true)));
+    .from(studentGuardians).innerJoin(students, and(eq(students.id, studentGuardians.studentId),
+      eq(students.organizationId, studentGuardians.organizationId)))
+    .where(and(inArray(studentGuardians.guardianId, guardianIds), eq(studentGuardians.hasLegalResponsibility, true)));
+  const legalLinks = linkedRows.filter(link => account.guardians.some(profile =>
+    profile.id === link.guardianId && profile.organizationId === link.organizationId));
   const studentIds = [...new Set(legalLinks.map(link => link.studentId))];
-  if (!studentIds.length) return { guardianName: account.name, students: [], announcements: [] };
+  if (!studentIds.length) return { guardianName: account.name, students: [], announcements: [], consents: [] };
 
   const orgIds = [...new Set(legalLinks.map(link => link.organizationId))];
-  const [studentRows, schoolRows, yearRows, classRows, gradeRows, termRows, enrollmentRows] = await Promise.all([
+  const [studentRows, schoolRows, guardianRows, consentRows, yearRows, classRows, gradeRows, termRows, enrollmentRows] = await Promise.all([
     db.select({ id: students.id, organizationId: students.organizationId, firstName: students.firstName,
       preferredName: students.preferredName, lastName: students.lastName, studentNumber: students.studentNumber, status: students.status })
       .from(students).where(inArray(students.id, studentIds)),
     db.select({ id: organizations.id, name: organizations.name }).from(organizations).where(inArray(organizations.id, orgIds)),
+    db.select({ id: guardians.id, organizationId: guardians.organizationId, firstName: guardians.firstName, lastName: guardians.lastName })
+      .from(guardians).where(inArray(guardians.id, guardianIds)),
+    db.select({ guardianId: guardianConsents.guardianId, organizationId: guardianConsents.organizationId,
+      mediaConsent: guardianConsents.mediaConsent, excursionConsent: guardianConsents.excursionConsent })
+      .from(guardianConsents).where(and(inArray(guardianConsents.guardianId, guardianIds), inArray(guardianConsents.organizationId, orgIds))),
     db.select().from(academicYears).where(and(inArray(academicYears.organizationId, orgIds), eq(academicYears.isCurrent, true))),
     db.select().from(classes).where(inArray(classes.organizationId, orgIds)),
     db.select().from(gradeLevels).where(inArray(gradeLevels.organizationId, orgIds)),
@@ -89,7 +98,21 @@ export async function getGuardianPortalData() {
   })).map(notice => ({ id: notice.id, title: notice.title, content: notice.content, priority: notice.priority,
     publishedAt: notice.publishedAt, schoolName: schoolRows.find(school => school.id === notice.organizationId)?.name ?? "School" }));
 
-  return { guardianName: account.name, students: studentsWithDetails, announcements: visibleNotices };
+  const consentProfiles = [...new Map(legalLinks.map(link => [`${link.organizationId}:${link.guardianId}`, link])).values()];
+  const consents = consentProfiles.map(profile => {
+    const consent = consentRows.find(row => row.guardianId === profile.guardianId && row.organizationId === profile.organizationId);
+    const guardian = guardianRows.find(row => row.id === profile.guardianId && row.organizationId === profile.organizationId);
+    const coveredIds = new Set(legalLinks.filter(link => link.guardianId === profile.guardianId && link.organizationId === profile.organizationId)
+      .map(link => link.studentId));
+    return { guardianId: profile.guardianId, schoolId: profile.organizationId,
+      schoolName: schoolRows.find(school => school.id === profile.organizationId)?.name ?? "School",
+      guardianName: guardian ? `${guardian.firstName} ${guardian.lastName}` : account.name,
+      studentNames: studentsWithDetails.filter(child => coveredIds.has(child.id) && child.schoolId === profile.organizationId)
+        .map(child => `${child.firstName} ${child.lastName}`),
+      mediaConsent: consent?.mediaConsent ?? false, excursionConsent: consent?.excursionConsent ?? false };
+  });
+
+  return { guardianName: account.name, students: studentsWithDetails, announcements: visibleNotices, consents };
 }
 
 export type GuardianPortalData = Awaited<ReturnType<typeof getGuardianPortalData>>;

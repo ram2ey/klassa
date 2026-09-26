@@ -10,6 +10,7 @@ import { accounts, guardianAbsenceNotes, guardians, organizations, studentGuardi
 import { requireGuardian, requireStaff } from "@/lib/action-access";
 import { logAuditEvent } from "@/lib/audit";
 import { loginUsername, usernameSchema } from "@/lib/login-identity";
+import { SchoolConsentError, updateGuardianSchoolConsent, type SchoolConsentInput } from "@/lib/guardian-school-consent-service";
 
 const provisionSchema = z.object({ guardianId: z.uuid(), username: usernameSchema, temporaryPassword: z.string().min(12).max(128) });
 class GuardianPortalError extends Error {}
@@ -88,5 +89,18 @@ export async function submitGuardianAbsenceNoteAction(raw: z.input<typeof absenc
     if (error instanceof z.ZodError) return { success: false as const, error: error.issues[0]?.message ?? "Check the note." };
     if (error instanceof GuardianPortalError) return { success: false as const, error: error.message };
     return { success: false as const, error: "The absence note could not be submitted. Refresh and try again." };
+  }
+}
+
+export async function updateGuardianSchoolConsentAction(input: SchoolConsentInput) {
+  const account = await requireGuardian();
+  try {
+    const result = await updateGuardianSchoolConsent(account, input);
+    revalidatePath("/");
+    return { success: true as const, ...result };
+  } catch (error) {
+    if (error instanceof z.ZodError) return { success: false as const, error: error.issues[0]?.message ?? "Check the consent choice." };
+    if (error instanceof SchoolConsentError) return { success: false as const, error: error.message };
+    return { success: false as const, error: "The consent choice could not be saved. Refresh and try again." };
   }
 }

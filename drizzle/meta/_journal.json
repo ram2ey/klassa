@@ -141,6 +141,13 @@
       "when": 1790357794494,
       "tag": "0019_gigantic_rocket_raccoon",
       "breakpoints": true
+    },
+    {
+      "idx": 20,
+      "version": "7",
+      "when": 1790403111616,
+      "tag": "0020_long_polaris",
+      "breakpoints": true
     }
   ]
 }

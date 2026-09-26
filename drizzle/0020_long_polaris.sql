@@ -1,0 +1,2 @@
+ALTER TABLE "guardian_consents" ADD COLUMN "media_consent" boolean DEFAULT false NOT NULL;--> statement-breakpoint
+ALTER TABLE "guardian_consents" ADD COLUMN "excursion_consent" boolean DEFAULT false NOT NULL;

@@ -533,6 +533,8 @@ export const guardianConsents = pgTable("guardian_consents", {
   optInSmsAnnouncements: boolean("opt_in_sms_announcements").default(true).notNull(),
   optInSmsAttendance: boolean("opt_in_sms_attendance").default(true).notNull(),
   optInSmsEmergency: boolean("opt_in_sms_emergency").default(true).notNull(),
+  mediaConsent: boolean("media_consent").default(false).notNull(),
+  excursionConsent: boolean("excursion_consent").default(false).notNull(),
   optOutReason: text("opt_out_reason"),
   optOutAt: timestamp("opt_out_at", { withTimezone: true }),
   ...timestamps,

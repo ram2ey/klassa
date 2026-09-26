@@ -5,6 +5,7 @@ import type { GuardianPortalData } from "@/lib/guardian-portal-data";
 
 vi.mock("@/components/account-sign-out", () => ({ AccountSignOut: () => null }));
 vi.mock("@/components/guardian-absence-note-form", () => ({ GuardianAbsenceNoteForm: () => null }));
+vi.mock("@/components/guardian-school-consents", () => ({ GuardianSchoolConsents: () => null }));
 
 const reportId = "11111111-1111-4111-8111-111111111111";
 const child = {
@@ -17,14 +18,14 @@ const child = {
 
 describe("guardian portal report links", () => {
   it("links each published report card to its printable page", () => {
-    const data = { guardianName: "Parent", students: [child], announcements: [] } as GuardianPortalData;
+    const data = { guardianName: "Parent", students: [child], announcements: [], consents: [] } as GuardianPortalData;
     const html = renderToStaticMarkup(<GuardianPortalWorkspace data={data} />);
     expect(html).toContain(`href="/reports/${reportId}"`);
     expect(html).toContain("Open printable report card");
   });
 
   it("does not show a printable link when there are no published reports", () => {
-    const data = { guardianName: "Parent", students: [{ ...child, reports: [] }], announcements: [] } as GuardianPortalData;
+    const data = { guardianName: "Parent", students: [{ ...child, reports: [] }], announcements: [], consents: [] } as GuardianPortalData;
     const html = renderToStaticMarkup(<GuardianPortalWorkspace data={data} />);
     expect(html).not.toContain("Open printable report card");
   });
