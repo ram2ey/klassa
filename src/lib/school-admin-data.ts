@@ -2,7 +2,7 @@ import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { academicYears, attendanceRecords, attendanceSessions, auditEvents, classes, courtRestrictions, enrollments, gradeLevels, guardians, needToKnowAlerts, organizationMemberships,
   organizations, reportCards, reportCardSubjectGrades, studentBehaviours, studentGuardians, students, subjects, teacherClassAssignments, terms, users,
-  guardianAbsenceNotes } from "@/db/schema";
+  guardianAbsenceNotes, guardianInquiries, guardianInquiryMessages } from "@/db/schema";
 import { requireStaff } from "@/lib/action-access";
 
 export async function getSchoolAdminData() {
@@ -49,8 +49,8 @@ export async function getSchoolAdminData() {
       prohibitDisclosure: courtRestrictions.prohibitDisclosure, effectiveDate: courtRestrictions.effectiveDate, expirationDate: courtRestrictions.expirationDate })
       .from(courtRestrictions).where(and(eq(courtRestrictions.organizationId, org), eq(courtRestrictions.isEnforced, true))),
   ]);
-  const publishedReportIds = publishedReports.map(r => r.id);
-  const [reportSubjects, behaviours, absenceNotes] = await Promise.all([
+  const publishedReportIds = publishedReports.map((r) => r.id);
+  const [reportSubjects, behaviours, absenceNotes, inquiryRows] = await Promise.all([
     publishedReportIds.length
       ? db.select().from(reportCardSubjectGrades).where(and(eq(reportCardSubjectGrades.organizationId, org), inArray(reportCardSubjectGrades.reportCardId, publishedReportIds)))
       : Promise.resolve([]),
@@ -60,10 +60,49 @@ export async function getSchoolAdminData() {
       status: guardianAbsenceNotes.status, createdAt: guardianAbsenceNotes.createdAt })
       .from(guardianAbsenceNotes).where(eq(guardianAbsenceNotes.organizationId, org))
       .orderBy(desc(guardianAbsenceNotes.createdAt)).limit(100),
+    db.select().from(guardianInquiries).where(eq(guardianInquiries.organizationId, org))
+      .orderBy(desc(guardianInquiries.updatedAt), desc(guardianInquiries.createdAt)).limit(200),
   ]);
+  const inquiryIds = inquiryRows.map(r => r.id);
+  const inquiryMessages = inquiryIds.length ? await db.select().from(guardianInquiryMessages)
+    .where(and(eq(guardianInquiryMessages.organizationId, org), inArray(guardianInquiryMessages.inquiryId, inquiryIds)))
+    .orderBy(guardianInquiryMessages.createdAt) : [];
+  const inquiries = inquiryRows.map(row => {
+    const student = studentRows.find(s => s.id === row.studentId);
+    const link = links.find(l => l.studentId === row.studentId);
+    const guardian = link ? guardianRows.find(g => g.id === link.guardianId) : null;
+    const klass = classRows.find(c => c.id === row.classId);
+    return {
+      id: row.id,
+      studentId: row.studentId,
+      studentName: student ? `${student.firstName} ${student.lastName}` : "Student",
+      studentNumber: student?.studentNumber ?? "",
+      guardianId: row.guardianId,
+      guardianName: guardian ? `${guardian.firstName} ${guardian.lastName}` : "Guardian",
+      guardianPhone: guardian?.phone,
+      guardianEmail: guardian?.email,
+      classId: row.classId,
+      className: klass?.name ?? "Class",
+      targetRole: row.targetRole,
+      title: row.title,
+      category: row.category as "academic" | "pastoral" | "attendance" | "general",
+      status: row.status,
+      closedAt: row.closedAt,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      messages: inquiryMessages.filter(m => m.inquiryId === row.id).map(m => ({
+        id: m.id,
+        senderType: m.senderType,
+        senderUserId: m.senderUserId,
+        senderName: m.senderName,
+        message: m.message,
+        createdAt: m.createdAt,
+      })),
+    };
+  });
   return { school, actor, students: studentRows, guardians: guardianRows, links, staff, classes: classRows, assignments,
     grades, years, terms: termRows, subjects: subjectRows, enrollments: enrollmentRows, audit, absenceNotes,
-    attendanceSummary, publishedReports, reportSubjects, behaviours, activeAlerts: activeAlerts.filter(alert => !alert.expiresAt || alert.expiresAt > new Date()),
+    attendanceSummary, publishedReports, reportSubjects, behaviours, inquiries, activeAlerts: activeAlerts.filter(alert => !alert.expiresAt || alert.expiresAt > new Date()),
     activeRestrictions: activeRestrictions.filter(restriction => restriction.effectiveDate <= new Date().toISOString().slice(0, 10) &&
       (!restriction.expirationDate || restriction.expirationDate >= new Date().toISOString().slice(0, 10))) };
 }

@@ -3,7 +3,7 @@ import { db } from "@/db";
 import { academicYears, assessmentCategories, assessmentGrades, assessments, attendanceRecords, attendanceSessions,
   classes, enrollments, gradeLevels, organizations, reportCards, reportCardSubjectGrades, students, subjects,
   teacherClassAssignments, terms, needToKnowAlerts, courtRestrictions, guardians, studentGuardians,
-  guardianAbsenceNotes, studentBehaviours } from "@/db/schema";
+  guardianAbsenceNotes, studentBehaviours, guardianInquiries, guardianInquiryMessages } from "@/db/schema";
 import { requireStaff } from "@/lib/action-access";
 import { buildTeacherSafetyNotices } from "@/lib/teacher-safety";
 
@@ -98,11 +98,50 @@ export async function getTeacherData(section: string, sessionDate: string) {
   const behaviourRows = studentIds.length ? await db.select().from(studentBehaviours)
     .where(and(eq(studentBehaviours.organizationId, org), inArray(studentBehaviours.studentId, studentIds)))
     .orderBy(desc(studentBehaviours.occurredAt), desc(studentBehaviours.createdAt)).limit(150) : [];
+  const inquiryRows = classIds.length ? await db.select().from(guardianInquiries)
+    .where(and(eq(guardianInquiries.organizationId, org), inArray(guardianInquiries.classId, classIds)))
+    .orderBy(desc(guardianInquiries.updatedAt), desc(guardianInquiries.createdAt)).limit(100) : [];
+  const inquiryIds = inquiryRows.map(r => r.id);
+  const inquiryMessages = inquiryIds.length ? await db.select().from(guardianInquiryMessages)
+    .where(and(eq(guardianInquiryMessages.organizationId, org), inArray(guardianInquiryMessages.inquiryId, inquiryIds)))
+    .orderBy(guardianInquiryMessages.createdAt) : [];
+  const inquiries = inquiryRows.map(row => {
+    const student = studentRows.find(s => s.id === row.studentId);
+    const guardianLink = guardianContacts.find(c => c.studentId === row.studentId);
+    const klass = classRows.find(c => c.id === row.classId);
+    return {
+      id: row.id,
+      studentId: row.studentId,
+      studentName: student ? `${student.firstName} ${student.lastName}` : "Student",
+      studentNumber: student?.studentNumber ?? "",
+      guardianId: row.guardianId,
+      guardianName: guardianLink?.guardian ? `${guardianLink.guardian.firstName} ${guardianLink.guardian.lastName}` : "Guardian",
+      guardianPhone: guardianLink?.guardian?.phone,
+      guardianEmail: guardianLink?.guardian?.email,
+      classId: row.classId,
+      className: klass?.name ?? "Class",
+      targetRole: row.targetRole,
+      title: row.title,
+      category: row.category as "academic" | "pastoral" | "attendance" | "general",
+      status: row.status,
+      closedAt: row.closedAt,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      messages: inquiryMessages.filter(m => m.inquiryId === row.id).map(m => ({
+        id: m.id,
+        senderType: m.senderType,
+        senderUserId: m.senderUserId,
+        senderName: m.senderName,
+        message: m.message,
+        createdAt: m.createdAt,
+      })),
+    };
+  });
   return { actor, school, currentYear, classes: classRows, assignments, homeroomClassIds: homeIds, gradeLevels: gradeLevelsRows,
     subjects: subjectsRows, terms: termRows, enrollments: enrollmentRows, students: studentRows,
     assessments: permittedAssessments, grades: gradeRows, categories: categoryRows, reports: reportRows, reportSubjects,
     sessions: sessionRows, records: recordRows, safety, guardianContacts, absenceNotes,
-    historySessions, historyRecords, publishedReports, behaviours: behaviourRows };
+    historySessions, historyRecords, publishedReports, behaviours: behaviourRows, inquiries };
 }
 
 export type TeacherData = Awaited<ReturnType<typeof getTeacherData>>;

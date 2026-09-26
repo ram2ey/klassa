@@ -10,6 +10,7 @@ import type { WorkflowCommand } from "@/lib/school-workflow-policy";
 import { formatGMTDateTime } from "@/lib/timezone";
 import { EmergencySmsBroadcast } from "@/components/emergency-sms-broadcast";
 import { TeacherBehaviourPanel } from "@/components/teacher-behaviour-panel";
+import { StaffInquiryList } from "@/components/staff-inquiry-list";
 
 const field = "min-h-11 w-full border border-slate-300 bg-white px-3 py-2 text-sm";
 const button = "min-h-11 bg-blue-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50";
@@ -147,6 +148,12 @@ export function SchoolAdminWorkflows({ section, date, base, data }: { section: s
           return { success: false, error: res.error };
         }}
         schoolName={base.school.name}
+      />
+      <StaffInquiryList
+        inquiries={base.inquiries ?? []}
+        title="Guardian Inquiries & Communications"
+        description="Review, triage, and reply to all parent and guardian inquiries submitted across the school."
+        isAdmin={true}
       />
       <Box title={editingAnnouncement ? "Edit announcement draft" : "Create in-app announcement"}><form key={editingAnnouncement?.id ?? "new-announcement"} className="space-y-3" onSubmit={event => submit(event, form => editingAnnouncement ? ({ kind: "announcement_update", announcementId: editingAnnouncement.id, title: string(form.get("title")), content: string(form.get("content")), targetType, targetId: targetType === "school" ? "all" : string(form.get("targetId")), priority: string(form.get("priority")) as "normal" | "important" }) : ({ kind: "announcement", title: string(form.get("title")), content: string(form.get("content")), targetType, targetId: targetType === "school" ? "all" : string(form.get("targetId")), priority: string(form.get("priority")) as "normal" | "important", status: string(form.get("status")) as "draft" | "published" }))}>
         <Input name="title" label="Title" defaultValue={editingAnnouncement?.title} /><label className="block text-sm font-medium">Message<textarea className={`${field} mt-1 min-h-28`} name="content" required defaultValue={editingAnnouncement?.content ?? ""} /></label>

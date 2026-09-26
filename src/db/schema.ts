@@ -37,6 +37,8 @@ export const platformIncidentSeverity = pgEnum("platform_incident_severity", ["w
 export const clinicVisitOutcome = pgEnum("clinic_visit_outcome", ["returned_to_class", "resting_in_clinic", "sent_home", "collected_by_guardian", "emergency_referral"]);
 export const receptionLogType = pgEnum("reception_log_type", ["late_arrival", "early_departure"]);
 export const behaviourType = pgEnum("behaviour_type", ["praise", "incident"]);
+export const guardianInquiryStatus = pgEnum("guardian_inquiry_status", ["open", "in_progress", "resolved"]);
+export const guardianInquirySenderType = pgEnum("guardian_inquiry_sender_type", ["guardian", "teacher", "school_admin", "office_staff"]);
 
 export const organizations = pgTable("organizations", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -705,6 +707,40 @@ export const studentBehaviours = pgTable("student_behaviours", {
   index("student_behaviours_class_idx").on(table.organizationId, table.classId),
 ]);
 
+export const guardianInquiries = pgTable("guardian_inquiries", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  guardianId: uuid("guardian_id").notNull().references(() => guardians.id, { onDelete: "cascade" }),
+  studentId: uuid("student_id").notNull().references(() => students.id, { onDelete: "cascade" }),
+  classId: uuid("class_id").references(() => classes.id, { onDelete: "set null" }),
+  assignedTeacherId: text("assigned_teacher_id").references(() => users.id, { onDelete: "set null" }),
+  targetRole: varchar("target_role", { length: 50 }).default("teacher").notNull(),
+  title: varchar("title", { length: 180 }).notNull(),
+  category: varchar("category", { length: 60 }).notNull(),
+  status: guardianInquiryStatus("status").default("open").notNull(),
+  closedAt: timestamp("closed_at", { withTimezone: true }),
+  closedBy: text("closed_by").references(() => users.id, { onDelete: "set null" }),
+  ...timestamps,
+}, (table) => [
+  index("guardian_inquiries_org_status_idx").on(table.organizationId, table.status),
+  index("guardian_inquiries_student_idx").on(table.organizationId, table.studentId),
+  index("guardian_inquiries_guardian_idx").on(table.organizationId, table.guardianId),
+  index("guardian_inquiries_class_idx").on(table.organizationId, table.classId),
+]);
+
+export const guardianInquiryMessages = pgTable("guardian_inquiry_messages", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  inquiryId: uuid("inquiry_id").notNull().references(() => guardianInquiries.id, { onDelete: "cascade" }),
+  senderType: guardianInquirySenderType("sender_type").notNull(),
+  senderUserId: text("sender_user_id").references(() => users.id, { onDelete: "set null" }),
+  senderName: varchar("sender_name", { length: 180 }).notNull(),
+  message: text("message").notNull(),
+  ...timestamps,
+}, (table) => [
+  index("guardian_inquiry_messages_org_inquiry_idx").on(table.organizationId, table.inquiryId),
+]);
+
 export const gdprRequests = pgTable("gdpr_requests", {
   id: uuid("id").defaultRandom().primaryKey(),
   organizationId: uuid("organization_id").references(() => organizations.id, { onDelete: "cascade" }).notNull(),
@@ -846,6 +882,8 @@ export const schema = {
   clinicVisits,
   receptionLogs,
   studentBehaviours,
+  guardianInquiries,
+  guardianInquiryMessages,
   gdprRequests,
   restoreDrills,
   rateLimitLogs,

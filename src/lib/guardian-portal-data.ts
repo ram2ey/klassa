@@ -1,7 +1,7 @@
 import { and, desc, eq, gte, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { academicYears, announcements, attendanceRecords, attendanceSessions, classes, enrollments, gradeLevels,
-  guardianAbsenceNotes, guardianConsents, guardians, organizations, reportCardSubjectGrades, reportCards, studentGuardians, students, subjects, terms } from "@/db/schema";
+  guardianAbsenceNotes, guardianConsents, guardianInquiries, guardianInquiryMessages, guardians, organizations, reportCardSubjectGrades, reportCards, studentGuardians, students, subjects, terms } from "@/db/schema";
 import { requireGuardian } from "@/lib/action-access";
 
 export async function getGuardianPortalData() {
@@ -15,7 +15,7 @@ export async function getGuardianPortalData() {
   const legalLinks = linkedRows.filter(link => account.guardians.some(profile =>
     profile.id === link.guardianId && profile.organizationId === link.organizationId));
   const studentIds = [...new Set(legalLinks.map(link => link.studentId))];
-  if (!studentIds.length) return { guardianName: account.name, students: [], announcements: [], consents: [] };
+  if (!studentIds.length) return { guardianName: account.name, students: [], announcements: [], consents: [], inquiries: [] };
 
   const orgIds = [...new Set(legalLinks.map(link => link.organizationId))];
   const [studentRows, schoolRows, guardianRows, consentRows, yearRows, classRows, gradeRows, termRows, enrollmentRows] = await Promise.all([
@@ -51,7 +51,7 @@ export async function getGuardianPortalData() {
   });
 
   const attendanceStart = new Date(); attendanceStart.setUTCDate(attendanceStart.getUTCDate() - 120);
-  const [attendanceRows, publishedCards, noticeRows, absenceNotes] = await Promise.all([
+  const [attendanceRows, publishedCards, noticeRows, absenceNotes, inquiryRows] = await Promise.all([
     db.select({ studentId: attendanceRecords.studentId, date: attendanceSessions.sessionDate,
       status: attendanceRecords.status, arrivalMinutesLate: attendanceRecords.arrivalMinutesLate })
       .from(attendanceRecords).innerJoin(attendanceSessions, eq(attendanceRecords.sessionId, attendanceSessions.id))
@@ -72,6 +72,9 @@ export async function getGuardianPortalData() {
       .from(guardianAbsenceNotes).where(and(inArray(guardianAbsenceNotes.organizationId, orgIds),
         inArray(guardianAbsenceNotes.guardianId, guardianIds), inArray(guardianAbsenceNotes.studentId, studentIds)))
       .orderBy(desc(guardianAbsenceNotes.createdAt)),
+    db.select().from(guardianInquiries).where(and(inArray(guardianInquiries.organizationId, orgIds),
+      inArray(guardianInquiries.guardianId, guardianIds)))
+      .orderBy(desc(guardianInquiries.updatedAt), desc(guardianInquiries.createdAt)),
   ]);
   const publishedSubjects = publishedCards.length ? await db.select({ reportCardId: reportCardSubjectGrades.reportCardId,
     subjectName: subjects.name, scorePercentage: reportCardSubjectGrades.scorePercentage,
@@ -112,7 +115,38 @@ export async function getGuardianPortalData() {
       mediaConsent: consent?.mediaConsent ?? false, excursionConsent: consent?.excursionConsent ?? false };
   });
 
-  return { guardianName: account.name, students: studentsWithDetails, announcements: visibleNotices, consents };
+  const inquiryIds = inquiryRows.map(row => row.id);
+  const inquiryMessages = inquiryIds.length ? await db.select().from(guardianInquiryMessages)
+    .where(and(inArray(guardianInquiryMessages.organizationId, orgIds), inArray(guardianInquiryMessages.inquiryId, inquiryIds)))
+    .orderBy(guardianInquiryMessages.createdAt) : [];
+
+  const serializedInquiries = inquiryRows.map(row => {
+    const student = authorizedStudentRows.find(s => s.id === row.studentId);
+    const school = schoolRows.find(s => s.id === row.organizationId);
+    return {
+      id: row.id,
+      studentId: row.studentId,
+      studentName: student ? `${student.preferredName || student.firstName} ${student.lastName}` : "Student",
+      schoolId: row.organizationId,
+      schoolName: school?.name ?? "School",
+      targetRole: row.targetRole,
+      title: row.title,
+      category: row.category as "academic" | "pastoral" | "attendance" | "general",
+      status: row.status,
+      closedAt: row.closedAt,
+      createdAt: row.createdAt,
+      updatedAt: row.updatedAt,
+      messages: inquiryMessages.filter(m => m.inquiryId === row.id).map(m => ({
+        id: m.id,
+        senderType: m.senderType,
+        senderName: m.senderName,
+        message: m.message,
+        createdAt: m.createdAt,
+      })),
+    };
+  });
+
+  return { guardianName: account.name, students: studentsWithDetails, announcements: visibleNotices, consents, inquiries: serializedInquiries };
 }
 
 export type GuardianPortalData = Awaited<ReturnType<typeof getGuardianPortalData>>;

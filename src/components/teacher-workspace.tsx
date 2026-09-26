@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Award, BookOpen, CalendarCheck, ChevronRight, ClipboardList, GraduationCap, LayoutDashboard, Megaphone, Menu, X } from "lucide-react";
+import { Award, BookOpen, CalendarCheck, ChevronRight, ClipboardList, GraduationCap, LayoutDashboard, Megaphone, Menu, MessageSquare, X } from "lucide-react";
 import { AccountSignOut } from "@/components/account-sign-out";
 import { saveTeacherWorkflowAction } from "@/app/actions/teacher-actions";
 import type { TeacherData } from "@/lib/teacher-data";
@@ -11,6 +11,7 @@ import { attendancePeriods, type AttendancePeriod, type WorkflowCommand } from "
 import type { announcements } from "@/db/schema";
 import { TeacherBehaviourPanel } from "@/components/teacher-behaviour-panel";
 import { StudentAcademicDrawer } from "@/components/student-academic-drawer";
+import { StaffInquiryList } from "@/components/staff-inquiry-list";
 
 const tabs = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -19,6 +20,7 @@ const tabs = [
   { id: "gradebook", label: "Gradebook", icon: BookOpen },
   { id: "reports", label: "Report cards", icon: ClipboardList },
   { id: "behaviour", label: "Behaviour & praise", icon: Award },
+  { id: "inquiries", label: "Inquiries", icon: MessageSquare },
   { id: "notices", label: "Notices", icon: Megaphone },
 ] as const;
 const inputStyle = "mt-1 block min-h-11 w-full border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-600";
@@ -134,9 +136,10 @@ export function TeacherWorkspace({ data, notices, section, date }: { data: Teach
         {message && <p role="status" className="border border-blue-200 bg-blue-50 p-3 text-sm text-blue-900">{message}</p>}
         {current.id === "overview" && (data.safety.alerts.length > 0 || data.safety.pickupWarnings.length > 0) && <Link href="/?section=classes" className="block border-l-4 border-amber-600 bg-amber-50 p-4 text-sm font-semibold text-amber-950">Active student safety information is on your class rosters. Review directives and pickup restrictions before class or dismissal.</Link>}
         {!data.classes.length && current.id !== "notices" && <div className="border border-amber-200 bg-amber-50 p-5 text-sm text-amber-900"><strong>No classes assigned yet.</strong><p className="mt-1">Ask your school administrator to assign you as a homeroom or subject teacher for the current year.</p></div>}
-        {current.id === "overview" && <><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">{[
+        {current.id === "overview" && <><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">{[
           { label: "Assigned classes", value: data.classes.length, href: "classes" },
           { label: "Active students", value: new Set(data.enrollments.filter(row => row.status === "active").map(row => row.studentId)).size, href: "classes" },
+          { label: "Open inquiries", value: (data.inquiries ?? []).filter(row => row.status === "open").length, href: "inquiries" },
           { label: "Praise merits", value: (data.behaviours ?? []).filter(row => row.type === "praise").reduce((sum, row) => sum + row.points, 0), href: "behaviour" },
           { label: "Assessments", value: data.assessments.length, href: "gradebook" },
         ].map(item => <Link key={item.label} href={`/?section=${item.href}`} className="border border-slate-200 bg-white p-5"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{item.label}</p><p className="mt-3 text-3xl font-bold">{item.value}</p></Link>)}</div><Card title="Your classes"><div className="grid gap-3 md:grid-cols-2">{data.classes.map(row => <Link key={row.id} href="/?section=classes" className="flex min-h-16 items-center justify-between border border-slate-200 p-4 text-sm hover:border-blue-500"><span><strong>{row.name}</strong><span className="ml-2 text-slate-500">{data.gradeLevels.find(grade => grade.id === row.gradeLevelId)?.name}</span></span><span className="text-slate-500">{roster(row.id).length} students</span></Link>)}</div></Card><Card title="Latest notices">{notices.slice(0, 3).map(notice => <div key={notice.id} className="border-b border-slate-100 py-3 text-sm"><strong>{notice.title}</strong><p className="mt-1 text-slate-600">{notice.content}</p></div>)}{!notices.length && <p className="text-sm text-slate-500">No published notices.</p>}</Card></>}
@@ -164,6 +167,14 @@ export function TeacherWorkspace({ data, notices, section, date }: { data: Teach
             defaultDate={date}
             pending={pending}
             onSave={save}
+          />
+        )}
+        {current.id === "inquiries" && (
+          <StaffInquiryList
+            inquiries={data.inquiries ?? []}
+            title="Guardian Inquiries"
+            description="Two-way messages and inquiries submitted by verified guardians of students in your assigned classes."
+            onOpenStudentDrawer={(id) => setDrawerStudentId(id)}
           />
         )}
         {current.id === "notices" && <TeacherClassAnnouncement classes={data.classes} pending={pending} onSave={save} />}

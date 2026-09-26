@@ -169,6 +169,13 @@
       "when": 1790420137715,
       "tag": "0023_sloppy_praxagora",
       "breakpoints": true
+    },
+    {
+      "idx": 24,
+      "version": "7",
+      "when": 1790425000000,
+      "tag": "0024_dazzling_inquiries",
+      "breakpoints": true
     }
   ]
 }

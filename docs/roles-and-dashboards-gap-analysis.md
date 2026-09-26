@@ -151,6 +151,15 @@ flowchart TD
      - Conduct praise/sanction event log with guardian portal visibility.
      - Verified guardian contacts with click-to-call, email, and pickup restriction alerts.
 
+8. **Guardian Two-Way Inquiry Messaging Inbox**:
+   - Integrated [`StaffInquiryList`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/staff-inquiry-list.tsx) into dedicated `Inquiries` tab with an open inquiry count indicator on the Overview KPI card:
+     - Filter between active (open / in progress), resolved, and all inquiries.
+     - Search and category dropdown (Academic, Pastoral, Attendance, General).
+     - Inline thread review with sender attribution and timestamping.
+     - Direct staff reply composer with automated status advancement to `in_progress`.
+     - Inquiry resolution controls with full audit logging.
+     - Direct integration with [`StudentAcademicDrawer`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/student-academic-drawer.tsx) to examine the student's profile before replying.
+
 #### What Remains Pending:
 1. **Teacher Assignment Preferences / Availability**:
    - Schedule availability and subject preference submission for upcoming academic periods.
@@ -202,6 +211,8 @@ flowchart TD
    - Integrated [`EmergencySmsBroadcast`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/emergency-sms-broadcast.tsx) into `Communications` tab via `smsDispatches` supporting whole-school, grade, and class emergency alerts with safety confirmation guards and delivery logs.
 5. **Student Academic Detail Drawer Integration**:
    - Integrated [`StudentAcademicDrawer`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/student-academic-drawer.tsx) into [`SchoolAdminStudentDirectory`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/school-admin-student-directory.tsx) displaying multi-term GPA progression, subject breakdowns, roll call attendance statistics, conduct points, and verified guardian contacts.
+6. **Guardian Two-Way Inquiry Management**:
+   - Integrated [`StaffInquiryList`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/staff-inquiry-list.tsx) into `Communications` tab in [`SchoolAdminWorkflows`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/school-admin-workflows.tsx), providing central administration, search, filtering, and response triage of parent inquiries across teachers and front office.
 
 #### What Remains Pending:
 1. **Term Closure & Gradebook Seal**:
@@ -212,7 +223,7 @@ flowchart TD
 ### Role 7: `guardian` (Parent / Family Portal)
 
 * **Current Status**: **Active Live Workspace** ([`GuardianPortalWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/guardian-portal-workspace.tsx)).
-* **Current Features**: Student cards, recent attendance, published report cards, absence notes, school notices.
+* **Current Features**: Student cards, recent attendance, published report cards, absence notes, school notices, two-way inquiries.
 
 #### What Has Been Added:
 1. **Printable Official Report Card Access**:
@@ -220,11 +231,16 @@ flowchart TD
    - Portal includes "Open printable report card" links for all published report cards.
 2. **School Consent Management**:
    - Embedded [`GuardianSchoolConsents`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/guardian-school-consents.tsx) allowing parents to grant or revoke photo, excursion, and digital learning permissions.
+3. **Two-Way School & Teacher Inquiry Messaging**:
+   - Integrated [`GuardianInquiriesPanel`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/guardian-inquiries-panel.tsx) into [`GuardianPortalWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/guardian-portal-workspace.tsx):
+     - Start inquiries targeted at homeroom teacher or school office/admin.
+     - Categorization: Academic progress & homework, Pastoral care & wellbeing, Attendance & absence follow-up, General school information.
+     - Full interactive conversation thread with staff replies.
+     - Reply box that automatically reopens resolved threads on follow-up questions.
+     - Guardian one-click "Mark as resolved" confirmation.
 
 #### What Remains Pending:
-1. **Two-Way School / Teacher Messaging**:
-   - Direct inquiry messaging with homeroom teachers beyond absence notes.
-2. **Daily Period Timetable**:
+1. **Daily Period Timetable**:
    - Student schedule view showing periods and classroom locations.
 
 ---
@@ -257,10 +273,10 @@ flowchart TD
 | **`safeguarding_lead`** | ✅ Active | ❌ | ❌ | ✅ Active (DSL scoped) | ⚠️ Read notices | ✅ Statutory disclosures & court admin | Low-level concern triage queue |
 | **`senco`** | ✅ Active | ❌ | ❌ | ✅ Active (SEN scoped) | ⚠️ Read notices | ⚠️ Case / directive admin | Formal SEN register tiers; IEP review date scheduling |
 | **`health_nurse`** | ✅ Active | ❌ | ❌ | ✅ Active (Health scoped)| ⚠️ Read notices | ✅ Clinic triage log & health admin | Prescription medication administration record (MAR) |
-| **`teacher`** | ✅ Active | ✅ Period & morning | ✅ Yes + Drawer | ⚠️ Safety alerts & pickup | ✅ Class & school notices | ❌ | Teacher assignment preferences |
+| **`teacher`** | ✅ Active | ✅ Period & morning | ✅ Yes + Drawer | ⚠️ Safety alerts & pickup | ✅ Notices & 2-way guardian inquiries | ❌ | Teacher assignment preferences |
 | **`office_staff`** | ✅ Active | ✅ Full absence follow-up | ❌ | ⚠️ Pickup & medical alerts | ✅ Emergency SMS trigger | ✅ Intake, emergency rolls & reception desk | Front desk clinic medication intake log |
-| **`school_admin`** | ✅ Active | ✅ Full oversight | ✅ Full | ✅ Full | ✅ Emergency SMS trigger | ✅ Full + Subject assignments + GDPR | Bulk term-end gradebook lock |
-| **`guardian`** | ✅ Active | ⚠️ Student history | ✅ Printable report cards | ❌ | ⚠️ Read notices | ⚠️ School consents | Direct 2-way messaging with teacher; student daily period timetable view |
+| **`school_admin`** | ✅ Active | ✅ Full oversight | ✅ Full | ✅ Full | ✅ Emergency SMS & 2-way inquiries | ✅ Full + Subject assignments + GDPR | Bulk term-end gradebook lock |
+| **`guardian`** | ✅ Active | ⚠️ Student history | ✅ Printable report cards | ❌ | ✅ 2-way inquiries & notices | ⚠️ School consents | Student daily period timetable view |
 | **`platform_admin`** | ✅ Active | ❌ (By design) | ❌ (By design) | ❌ (By design) | ✅ Platform-wide notice | ✅ Full + Restore drills + Tenant export | Direct UI trigger for automated restore drill execution |
 
 ---
@@ -282,6 +298,8 @@ flowchart TD
 | `restoreDrills` | `platform_admin` | `PlatformInvitations` | **Connected**: Disaster recovery drills visible |
 | `guardianAbsenceNotes` | `office_staff`, `school_admin`, `teacher`, `guardian` | `OfficeWorkspace`, `TeacherWorkspace`, `SchoolAdminWorkspace`, `GuardianPortalWorkspace` | **Connected**: Visible across all relevant roles |
 | `smsDispatches` | `school_admin`, `office_staff` | `SchoolAdminWorkspace`, `OfficeWorkspace` | **Connected**: Live emergency SMS broadcast trigger and audit history |
+| `guardianInquiries` | `guardian`, `teacher`, `school_admin`, `office_staff` | `GuardianPortalWorkspace`, `TeacherWorkspace`, `SchoolAdminWorkspace` | **Connected**: Two-way inquiry messaging threads with category & status lifecycle |
+| `guardianInquiryMessages` | `guardian`, `teacher`, `school_admin`, `office_staff` | `GuardianPortalWorkspace`, `TeacherWorkspace`, `SchoolAdminWorkspace` | **Connected**: Chronological message thread communication |
 
 ---
 
@@ -299,5 +317,7 @@ flowchart TD
    Added `studentBehaviours` table, `behaviour_log` command & service, and interactive conduct logger in [`TeacherWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/teacher-workspace.tsx) and [`SchoolAdminWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/school-admin-workspace.tsx).
 6. **[COMPLETED] Student Academic Detail Drawer & Historical Trends**:
    Added [`StudentAcademicDrawer`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/student-academic-drawer.tsx) with multi-term GPA progression trend bars, subject breakdowns, roll call attendance statistics, conduct events, and verified guardian contacts in [`TeacherWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/teacher-workspace.tsx) and [`SchoolAdminStudentDirectory`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/school-admin-student-directory.tsx).
-7. **Guardian Two-Way Messaging & Student Timetable**:
-   Add inquiry messaging and daily class schedules to `GuardianPortalWorkspace`.
+7. **[COMPLETED] Guardian Two-Way Messaging & Inquiry System**:
+   Added `guardianInquiries` and `guardianInquiryMessages` tables, audit trail, server actions, [`GuardianInquiriesPanel`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/guardian-inquiries-panel.tsx) in [`GuardianPortalWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/guardian-portal-workspace.tsx), and [`StaffInquiryList`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/staff-inquiry-list.tsx) in [`TeacherWorkspace`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/teacher-workspace.tsx) and [`SchoolAdminWorkflows`](file:///c:/Users/admin/Desktop/WEB/gradia-klasso/src/components/school-admin-workflows.tsx).
+8. **Student & Guardian Daily Period Timetable**:
+   Add student schedule view showing period-by-period class timetables, teachers, and room locations.
