@@ -12,6 +12,7 @@ import type { WorkflowCommand } from "@/lib/school-workflow-policy";
 import { saveSchoolRecord } from "@/lib/school-admin-service";
 import { saveSchoolWorkflow } from "@/lib/school-workflow-service";
 import { importSchoolStudents } from "@/lib/school-student-import";
+import { reviewAndExcuseGuardianAbsence } from "@/lib/office-absence-service";
 
 function failure(error: unknown) {
   if (error instanceof z.ZodError) return error.issues[0]?.message ?? "Check the form entries.";
@@ -66,5 +67,14 @@ export async function markGuardianAbsenceNoteReviewedAction(noteId: string) {
     });
     revalidatePath("/");
     return { success: true as const };
+  } catch (error) { return { success: false as const, error: failure(error) }; }
+}
+
+export async function reviewAndExcuseGuardianAbsenceAction(noteId: string) {
+  const actor = await requireStaff(["office_staff"]);
+  try {
+    const result = await reviewAndExcuseGuardianAbsence(actor, noteId);
+    revalidatePath("/");
+    return { success: true as const, ...result };
   } catch (error) { return { success: false as const, error: failure(error) }; }
 }

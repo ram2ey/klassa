@@ -3,11 +3,12 @@ import { db } from "@/db";
 import { academicYears, attendanceRecords, attendanceSessions, classes, courtRestrictions, enrollments,
   gradeLevels, guardianAbsenceNotes, guardians, organizations, studentGuardians, students, users } from "@/db/schema";
 import { requireStaff } from "@/lib/action-access";
+import { buildUnexplainedAbsenceCallList } from "@/lib/office-absence-followup";
 
 export async function getOfficeData(sessionDate: string) {
   const actor = await requireStaff(["office_staff"]);
   const org = actor.organizationId;
-  const [school, years, grades, classRows, studentRows, guardianRows, links, enrollmentRows, sessionRows, restrictions, absenceNotes] = await Promise.all([
+  const [school, years, grades, classRows, studentRows, guardianRows, links, enrollmentRows, sessionRows, restrictions, absenceNotes, dateNotes] = await Promise.all([
     db.select({ id: organizations.id, name: organizations.name, slug: organizations.slug }).from(organizations).where(eq(organizations.id, org)).then(rows => rows[0]),
     db.select().from(academicYears).where(eq(academicYears.organizationId, org)),
     db.select().from(gradeLevels).where(eq(gradeLevels.organizationId, org)).orderBy(gradeLevels.position),
@@ -28,13 +29,16 @@ export async function getOfficeData(sessionDate: string) {
       .from(guardianAbsenceNotes).innerJoin(guardians, eq(guardianAbsenceNotes.guardianId, guardians.id))
       .leftJoin(users, eq(guardianAbsenceNotes.reviewedBy, users.id)).where(eq(guardianAbsenceNotes.organizationId, org))
       .orderBy(desc(guardianAbsenceNotes.createdAt)).limit(200),
+    db.select({ studentId: guardianAbsenceNotes.studentId, absenceDate: guardianAbsenceNotes.absenceDate })
+      .from(guardianAbsenceNotes).where(and(eq(guardianAbsenceNotes.organizationId, org), eq(guardianAbsenceNotes.absenceDate, sessionDate))),
   ]);
   if (!school) throw new Error("School not found.");
   const sessionIds = sessionRows.map(row => row.id);
   const records = sessionIds.length ? await db.select().from(attendanceRecords)
     .where(and(eq(attendanceRecords.organizationId, org), inArray(attendanceRecords.sessionId, sessionIds))) : [];
+  const unexplainedAbsences = buildUnexplainedAbsenceCallList(sessionRows, records, dateNotes, links, guardianRows);
   return { actor, school, years, grades, classes: classRows, students: studentRows, guardians: guardianRows,
-    links, enrollments: enrollmentRows, sessions: sessionRows, records, restrictions, absenceNotes };
+    links, enrollments: enrollmentRows, sessions: sessionRows, records, restrictions, absenceNotes, unexplainedAbsences };
 }
 
 export type OfficeData = Awaited<ReturnType<typeof getOfficeData>>;
