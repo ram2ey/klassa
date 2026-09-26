@@ -10,6 +10,7 @@ import type { TeacherData } from "@/lib/teacher-data";
 import { attendancePeriods, type AttendancePeriod, type WorkflowCommand } from "@/lib/school-workflow-policy";
 import type { announcements } from "@/db/schema";
 import { TeacherBehaviourPanel } from "@/components/teacher-behaviour-panel";
+import { StudentAcademicDrawer } from "@/components/student-academic-drawer";
 
 const tabs = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -49,7 +50,7 @@ function StudentSafety({ studentId, safety }: { studentId: string; safety: Teach
   </div>;
 }
 
-function StudentContext({ studentId, data }: { studentId: string; data: TeacherData }) {
+function StudentContext({ studentId, data, onOpenProfile }: { studentId: string; data: TeacherData; onOpenProfile?: () => void }) {
   const contacts = data.guardianContacts?.filter(row => row.studentId === studentId) ?? [];
   const primary = contacts.find(row => row.isPrimary) ?? contacts[0];
   const marks = data.historyRecords?.filter(row => row.studentId === studentId) ?? [];
@@ -60,6 +61,7 @@ function StudentContext({ studentId, data }: { studentId: string; data: TeacherD
       <p>Primary contact: {primary?.guardian ? <>{primary.guardian.firstName} {primary.guardian.lastName} {primary.guardian.phone && <a href={`tel:${primary.guardian.phone}`} className="underline">{primary.guardian.phone}</a>} {primary.guardian.email && <a href={`mailto:${primary.guardian.email}`} className="underline">{primary.guardian.email}</a>}</> : "No linked guardian"}</p>
       <p>Recent morning attendance: {marks.length ? `${present}/${marks.length} present` : "No submitted marks"}</p>
       <p>Published reports: {reports.length ? reports.slice(0, 3).map(row => `${data.terms.find(term => term.id === row.termId)?.name ?? "Term"}: ${row.overallPercentage ?? "—"}%`).join(" · ") : "None"}</p>
+      {onOpenProfile && <p><button type="button" onClick={onOpenProfile} className="font-semibold text-blue-700 hover:underline">Open full academic profile & trends →</button></p>}
     </div></details>;
 }
 
@@ -98,7 +100,19 @@ export function TeacherWorkspace({ data, notices, section, date }: { data: Teach
     .map(row => data.students.find(student => student.id === row.studentId)).filter((student): student is NonNullable<typeof student> => !!student);
   const allowedSubjects = (id: string) => data.homeroomClassIds.includes(id) ? data.subjects : data.subjects.filter(subject =>
     data.assignments.some(item => item.classId === id && item.subjectId === subject.id));
+  const [drawerStudentId, setDrawerStudentId] = useState<string | null>(null);
   const selectedAssessment = data.assessments.find(row => row.id === activeAssessmentId);
+  const drawerStudent = drawerStudentId ? data.students.find(s => s.id === drawerStudentId) : null;
+  const drawerStudentEnrollment = drawerStudent ? data.enrollments.find(e => e.studentId === drawerStudent.id && e.status === "active") : null;
+  const drawerStudentClass = drawerStudentEnrollment ? data.classes.find(c => c.id === drawerStudentEnrollment.classId) : null;
+  const drawerStudentGrade = drawerStudentClass ? data.gradeLevels.find(g => g.id === drawerStudentClass.gradeLevelId) : null;
+  const drawerStudentPlacement = drawerStudentClass ? `${drawerStudentGrade?.name ? `${drawerStudentGrade.name} / ` : ""}${drawerStudentClass.name} · ${data.currentYear?.name ?? ""}` : undefined;
+  const drawerStudentGuardians = drawerStudent ? (data.guardianContacts?.filter(c => c.studentId === drawerStudent.id) ?? []).map(c => ({ firstName: c.guardian?.firstName ?? "", lastName: c.guardian?.lastName ?? "", phone: c.guardian?.phone, email: c.guardian?.email, relationship: "guardian", isPrimary: c.isPrimary })) : [];
+  const drawerStudentSafety = drawerStudent ? [ ...(data.safety.alerts.filter(a => a.studentId === drawerStudent.id).map(a => ({ type: "directive" as const, title: words(a.category), detail: `${words(a.severity)}: ${a.directiveSummary}` }))), ...(data.safety.pickupWarnings.filter(id => id === drawerStudent.id).map(() => ({ type: "pickup" as const, title: "Pickup restriction", detail: "Verify any release with front office" }))) ] : [];
+  const drawerStudentReports = drawerStudent ? (data.publishedReports ?? []).filter(r => r.studentId === drawerStudent.id) : [];
+  const drawerStudentReportSubjects = drawerStudent ? (data.reportSubjects ?? []).filter(rs => drawerStudentReports.some(r => r.id === rs.reportCardId)) : [];
+  const drawerStudentMarks = drawerStudent ? (data.historyRecords?.filter(m => m.studentId === drawerStudent.id) ?? []) : [];
+  const drawerStudentBehaviours = drawerStudent ? (data.behaviours?.filter(b => b.studentId === drawerStudent.id) ?? []) : [];
   const save = (command: WorkflowCommand) => start(async () => {
     setMessage("");
     const result = await saveTeacherWorkflowAction(command);
@@ -129,7 +143,7 @@ export function TeacherWorkspace({ data, notices, section, date }: { data: Teach
         {current.id === "classes" && <div className="space-y-5">{data.classes.map(row => <Card key={row.id} title={`${data.gradeLevels.find(grade => grade.id === row.gradeLevelId)?.name ?? "Grade"} / ${row.name}`}><p className="mb-3 text-sm text-slate-500">{data.homeroomClassIds.includes(row.id) ? "Homeroom teacher" : `Subject teacher: ${allowedSubjects(row.id).map(item => item.name).join(", ")}`}</p><div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b border-slate-200 text-slate-500"><th className="py-2">Student</th><th>Student number</th><th>Status</th><th>Safety information</th></tr></thead><tbody>{roster(row.id).map(student => {
           const merits = (data.behaviours ?? []).filter(b => b.studentId === student.id && b.type === "praise").reduce((sum, b) => sum + b.points, 0);
           const incidents = (data.behaviours ?? []).filter(b => b.studentId === student.id && b.type === "incident").reduce((sum, b) => sum + b.points, 0);
-          return <tr key={student.id} className="border-b border-slate-100"><td className="py-3 font-medium"><div className="flex flex-wrap items-center gap-2"><span>{student.firstName} {student.lastName}</span>{merits > 0 && <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-800">+{merits} merits</span>}{incidents > 0 && <span className="rounded bg-rose-50 px-1.5 py-0.5 text-[11px] font-semibold text-rose-800">-{incidents}</span>}</div><StudentContext studentId={student.id} data={data} /></td><td>{student.studentNumber}</td><td>{words(student.status)}</td><td className="min-w-72 py-3"><StudentSafety studentId={student.id} safety={data.safety} /></td></tr>;
+          return <tr key={student.id} className="border-b border-slate-100"><td className="py-3 font-medium"><div className="flex flex-wrap items-center gap-2"><button type="button" onClick={() => setDrawerStudentId(student.id)} className="cursor-pointer font-semibold text-blue-900 hover:text-blue-700 hover:underline text-left">{student.firstName} {student.lastName}</button>{merits > 0 && <span className="rounded bg-emerald-50 px-1.5 py-0.5 text-[11px] font-semibold text-emerald-800">+{merits} merits</span>}{incidents > 0 && <span className="rounded bg-rose-50 px-1.5 py-0.5 text-[11px] font-semibold text-rose-800">-{incidents}</span>}</div><StudentContext studentId={student.id} data={data} onOpenProfile={() => setDrawerStudentId(student.id)} /></td><td>{student.studentNumber}</td><td>{words(student.status)}</td><td className="min-w-72 py-3"><StudentSafety studentId={student.id} safety={data.safety} /></td></tr>;
         })}</tbody></table>{!roster(row.id).length && <p className="py-4 text-slate-500">No active students enrolled.</p>}</div></Card>)}</div>}
         {current.id === "attendance" && <Card title="Class attendance"><div className="grid gap-3 sm:grid-cols-3"><Select label="Session period" name="period" choices={attendancePeriods.map(period => ({ id: period, name: period === "morning_roll_call" ? "Morning roll call" : words(period) }))} value={attendancePeriod} onChange={value => setAttendancePeriod(value as AttendancePeriod)} /><Select label="Class" name="classId" choices={attendanceClasses.map(row => ({ id: row.id, name: row.name }))} value={attendanceClassId} onChange={setClassId} /><form onSubmit={event => { event.preventDefault(); router.push(`/?section=attendance&date=${encodeURIComponent(str(new FormData(event.currentTarget), "date"))}`); }}><Field label="Date" name="date" type="date" defaultValue={date} /><button type="submit" className={`${secondary} mt-2`}>Load date</button></form></div>
           {attendanceClasses.length === 0 && <p className="mt-4 text-sm text-slate-500">No classes are assigned for this attendance period.</p>}
@@ -155,5 +169,24 @@ export function TeacherWorkspace({ data, notices, section, date }: { data: Teach
         {current.id === "notices" && <TeacherClassAnnouncement classes={data.classes} pending={pending} onSave={save} />}
         {current.id === "notices" && <Card title="Published school notices">{notices.map(notice => <article key={notice.id} className="border-b border-slate-100 py-4"><div className="flex justify-between gap-3"><h3 className="font-semibold">{notice.title}</h3><span className="text-xs text-slate-500">{words(notice.priority)}</span></div><p className="mt-2 whitespace-pre-wrap text-sm text-slate-700">{notice.content}</p></article>)}{!notices.length && <p className="text-sm text-slate-500">No published notices for your classes.</p>}</Card>}
       </main></div>
+    {drawerStudent && (
+      <StudentAcademicDrawer
+        student={drawerStudent}
+        classPlacement={drawerStudentPlacement}
+        academicYears={data.currentYear ? [data.currentYear] : []}
+        classes={data.classes}
+        gradeLevels={data.gradeLevels}
+        subjects={data.subjects}
+        terms={data.terms}
+        enrollments={data.enrollments}
+        reports={drawerStudentReports}
+        reportSubjects={drawerStudentReportSubjects}
+        historyMarks={drawerStudentMarks}
+        behaviours={drawerStudentBehaviours}
+        guardians={drawerStudentGuardians}
+        safetyNotices={drawerStudentSafety}
+        onClose={() => setDrawerStudentId(null)}
+      />
+    )}
   </div>;
 }

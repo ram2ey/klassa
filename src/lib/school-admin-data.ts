@@ -1,7 +1,7 @@
 import { and, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { academicYears, attendanceRecords, attendanceSessions, auditEvents, classes, courtRestrictions, enrollments, gradeLevels, guardians, needToKnowAlerts, organizationMemberships,
-  organizations, reportCards, studentGuardians, students, subjects, teacherClassAssignments, terms, users,
+  organizations, reportCards, reportCardSubjectGrades, studentBehaviours, studentGuardians, students, subjects, teacherClassAssignments, terms, users,
   guardianAbsenceNotes } from "@/db/schema";
 import { requireStaff } from "@/lib/action-access";
 
@@ -40,7 +40,7 @@ export async function getSchoolAdminData() {
       .where(and(eq(attendanceRecords.organizationId, org), inArray(attendanceSessions.status, ["submitted", "locked"])))
       .groupBy(attendanceRecords.studentId),
     db.select({ id: reportCards.id, studentId: reportCards.studentId, termId: reportCards.termId, version: reportCards.version,
-      gpa: reportCards.gpa, overallPercentage: reportCards.overallPercentage, attendanceRate: reportCards.attendanceRate, createdAt: reportCards.createdAt })
+      gpa: reportCards.gpa, overallPercentage: reportCards.overallPercentage, attendanceRate: reportCards.attendanceRate, teacherRemarks: reportCards.teacherRemarks, publishedAt: reportCards.publishedAt, createdAt: reportCards.createdAt })
       .from(reportCards).where(and(eq(reportCards.organizationId, org), eq(reportCards.status, "published"))).orderBy(desc(reportCards.createdAt)),
     db.select({ studentId: needToKnowAlerts.studentId, category: needToKnowAlerts.category, severity: needToKnowAlerts.severity,
       expiresAt: needToKnowAlerts.expiresAt }).from(needToKnowAlerts)
@@ -49,14 +49,21 @@ export async function getSchoolAdminData() {
       prohibitDisclosure: courtRestrictions.prohibitDisclosure, effectiveDate: courtRestrictions.effectiveDate, expirationDate: courtRestrictions.expirationDate })
       .from(courtRestrictions).where(and(eq(courtRestrictions.organizationId, org), eq(courtRestrictions.isEnforced, true))),
   ]);
-  const absenceNotes = await db.select({ id: guardianAbsenceNotes.id, studentId: guardianAbsenceNotes.studentId,
-    absenceDate: guardianAbsenceNotes.absenceDate, reasonCategory: guardianAbsenceNotes.reasonCategory,
-    status: guardianAbsenceNotes.status, createdAt: guardianAbsenceNotes.createdAt })
-    .from(guardianAbsenceNotes).where(eq(guardianAbsenceNotes.organizationId, org))
-    .orderBy(desc(guardianAbsenceNotes.createdAt)).limit(100);
+  const publishedReportIds = publishedReports.map(r => r.id);
+  const [reportSubjects, behaviours, absenceNotes] = await Promise.all([
+    publishedReportIds.length
+      ? db.select().from(reportCardSubjectGrades).where(and(eq(reportCardSubjectGrades.organizationId, org), inArray(reportCardSubjectGrades.reportCardId, publishedReportIds)))
+      : Promise.resolve([]),
+    db.select().from(studentBehaviours).where(eq(studentBehaviours.organizationId, org)).orderBy(desc(studentBehaviours.occurredAt), desc(studentBehaviours.createdAt)).limit(500),
+    db.select({ id: guardianAbsenceNotes.id, studentId: guardianAbsenceNotes.studentId,
+      absenceDate: guardianAbsenceNotes.absenceDate, reasonCategory: guardianAbsenceNotes.reasonCategory,
+      status: guardianAbsenceNotes.status, createdAt: guardianAbsenceNotes.createdAt })
+      .from(guardianAbsenceNotes).where(eq(guardianAbsenceNotes.organizationId, org))
+      .orderBy(desc(guardianAbsenceNotes.createdAt)).limit(100),
+  ]);
   return { school, actor, students: studentRows, guardians: guardianRows, links, staff, classes: classRows, assignments,
     grades, years, terms: termRows, subjects: subjectRows, enrollments: enrollmentRows, audit, absenceNotes,
-    attendanceSummary, publishedReports, activeAlerts: activeAlerts.filter(alert => !alert.expiresAt || alert.expiresAt > new Date()),
+    attendanceSummary, publishedReports, reportSubjects, behaviours, activeAlerts: activeAlerts.filter(alert => !alert.expiresAt || alert.expiresAt > new Date()),
     activeRestrictions: activeRestrictions.filter(restriction => restriction.effectiveDate <= new Date().toISOString().slice(0, 10) &&
       (!restriction.expirationDate || restriction.expirationDate >= new Date().toISOString().slice(0, 10))) };
 }

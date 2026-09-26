@@ -6,6 +6,7 @@ import Link from "next/link";
 import type { SchoolAdminData } from "@/lib/school-admin-data";
 import { Button } from "@/components/ui/button";
 import { bulkUpdateSchoolStudentsAction } from "@/app/actions/school-admin-actions";
+import { StudentAcademicDrawer } from "@/components/student-academic-drawer";
 
 type Props = {
   data: SchoolAdminData;
@@ -57,6 +58,9 @@ export function SchoolAdminStudentDirectory({ data, query, currentYearId, onEnro
   const selectedStudents = data.students.filter(student => selected.includes(student.id));
   const student = data.students.find(item => item.id === profileId);
   const currentEnrollment = student && data.enrollments.find(item => item.studentId === student.id && item.academicYearId === currentYearId);
+  const currentClass = currentEnrollment ? data.classes.find(c => c.id === currentEnrollment.classId) : null;
+  const currentGrade = currentClass ? data.grades.find(g => g.id === currentClass.gradeLevelId) : null;
+  const classPlacement = currentClass ? `${currentGrade?.name ? `${currentGrade.name} / ` : ""}${currentClass.name} · ${currentYearId ? data.years.find(y => y.id === currentYearId)?.name ?? "" : ""}` : "Not assigned";
   const guardianLinks = student ? data.links.filter(link => link.studentId === student.id) : [];
   const studentAlerts = student ? data.activeAlerts.filter(item => item.studentId === student.id) : [];
   const studentRestrictions = student ? data.activeRestrictions.filter(item => item.studentId === student.id) : [];
@@ -124,6 +128,43 @@ export function SchoolAdminStudentDirectory({ data, query, currentYearId, onEnro
       })}</tbody></table></div>
       {students.length === 0 ? <p className="px-6 py-12 text-center text-sm text-slate-500">No students match this view.</p> : <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 px-4 py-3 text-sm text-slate-600"><span>Showing {Math.min(students.length, (safePage - 1) * PAGE_SIZE + 1)}–{Math.min(students.length, safePage * PAGE_SIZE)} of {students.length} students</span><div className="flex gap-2"><Button variant="secondary" className="min-h-10" disabled={safePage === 1} onClick={() => setPage(safePage - 1)}>Previous</Button><span className="flex min-h-10 items-center px-2">Page {safePage} of {pages}</span><Button variant="secondary" className="min-h-10" disabled={safePage === pages} onClick={() => setPage(safePage + 1)}>Next</Button></div></div>}
     </section>
-    {student && <div className="fixed inset-0 z-50 flex justify-end bg-slate-950/40" onMouseDown={event => { if (event.target === event.currentTarget) setProfileId(null); }}><aside role="dialog" aria-modal="true" aria-labelledby="student-profile-title" className="h-full w-full max-w-xl overflow-y-auto bg-white shadow-xl"><div className="flex items-center justify-between border-b border-slate-200 p-5"><div><p className="text-xs uppercase tracking-wide text-slate-500">Student profile</p><h2 id="student-profile-title" className="mt-1 text-xl font-bold">{student.firstName} {student.lastName}</h2></div><button aria-label="Close student profile" className="min-h-11 min-w-11 border border-slate-300" onClick={() => setProfileId(null)}>×</button></div><div className="space-y-6 p-5"><section><h3 className="font-semibold">Student details</h3><dl className="mt-3 grid grid-cols-2 gap-4 text-sm"><div><dt className="text-slate-500">Student number</dt><dd className="mt-1 font-mono">{student.studentNumber}</dd></div><div><dt className="text-slate-500">Date of birth</dt><dd className="mt-1">{student.dateOfBirth}</dd></div><div><dt className="text-slate-500">Status</dt><dd className="mt-1">{student.status}</dd></div><div><dt className="text-slate-500">External reference</dt><dd className="mt-1">{student.externalReference || "Not recorded"}</dd></div></dl></section><section><h3 className="font-semibold">Current placement</h3><p className="mt-2 text-sm text-slate-600">{data.classes.find(row => row.id === currentEnrollment?.classId)?.name ?? "No class assigned"} · {currentYearId ? data.years.find(row => row.id === currentYearId)?.name : "No current year"}</p><h4 className="mt-4 text-sm font-semibold">Enrollment history</h4><ul className="mt-2 space-y-2 text-sm">{data.enrollments.filter(row => row.studentId === student.id).map(row => <li key={row.id} className="border-l-2 border-blue-200 pl-3">{data.years.find(year => year.id === row.academicYearId)?.name ?? "Academic year"} · {data.classes.find(klass => klass.id === row.classId)?.name ?? "No class"} · {row.status}</li>)}{!data.enrollments.some(row => row.studentId === student.id) && <li className="text-slate-500">No enrollment history.</li>}</ul></section><section><h3 className="font-semibold">Attendance</h3>{attendance ? <p className="mt-2 text-sm text-slate-600">{Math.round(Number(attendance.attended) / Number(attendance.total) * 100)}% attendance · {attendance.total} submitted days · {attendance.absent} absent</p> : <p className="mt-2 text-sm text-slate-500">No submitted attendance history.</p>}</section><section><h3 className="font-semibold">Published report cards</h3><ul className="mt-2 space-y-2 text-sm">{reportHistory.map(card => <li key={card.id} className="border border-slate-200 p-3"><strong>{data.terms.find(term => term.id === card.termId)?.name ?? "Term"}</strong><span className="ml-2 text-slate-600">{card.overallPercentage == null ? "No overall score" : `${card.overallPercentage}%`}{card.gpa == null ? "" : ` · GPA ${card.gpa}`}</span></li>)}{!reportHistory.length && <li className="text-slate-500">No published report cards.</li>}</ul></section><section><h3 className="font-semibold">Guardian contacts</h3><ul className="mt-2 space-y-2 text-sm">{guardianLinks.map(link => { const guardian = data.guardians.find(row => row.id === link.guardianId); return guardian && <li key={link.id} className="border border-slate-200 p-3"><strong>{guardian.firstName} {guardian.lastName}</strong><p className="mt-1 text-slate-600">{guardian.email || "No email"} · {guardian.phone || "No phone"}</p><p className="text-xs text-slate-500">{link.relationship}{link.isPrimary ? " · Primary contact" : ""}{link.hasLegalResponsibility ? " · Legal responsibility" : ""}</p></li>; })}{guardianLinks.length === 0 && <li className="text-slate-500">No guardian linked.</li>}</ul></section>{(studentAlerts.length > 0 || studentRestrictions.length > 0) && <section className="border border-amber-200 bg-amber-50 p-4"><h3 className="font-semibold text-amber-950">Restricted records require review</h3><p className="mt-1 text-sm text-amber-900">{studentAlerts.length > 0 && "An active staff directive is on file. "}{studentRestrictions.length > 0 && "A current safety restriction is on file. "}Details are kept out of this directory profile.</p><Link className="mt-3 inline-flex min-h-10 items-center font-semibold text-blue-800 underline" href="/?section=sensitive">Review in Sensitive records</Link></section>}<Button className="min-h-11" onClick={() => { onEdit(student, currentEnrollment?.classId ?? ""); setProfileId(null); }}>Edit student details</Button></div></aside></div>}
+    {student && (
+      <StudentAcademicDrawer
+        student={student}
+        classPlacement={classPlacement}
+        academicYears={data.years}
+        terms={data.terms}
+        subjects={data.subjects}
+        classes={data.classes}
+        gradeLevels={data.grades}
+        enrollments={data.enrollments}
+        reports={reportHistory}
+        reportSubjects={data.reportSubjects ?? []}
+        attendance={attendance ? { total: Number(attendance.total), attended: Number(attendance.attended), absent: Number(attendance.absent) } : undefined}
+        behaviours={(data.behaviours ?? []).filter(b => b.studentId === student.id)}
+        guardians={guardianLinks.map(link => {
+          const guardian = data.guardians.find(row => row.id === link.guardianId);
+          return {
+            id: link.id,
+            firstName: guardian?.firstName ?? "",
+            lastName: guardian?.lastName ?? "",
+            phone: guardian?.phone,
+            email: guardian?.email,
+            relationship: link.relationship,
+            isPrimary: link.isPrimary,
+            hasLegalResponsibility: link.hasLegalResponsibility,
+          };
+        })}
+        safetyNotices={[
+          ...studentAlerts.map(a => ({ type: "directive" as const, title: a.category.replace(/_/g, " "), detail: `Active directive (${a.severity})` })),
+          ...studentRestrictions.map(r => ({ type: "pickup" as const, title: "Safety restriction", detail: "Enforced court order on file" })),
+        ]}
+        onClose={() => setProfileId(null)}
+        onEditStudent={() => {
+          onEdit(student, currentEnrollment?.classId ?? "");
+          setProfileId(null);
+        }}
+      />
+    )}
   </>;
 }

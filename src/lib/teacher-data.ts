@@ -61,7 +61,8 @@ export async function getTeacherData(section: string, sessionDate: string) {
       .orderBy(desc(attendanceSessions.sessionDate)).limit(300) : Promise.resolve([]),
     section === "classes" ? db.select({ id: reportCards.id, studentId: reportCards.studentId,
       termId: reportCards.termId, overallPercentage: reportCards.overallPercentage,
-      attendanceRate: reportCards.attendanceRate }).from(reportCards).where(and(
+      gpa: reportCards.gpa, attendanceRate: reportCards.attendanceRate, version: reportCards.version,
+      teacherRemarks: reportCards.teacherRemarks, publishedAt: reportCards.publishedAt }).from(reportCards).where(and(
       eq(reportCards.organizationId, org), inArray(reportCards.studentId, studentIds),
       eq(reportCards.status, "published"))).orderBy(desc(reportCards.publishedAt)).limit(200) : Promise.resolve([]),
   ]) : [[], [], [], [], []];
@@ -71,7 +72,7 @@ export async function getTeacherData(section: string, sessionDate: string) {
       inArray(attendanceRecords.studentId, studentIds))) : [];
   const guardianContacts = guardianLinks.map(link => ({ studentId: link.studentId, isPrimary: link.isPrimary,
     guardian: guardianRows.find(row => row.id === link.guardianId) })).filter(link => !!link.guardian);
-  const termRows = currentYear ? await db.select().from(terms).where(and(eq(terms.organizationId, org), eq(terms.academicYearId, currentYear.id))) : [];
+  const termRows = await db.select().from(terms).where(eq(terms.organizationId, org)).orderBy(terms.position);
   const assessmentRows = classIds.length && ["overview", "gradebook", "reports"].includes(section) ? await db.select().from(assessments)
     .where(and(eq(assessments.organizationId, org), inArray(assessments.classId, classIds))).orderBy(desc(assessments.dateDue)) : [];
   const permittedAssessments = assessmentRows.filter(row => homeroomIds.has(row.classId) ||
@@ -84,9 +85,9 @@ export async function getTeacherData(section: string, sessionDate: string) {
   const homeIds = [...homeroomIds];
   const reportRows = homeIds.length && section === "reports" ? await db.select().from(reportCards)
     .where(and(eq(reportCards.organizationId, org), inArray(reportCards.classId, homeIds))).orderBy(desc(reportCards.createdAt)) : [];
-  const reportIds = reportRows.map(row => row.id);
-  const reportSubjects = reportIds.length ? await db.select().from(reportCardSubjectGrades)
-    .where(and(eq(reportCardSubjectGrades.organizationId, org), inArray(reportCardSubjectGrades.reportCardId, reportIds))) : [];
+  const relevantReportIds = section === "reports" ? reportRows.map(row => row.id) : section === "classes" ? publishedReports.map(row => row.id) : [];
+  const reportSubjects = relevantReportIds.length ? await db.select().from(reportCardSubjectGrades)
+    .where(and(eq(reportCardSubjectGrades.organizationId, org), inArray(reportCardSubjectGrades.reportCardId, relevantReportIds))) : [];
   const loadedSessions = classIds.length && section === "attendance" ? await db.select().from(attendanceSessions)
     .where(and(eq(attendanceSessions.organizationId, org), inArray(attendanceSessions.classId, classIds), eq(attendanceSessions.sessionDate, sessionDate))) : [];
   const sessionRows = loadedSessions.filter(row => row.period === "morning_roll_call" ? homeroomIds.has(row.classId) :
