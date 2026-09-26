@@ -10,6 +10,8 @@ import { SchoolAdminError } from "@/lib/school-admin-policy";
 import { workflowCommandSchema, type WorkflowCommand } from "@/lib/school-workflow-policy";
 import { calculateWeightedTermGrade, scoreToGrade } from "@/lib/assessments";
 import { decryptNarrative, encryptNarrative } from "@/lib/narrative-crypto";
+import { canUserAccessCaseArea } from "@/lib/sensitive-records";
+import { canSpecialistRunCommand, isSpecialistRole } from "@/lib/specialist-access";
 
 type Actor = Awaited<ReturnType<typeof requireStaff>>;
 function found<T>(row: T | undefined, label: string): T {
@@ -19,9 +21,10 @@ function found<T>(row: T | undefined, label: string): T {
 function decimal(value: number) { return value.toFixed(2); }
 
 export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
-  if (actor.role !== "school_admin" && actor.role !== "teacher" && actor.role !== "office_staff") throw new SchoolAdminError("School staff access required.");
+  if (actor.role !== "school_admin" && actor.role !== "teacher" && actor.role !== "office_staff" && !isSpecialistRole(actor.role)) throw new SchoolAdminError("School staff access required.");
   const value = workflowCommandSchema.parse(raw);
   if (actor.role === "office_staff" && value.kind !== "attendance") throw new SchoolAdminError("Office staff can only correct recorded attendance.");
+  if (isSpecialistRole(actor.role) && !canSpecialistRunCommand(actor.role, value.kind)) throw new SchoolAdminError("Your specialist role cannot change this school record.");
   const org = actor.organizationId;
   return db.transaction(async tx => {
     found((await tx.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, org)).for("update"))[0], "School");
@@ -235,6 +238,7 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
         break;
       }
       case "sensitive_case": {
+        if (!canUserAccessCaseArea(actor.role, value.area)) throw new SchoolAdminError("You cannot access this case area.");
         found((await tx.select({ id: students.id }).from(students).where(and(eq(students.id, value.studentId), eq(students.organizationId, org))))[0], "Student");
         const [row] = await tx.insert(sensitiveCases).values({ organizationId: org, studentId: value.studentId, caseNumber: value.caseNumber,
           area: value.area, confidentialityTier: value.confidentialityTier, title: value.title }).returning();
@@ -243,6 +247,7 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
       }
       case "sensitive_note": {
         const caseRow = found((await tx.select().from(sensitiveCases).where(and(eq(sensitiveCases.id, value.caseId), eq(sensitiveCases.organizationId, org))))[0], "Case");
+        if (!canUserAccessCaseArea(actor.role, caseRow.area)) throw new SchoolAdminError("You cannot access this case area.");
         const encrypted = encryptNarrative(value.note);
         const [row] = await tx.insert(sensitiveCaseNotes).values({ organizationId: org, caseId: caseRow.id, authorId: actor.userId,
           confidentialityTier: caseRow.confidentialityTier, encryptedCiphertext: encrypted.ciphertext, ivHex: encrypted.ivHex, authTagHex: encrypted.authTagHex }).returning();
@@ -251,6 +256,7 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
       }
       case "sensitive_access": {
         const caseRow = found((await tx.select().from(sensitiveCases).where(and(eq(sensitiveCases.id, value.caseId), eq(sensitiveCases.organizationId, org))))[0], "Case");
+        if (!canUserAccessCaseArea(actor.role, caseRow.area)) throw new SchoolAdminError("You cannot access this case area.");
         const notes = await tx.select().from(sensitiveCaseNotes).where(and(eq(sensitiveCaseNotes.organizationId, org), eq(sensitiveCaseNotes.caseId, caseRow.id), eq(sensitiveCaseNotes.isQuarantined, false)));
         await tx.insert(sensitiveAccessLogs).values({ organizationId: org, caseId: caseRow.id, userId: actor.userId,
           action: "view_decrypted", accessReason: value.accessReason });
@@ -260,6 +266,7 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
       }
       case "sensitive_case_status": {
         const caseRow = found((await tx.select().from(sensitiveCases).where(and(eq(sensitiveCases.id, value.caseId), eq(sensitiveCases.organizationId, org))))[0], "Case");
+        if (!canUserAccessCaseArea(actor.role, caseRow.area)) throw new SchoolAdminError("You cannot access this case area.");
         await tx.update(sensitiveCases).set({ status: value.status, closedAt: value.status === "closed" ? new Date() : null,
           closedReason: value.status === "closed" ? value.reason : null, updatedAt: new Date() }).where(and(eq(sensitiveCases.id, caseRow.id), eq(sensitiveCases.organizationId, org)));
         entityId = caseRow.id;
@@ -267,6 +274,7 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
       }
       case "need_to_know": {
         const caseRow = found((await tx.select().from(sensitiveCases).where(and(eq(sensitiveCases.id, value.caseId), eq(sensitiveCases.organizationId, org))))[0], "Case");
+        if (!canUserAccessCaseArea(actor.role, caseRow.area)) throw new SchoolAdminError("You cannot access this case area.");
         if (caseRow.studentId !== value.studentId) throw new SchoolAdminError("The directive student must match the case student.");
         const [row] = await tx.insert(needToKnowAlerts).values({ organizationId: org, studentId: value.studentId, caseId: caseRow.id,
           category: value.category, severity: value.severity, directiveSummary: value.directiveSummary,
@@ -276,6 +284,12 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
       }
       case "need_to_know_resolve": {
         const alert = found((await tx.select().from(needToKnowAlerts).where(and(eq(needToKnowAlerts.id, value.alertId), eq(needToKnowAlerts.organizationId, org))))[0], "Directive");
+        if (isSpecialistRole(actor.role)) {
+          if (!alert.caseId) throw new SchoolAdminError("This directive has no case area for your role.");
+          const caseRow = found((await tx.select({ area: sensitiveCases.area }).from(sensitiveCases).where(and(
+            eq(sensitiveCases.id, alert.caseId), eq(sensitiveCases.organizationId, org))))[0], "Case");
+          if (!canUserAccessCaseArea(actor.role, caseRow.area)) throw new SchoolAdminError("You cannot access this case area.");
+        }
         await tx.update(needToKnowAlerts).set({ isActive: false, updatedAt: new Date() }).where(and(eq(needToKnowAlerts.id, alert.id), eq(needToKnowAlerts.organizationId, org)));
         entityId = alert.id;
         break;

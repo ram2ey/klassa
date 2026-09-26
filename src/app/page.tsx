@@ -21,6 +21,8 @@ import { guardians, organizationMemberships } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getGuardianPortalData } from "@/lib/guardian-portal-data";
 import { GuardianPortalWorkspace } from "@/components/guardian-portal-workspace";
+import { getSpecialistData } from "@/lib/specialist-data";
+import { SpecialistWorkspace } from "@/components/specialist-workspace";
 
 export const dynamic = "force-dynamic";
 
@@ -60,6 +62,11 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
     const selectedDate = date && /^\d{4}-\d{2}-\d{2}$/.test(date) ? date : new Date().toISOString().slice(0, 10);
     const [data, notices] = await Promise.all([getOfficeData(selectedDate), getStaffAnnouncements()]);
     return <OfficeWorkspace key={data.school.id} data={data} notices={notices} section={selected} date={selectedDate} />;
+  }
+  if (actor.role === "safeguarding_lead" || actor.role === "senco" || actor.role === "health_nurse") {
+    const { section } = await searchParams;
+    const [data, notices] = await Promise.all([getSpecialistData(), getStaffAnnouncements()]);
+    return <SpecialistWorkspace key={data.school.id} data={data} notices={notices} section={section ?? "overview"} />;
   }
   return <><main className="mx-auto max-w-xl space-y-4 p-6"><h1 className="text-xl font-bold">Your school account is ready</h1>
       <p>Your membership is active. Live workflows for your role are still being connected.</p>
