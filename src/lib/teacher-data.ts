@@ -58,8 +58,10 @@ export async function getTeacherData(section: string, sessionDate: string) {
   const reportIds = reportRows.map(row => row.id);
   const reportSubjects = reportIds.length ? await db.select().from(reportCardSubjectGrades)
     .where(and(eq(reportCardSubjectGrades.organizationId, org), inArray(reportCardSubjectGrades.reportCardId, reportIds))) : [];
-  const sessionRows = homeIds.length && section === "attendance" ? await db.select().from(attendanceSessions)
-    .where(and(eq(attendanceSessions.organizationId, org), inArray(attendanceSessions.classId, homeIds), eq(attendanceSessions.sessionDate, sessionDate))) : [];
+  const loadedSessions = classIds.length && section === "attendance" ? await db.select().from(attendanceSessions)
+    .where(and(eq(attendanceSessions.organizationId, org), inArray(attendanceSessions.classId, classIds), eq(attendanceSessions.sessionDate, sessionDate))) : [];
+  const sessionRows = loadedSessions.filter(row => row.period === "morning_roll_call" ? homeroomIds.has(row.classId) :
+    homeroomIds.has(row.classId) || assignments.some(item => item.classId === row.classId && item.subjectId !== null));
   const sessionIds = sessionRows.map(row => row.id);
   const recordRows = sessionIds.length ? await db.select().from(attendanceRecords)
     .where(and(eq(attendanceRecords.organizationId, org), inArray(attendanceRecords.sessionId, sessionIds))) : [];

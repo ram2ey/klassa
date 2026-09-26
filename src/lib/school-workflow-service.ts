@@ -7,7 +7,7 @@ import { academicYears, announcements, assessmentCategories, assessmentGrades, a
 import { logAuditEvent } from "@/lib/audit";
 import type { requireStaff } from "@/lib/action-access";
 import { SchoolAdminError } from "@/lib/school-admin-policy";
-import { workflowCommandSchema, type WorkflowCommand } from "@/lib/school-workflow-policy";
+import { canTeacherTakeAttendance, workflowCommandSchema, type WorkflowCommand } from "@/lib/school-workflow-policy";
 import { calculateWeightedTermGrade, scoreToGrade } from "@/lib/assessments";
 import { decryptNarrative, encryptNarrative } from "@/lib/narrative-crypto";
 import { canUserAccessCaseArea } from "@/lib/sensitive-records";
@@ -34,7 +34,7 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
       let assignedClassId: string | null = null;
       let assignedSubjectId: string | null = null;
       let homeroomOnly = false;
-      if (value.kind === "attendance" || value.kind === "attendance_submit") { assignedClassId = value.classId; homeroomOnly = true; }
+      if (value.kind === "attendance" || value.kind === "attendance_submit") assignedClassId = value.classId;
       if (value.kind === "assessment") { assignedClassId = value.classId; assignedSubjectId = value.subjectId; }
       if (value.kind === "assessment_publish" || value.kind === "grade_entry") {
         const row = found((await tx.select({ classId: assessments.classId, subjectId: assessments.subjectId }).from(assessments)
@@ -55,7 +55,11 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
       const assignments = await tx.select().from(teacherClassAssignments).where(and(eq(teacherClassAssignments.organizationId, org),
         eq(teacherClassAssignments.teacherId, actor.userId), eq(teacherClassAssignments.classId, assignedClassId)));
       const assignedClass = found((await tx.select({ homeroomTeacherId: classes.homeroomTeacherId }).from(classes).where(and(eq(classes.id, assignedClassId), eq(classes.organizationId, org))))[0], "Class");
-      if (assignedClass.homeroomTeacherId !== actor.userId && !assignments.some(row => homeroomOnly ? row.isPrimaryHomeroom : row.isPrimaryHomeroom || (!!assignedSubjectId && row.subjectId === assignedSubjectId))) {
+      if ((value.kind === "attendance" || value.kind === "attendance_submit") &&
+        !canTeacherTakeAttendance(value.period, assignedClass.homeroomTeacherId === actor.userId || assignments.some(row => row.isPrimaryHomeroom), assignments.some(row => row.subjectId !== null))) {
+        throw new SchoolAdminError("You are not assigned to take attendance for this class and period.");
+      }
+      if (value.kind !== "attendance" && value.kind !== "attendance_submit" && assignedClass.homeroomTeacherId !== actor.userId && !assignments.some(row => homeroomOnly ? row.isPrimaryHomeroom : row.isPrimaryHomeroom || (!!assignedSubjectId && row.subjectId === assignedSubjectId))) {
         throw new SchoolAdminError("You are not assigned to this class or subject.");
       }
     }
@@ -67,10 +71,10 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
         const classRow = found((await tx.select().from(classes).where(and(eq(classes.id, value.classId), eq(classes.organizationId, org))))[0], "Class");
         const year = found((await tx.select().from(academicYears).where(and(eq(academicYears.id, classRow.academicYearId), eq(academicYears.organizationId, org))))[0], "Academic year");
         if (value.sessionDate < year.startsOn || value.sessionDate > year.endsOn) throw new SchoolAdminError("Attendance date must be within the class academic year.");
-        let [session] = await tx.select().from(attendanceSessions).where(and(eq(attendanceSessions.organizationId, org), eq(attendanceSessions.classId, value.classId), eq(attendanceSessions.sessionDate, value.sessionDate), eq(attendanceSessions.period, "morning_roll_call")));
+        let [session] = await tx.select().from(attendanceSessions).where(and(eq(attendanceSessions.organizationId, org), eq(attendanceSessions.classId, value.classId), eq(attendanceSessions.sessionDate, value.sessionDate), eq(attendanceSessions.period, value.period)));
         if (actor.role === "office_staff" && (!session || session.status !== "submitted")) throw new SchoolAdminError("Only submitted roll calls can be corrected by the office.");
         if (!session && value.kind === "attendance_submit") throw new SchoolAdminError("Record attendance before submitting the roll call.");
-        if (!session) [session] = await tx.insert(attendanceSessions).values({ organizationId: org, academicYearId: year.id, classId: classRow.id, sessionDate: value.sessionDate, recordedBy: actor.userId }).returning();
+        if (!session) [session] = await tx.insert(attendanceSessions).values({ organizationId: org, academicYearId: year.id, classId: classRow.id, sessionDate: value.sessionDate, period: value.period, recordedBy: actor.userId }).returning();
         if (session.status === "locked") throw new SchoolAdminError("This roll call is locked.");
         if (value.kind === "attendance_submit") {
           const roster = await tx.select().from(enrollments).where(and(eq(enrollments.organizationId, org), eq(enrollments.classId, classRow.id), eq(enrollments.academicYearId, year.id), eq(enrollments.status, "active")));
@@ -168,7 +172,7 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
         if (!results.length) throw new SchoolAdminError("Published grades are needed to generate a report card.");
         const percentage = results.reduce((sum, row) => sum + row.percentage, 0) / results.length;
         const gpa = results.reduce((sum, row) => sum + row.gpaPoint, 0) / results.length;
-        const sessions = await tx.select().from(attendanceSessions).where(and(eq(attendanceSessions.organizationId, org), eq(attendanceSessions.classId, enrollment.classId), eq(attendanceSessions.academicYearId, term.academicYearId)));
+        const sessions = await tx.select().from(attendanceSessions).where(and(eq(attendanceSessions.organizationId, org), eq(attendanceSessions.classId, enrollment.classId), eq(attendanceSessions.academicYearId, term.academicYearId), eq(attendanceSessions.period, "morning_roll_call")));
         const recordRows = await tx.select().from(attendanceRecords).where(and(eq(attendanceRecords.organizationId, org), eq(attendanceRecords.studentId, value.studentId)));
         const termRecords = recordRows.filter(record => sessions.some(session => session.id === record.sessionId && session.sessionDate >= term.startsOn && session.sessionDate <= term.endsOn && session.status !== "in_progress"));
         const present = termRecords.filter(row => row.status === "present").length;

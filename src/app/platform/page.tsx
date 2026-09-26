@@ -6,6 +6,7 @@ import { redirect } from "next/navigation";
 import { PlatformInvitations } from "@/components/platform-invitations";
 import { getLiveSystemHealthReport } from "@/lib/live-health";
 import { getPlatformIncidentData } from "@/lib/platform-incidents";
+import { getPlatformRestoreDrillData } from "@/lib/platform-restore-drills";
 
 export const dynamic = "force-dynamic";
 
@@ -17,8 +18,8 @@ export default async function PlatformPage() {
   if (session.user.mustChangePassword) redirect("/change-password");
   if (!session.user.isPlatformAdmin) return <main className="p-6">Platform administrator access required.</main>;
   if (!session.user.twoFactorEnabled) redirect("/setup-mfa");
-  const data = await getPlatformInvitationData();
+  const [data, drills] = await Promise.all([getPlatformInvitationData(), getPlatformRestoreDrillData()]);
   const health = await getLiveSystemHealthReport();
   const incidents = await getPlatformIncidentData();
-  return <PlatformInvitations data={data} health={health} incidents={incidents} currentUserId={session.user.id} />;
+  return <PlatformInvitations data={data} health={health} incidents={incidents} drills={drills} currentUserId={session.user.id} />;
 }

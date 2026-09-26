@@ -3,12 +3,19 @@ import { z } from "zod";
 const id = z.uuid();
 const date = z.iso.date();
 const reason = z.string().trim().min(4).max(500);
+export const attendancePeriods = ["morning_roll_call", "period_1", "period_2", "period_3", "period_4", "period_5", "period_6"] as const;
+export type AttendancePeriod = (typeof attendancePeriods)[number];
+const attendancePeriod = z.enum(attendancePeriods).default("morning_roll_call");
+
+export function canTeacherTakeAttendance(period: AttendancePeriod, isHomeroom: boolean, hasSubjectAssignment: boolean) {
+  return isHomeroom || (period !== "morning_roll_call" && hasSubjectAssignment);
+}
 
 export const workflowCommandSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("attendance"), classId: id, sessionDate: date, studentId: id,
+  z.object({ kind: z.literal("attendance"), classId: id, sessionDate: date, period: attendancePeriod, studentId: id,
     status: z.enum(["present", "absent", "late", "excused"]), reason: z.string().trim().max(255).default(""),
     correctionReason: z.string().trim().max(500).default("") }),
-  z.object({ kind: z.literal("attendance_submit"), classId: id, sessionDate: date }),
+  z.object({ kind: z.literal("attendance_submit"), classId: id, sessionDate: date, period: attendancePeriod }),
   z.object({ kind: z.literal("category"), academicYearId: id, subjectId: id, name: z.string().trim().min(2).max(100), weight: z.number().int().min(1).max(100) }),
   z.object({ kind: z.literal("assessment"), classId: id, termId: id, subjectId: id, categoryId: id,
     title: z.string().trim().min(2).max(150), maxScore: z.number().int().min(1).max(1000), dateDue: date }),
