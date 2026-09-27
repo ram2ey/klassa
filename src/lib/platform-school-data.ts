@@ -34,7 +34,6 @@ export async function getPlatformSchoolDetailData(organizationId: string) {
     setup: {
       schoolAdmin: memberships.some(member => member.role === "school_admin" && !member.suspendedAt),
       academicYear: years.length > 0,
-      safeguardingLead: memberships.some(member => member.role === "safeguarding_lead" && !member.suspendedAt),
       roster: (roster[0]?.total ?? 0) > 0,
     },
     staff: memberships.map(member => ({ ...member, hasActiveSession: activeUserIds.has(member.userId) })),

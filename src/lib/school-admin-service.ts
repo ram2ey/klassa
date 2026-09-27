@@ -1,6 +1,6 @@
 import { and, count, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { academicYears, assessmentGrades, assessments, attendanceSessions, classes, enrollments, gradeLevels, guardians, organizationMemberships, organizations,
+import { academicYears, assessmentGrades, assessments, attendanceSessions, classes, enrollments, gradeLevels, guardianConsents, guardians, organizationMemberships, organizations,
   reportCards, studentGuardians, students, subjects, teacherClassAssignments, terms } from "@/db/schema";
 import { AuditActions, logAuditEvent } from "@/lib/audit";
 import { SCHOOL_TIME_ZONE } from "@/lib/timezone";
@@ -57,10 +57,14 @@ export async function saveSchoolRecord(actor: Actor, raw: SchoolCommand) {
       }
       case "guardian": {
         const fields = { firstName: value.firstName, lastName: value.lastName, email: value.email || null, phone: value.phone || null };
+        const previous = value.id ? found((await tx.select({ phone: guardians.phone }).from(guardians).where(and(
+          eq(guardians.id, value.id), eq(guardians.organizationId, org))))[0], "Guardian") : null;
         const [saved] = value.id
-          ? await tx.update(guardians).set({ ...fields, updatedAt: new Date() }).where(and(eq(guardians.id, value.id), eq(guardians.organizationId, org))).returning({ id: guardians.id })
+          ? await tx.update(guardians).set({ ...fields, ...(previous?.phone !== fields.phone ? { phoneVerifiedAt: null, phoneVerifiedBy: null } : {}), updatedAt: new Date() }).where(and(eq(guardians.id, value.id), eq(guardians.organizationId, org))).returning({ id: guardians.id })
           : await tx.insert(guardians).values({ ...fields, organizationId: org }).returning({ id: guardians.id });
         entityId = found(saved, "Guardian").id;
+        if (previous && previous.phone !== fields.phone) await tx.update(guardianConsents).set({ smsConfirmedAt: null,
+          updatedAt: new Date() }).where(and(eq(guardianConsents.organizationId, org), eq(guardianConsents.guardianId, entityId)));
         break;
       }
       case "guardian_link": {
@@ -153,11 +157,27 @@ export async function saveSchoolRecord(actor: Actor, raw: SchoolCommand) {
       }
       case "year": {
         if (value.id) {
-          found((await tx.select({ id: academicYears.id }).from(academicYears).where(and(eq(academicYears.id, value.id), eq(academicYears.organizationId, org))))[0], "Academic year");
+          const previousYear = found((await tx.select({ id: academicYears.id, isCurrent: academicYears.isCurrent }).from(academicYears).where(and(eq(academicYears.id, value.id), eq(academicYears.organizationId, org))))[0], "Academic year");
+          if (previousYear.isCurrent && !value.isCurrent) {
+            const [enrolled] = await tx.select({ id: enrollments.id }).from(enrollments).where(and(
+              eq(enrollments.organizationId, org), eq(enrollments.academicYearId, previousYear.id),
+              eq(enrollments.status, "active"))).limit(1);
+            if (enrolled) throw new SchoolAdminError("Use the audited rollover review before changing the current year with active students.");
+          }
           const existingTerms = await tx.select().from(terms).where(and(eq(terms.organizationId, org), eq(terms.academicYearId, value.id)));
           if (existingTerms.some(term => term.startsOn < value.startsOn || term.endsOn > value.endsOn)) throw new SchoolAdminError("Academic year dates must contain all of its terms.");
         }
-        if (value.isCurrent) await tx.update(academicYears).set({ isCurrent: false, updatedAt: new Date() }).where(eq(academicYears.organizationId, org));
+        if (value.isCurrent) {
+          const [previousCurrent] = await tx.select({ id: academicYears.id }).from(academicYears).where(and(
+            eq(academicYears.organizationId, org), eq(academicYears.isCurrent, true)));
+          if (previousCurrent && previousCurrent.id !== value.id) {
+            const [enrolled] = await tx.select({ id: enrollments.id }).from(enrollments).where(and(
+              eq(enrollments.organizationId, org), eq(enrollments.academicYearId, previousCurrent.id),
+              eq(enrollments.status, "active"))).limit(1);
+            if (enrolled) throw new SchoolAdminError("Use the audited rollover review to change the current year with active students.");
+          }
+          await tx.update(academicYears).set({ isCurrent: false, updatedAt: new Date() }).where(eq(academicYears.organizationId, org));
+        }
         const fields = { name: value.name, startsOn: value.startsOn, endsOn: value.endsOn, isCurrent: value.isCurrent };
         const [saved] = value.id
           ? await tx.update(academicYears).set({ ...fields, updatedAt: new Date() }).where(and(eq(academicYears.id, value.id), eq(academicYears.organizationId, org))).returning({ id: academicYears.id })
@@ -184,7 +204,8 @@ export async function saveSchoolRecord(actor: Actor, raw: SchoolCommand) {
         if (actor.role !== "school_admin") throw new SchoolAdminError("Only a school administrator can close and lock a term.");
         const term = found((await tx.select().from(terms).where(and(eq(terms.id, value.termId), eq(terms.organizationId, org))).for("update"))[0], "Term");
         if (term.isLocked) throw new SchoolAdminError("This term is already closed and locked.");
-        const termSessions = await tx.select({ status: attendanceSessions.status }).from(attendanceSessions).where(and(
+        const termSessions = await tx.select({ classId: attendanceSessions.classId, sessionDate: attendanceSessions.sessionDate,
+          period: attendanceSessions.period, status: attendanceSessions.status }).from(attendanceSessions).where(and(
           eq(attendanceSessions.organizationId, org), eq(attendanceSessions.academicYearId, term.academicYearId),
           sql`${attendanceSessions.sessionDate} >= ${term.startsOn} AND ${attendanceSessions.sessionDate} <= ${term.endsOn}`
         ));
@@ -196,7 +217,8 @@ export async function saveSchoolRecord(actor: Actor, raw: SchoolCommand) {
         if (termAssessments.some(assessment => assessment.status !== "published")) {
           throw new SchoolAdminError("Publish every term assessment before closing this term.");
         }
-        const activeEnrollments = await tx.select({ studentId: enrollments.studentId, classId: enrollments.classId })
+        const activeEnrollments = await tx.select({ studentId: enrollments.studentId, classId: enrollments.classId,
+          startsOn: enrollments.startsOn, endsOn: enrollments.endsOn })
           .from(enrollments).where(and(eq(enrollments.organizationId, org), eq(enrollments.academicYearId, term.academicYearId),
             eq(enrollments.status, "active"), sql`${enrollments.startsOn} <= ${term.endsOn}`,
             sql`(${enrollments.endsOn} IS NULL OR ${enrollments.endsOn} >= ${term.startsOn})`));

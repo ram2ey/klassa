@@ -1,7 +1,8 @@
 "use client";
 
-import { useId, useState, useTransition } from "react";
-import { AlertCircle, AlertTriangle, CheckCircle2, MessageSquare, Radio, Send, ShieldAlert, Sparkles } from "lucide-react";
+import { useEffect, useId, useState, useTransition } from "react";
+import { approveEmergencyBroadcastAction, pendingEmergencyBroadcastsAction } from "@/app/actions/school-workflow-actions";
+import { AlertCircle, CheckCircle2, MessageSquare, Radio, Send, ShieldAlert, Sparkles } from "lucide-react";
 import type { WorkflowCommand } from "@/lib/school-workflow-policy";
 
 interface DispatchRecord {
@@ -14,6 +15,7 @@ interface DispatchRecord {
 }
 
 interface EmergencySmsBroadcastProps {
+  students?: Array<{ id: string; firstName: string; lastName: string }>;
   grades: Array<{ id: string; name: string }>;
   classes: Array<{ id: string; name: string; gradeLevelId?: string | null }>;
   dispatches?: DispatchRecord[];
@@ -53,6 +55,7 @@ type SeverityKey = keyof typeof SEVERITY_CONFIG;
 
 export function EmergencySmsBroadcast({
   grades,
+  students = [],
   classes,
   dispatches = [],
   onDispatch,
@@ -69,9 +72,12 @@ export function EmergencySmsBroadcast({
   const [targetId, setTargetId] = useState<string>("all");
   const [severity, setSeverity] = useState<SeverityKey>("urgent_alert");
   const [message, setMessage] = useState("");
+  const [reason, setReason] = useState("");
+  const [approvals, setApprovals] = useState<Awaited<ReturnType<typeof pendingEmergencyBroadcastsAction>>>([]);
   const [confirmed, setConfirmed] = useState(false);
   const [statusMessage, setStatusMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [pending, start] = useTransition();
+  useEffect(() => { void pendingEmergencyBroadcastsAction().then(setApprovals).catch(() => undefined); }, []);
 
   const charCount = message.length;
   const maxChars = 320;
@@ -140,14 +146,17 @@ export function EmergencySmsBroadcast({
           targetId: scope === "whole_school" ? "all" : targetId,
           severity,
           message,
+          reason,
         });
 
         if (result.success) {
           setStatusMessage({
             type: "success",
-            text: `Emergency SMS broadcast successfully dispatched to ${result.recipientCount ?? "all eligible"} guardians.`,
+            text: `Broadcast awaiting approval by a different staff member. ${result.recipientCount ?? "Eligible"} guardians in the preview.`,
           });
+          void pendingEmergencyBroadcastsAction().then(setApprovals);
           setMessage("");
+          setReason("");
           setConfirmed(false);
         } else {
           setStatusMessage({ type: "error", text: result.error || "Failed to dispatch broadcast." });
@@ -321,6 +330,10 @@ export function EmergencySmsBroadcast({
           </div>
 
           {/* Message Textarea with Live Counters */}
+          <label className="block text-sm font-semibold text-slate-900">Emergency reason
+            <textarea value={reason} onChange={event => setReason(event.target.value)} minLength={4} maxLength={500}
+              className="mt-1 block min-h-20 w-full border border-slate-300 p-3 text-sm" required />
+          </label>
           <div>
             <div className="flex items-center justify-between">
               <label htmlFor={messageId} className="block text-sm font-semibold text-slate-900">
@@ -389,10 +402,32 @@ export function EmergencySmsBroadcast({
               className="inline-flex min-h-11 items-center gap-2 bg-rose-700 px-6 py-2.5 text-sm font-semibold text-white shadow-xs hover:bg-rose-800 disabled:opacity-50 transition-colors"
             >
               <Send className="h-4 w-4" />
-              {pending ? "Dispatching Broadcast..." : "Send Emergency SMS Broadcast"}
+              {pending ? "Requesting Broadcast..." : "Request Emergency SMS Broadcast"}
             </button>
           </div>
         </form>
+      </section>
+
+      <section className="border border-slate-200 bg-white p-5">
+        <h3 className="font-bold">Broadcasts awaiting second approval</h3>
+        {approvals.map(item => <article key={item.id} className="mt-3 border-t border-slate-200 pt-3 text-sm">
+          <p className="font-semibold">{item.severity} · {item.recipientCount} verified guardians</p>
+          <p className="mt-1 whitespace-pre-wrap">{item.message}</p>
+          <p className="mt-1">Reason: {item.reason}</p>
+          <p className="mt-1 text-amber-800">Students without a reachable guardian: {item.unreachableStudentIds.length}</p>
+          {!!item.unreachableStudentIds.length && <ul className="mt-1 list-inside list-disc text-amber-800">
+            {item.unreachableStudentIds.map(id => { const pupil = students.find(student => student.id === id);
+              return <li key={id}>{pupil ? `${pupil.firstName} ${pupil.lastName}` : id}</li>; })}
+          </ul>}
+          <button type="button" disabled={pending} className="mt-2 border border-blue-700 px-3 py-2 font-semibold text-blue-700"
+            onClick={() => start(async () => {
+              const result = await approveEmergencyBroadcastAction(item.id);
+              setStatusMessage(result.success ? { type: "success", text: `${result.queuedCount} messages queued for provider delivery.` }
+                : { type: "error", text: result.error });
+              if (result.success) void pendingEmergencyBroadcastsAction().then(setApprovals);
+            })}>Approve and queue</button>
+        </article>)}
+        {!approvals.length && <p className="mt-2 text-sm text-slate-500">No broadcasts await approval.</p>}
       </section>
 
       {/* Dispatches History Feed */}
@@ -409,7 +444,7 @@ export function EmergencySmsBroadcast({
             <table className="w-full text-left text-xs">
               <thead>
                 <tr className="border-b border-slate-200 text-slate-500 uppercase tracking-wider">
-                  <th className="py-2 pr-4 font-semibold">Sent At</th>
+                  <th className="py-2 pr-4 font-semibold">Queued At</th>
                   <th className="py-2 pr-4 font-semibold">Recipient</th>
                   <th className="py-2 pr-4 font-semibold">Phone</th>
                   <th className="py-2 pr-4 font-semibold">Status</th>
@@ -433,10 +468,16 @@ export function EmergencySmsBroadcast({
                     <td className="py-2.5 pr-4 whitespace-nowrap">
                       <span
                         className={`inline-block rounded-xs px-2 py-0.5 text-[10px] font-semibold uppercase ${
-                          dispatch.status === "delivered" || dispatch.status === "sent"
+                          dispatch.status === "delivered"
                             ? "bg-emerald-100 text-emerald-800"
+                            : dispatch.status === "queued" || dispatch.status === "processing"
+                            ? "bg-amber-100 text-amber-800"
+                            : dispatch.status === "accepted" || dispatch.status === "sent"
+                            ? "bg-blue-100 text-blue-800"
                             : dispatch.status === "simulated"
                             ? "bg-blue-100 text-blue-800"
+                            : dispatch.status === "cancelled"
+                            ? "bg-slate-100 text-slate-600"
                             : "bg-rose-100 text-rose-800"
                         }`}
                       >

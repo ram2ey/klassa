@@ -24,6 +24,8 @@ const mockDispatches = [
 ];
 
 const mockOnDispatch = vi.fn();
+vi.mock("@/app/actions/school-workflow-actions", () => ({ pendingEmergencyBroadcastsAction: async () => [],
+  approveEmergencyBroadcastAction: async () => ({ success: true, queuedCount: 0 }) }));
 
 beforeEach(() => {
   mockOnDispatch.mockReset().mockResolvedValue({ success: true, recipientCount: 45 });
@@ -81,11 +83,12 @@ describe("EmergencySmsBroadcast component", () => {
       />
     );
 
-    const submitBtn = screen.getByRole("button", { name: "Send Emergency SMS Broadcast" });
+    const submitBtn = screen.getByRole("button", { name: "Request Emergency SMS Broadcast" });
     expect(submitBtn.hasAttribute("disabled")).toBe(true);
 
     // Apply template
     fireEvent.click(screen.getByRole("button", { name: "Precautionary Lockdown" }));
+    fireEvent.change(screen.getByLabelText("Emergency reason"), { target: { value: "Verified campus incident" } });
 
     // Still disabled without checkbox
     expect(submitBtn.hasAttribute("disabled")).toBe(true);
@@ -107,11 +110,12 @@ describe("EmergencySmsBroadcast component", () => {
         targetId: "all",
         severity: "lockdown",
         message: expect.stringContaining("lockdown"),
+        reason: "Verified campus incident",
       });
     });
 
     await waitFor(() => {
-      expect(screen.getByText(/Emergency SMS broadcast successfully dispatched to 45 guardians/)).toBeTruthy();
+      expect(screen.getByText(/Broadcast awaiting approval by a different staff member/)).toBeTruthy();
     });
   });
 
@@ -131,9 +135,10 @@ describe("EmergencySmsBroadcast component", () => {
 
     fireEvent.change(screen.getByLabelText("Select Grade Level"), { target: { value: "grade-2" } });
     fireEvent.change(screen.getByLabelText("SMS Message Text"), { target: { value: "Grade 10 field trip return delayed." } });
+    fireEvent.change(screen.getByLabelText("Emergency reason"), { target: { value: "Transport disruption" } });
     fireEvent.click(screen.getByLabelText(/Emergency Authorization Acknowledgement/));
 
-    fireEvent.click(screen.getByRole("button", { name: "Send Emergency SMS Broadcast" }));
+    fireEvent.click(screen.getByRole("button", { name: "Request Emergency SMS Broadcast" }));
 
     await waitFor(() => {
       expect(mockOnDispatch).toHaveBeenCalledWith({
@@ -142,6 +147,7 @@ describe("EmergencySmsBroadcast component", () => {
         targetId: "grade-2",
         severity: "urgent_alert",
         message: "Grade 10 field trip return delayed.",
+        reason: "Transport disruption",
       });
     });
   });

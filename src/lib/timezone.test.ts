@@ -5,8 +5,8 @@ import { schoolCommandSchema } from "./school-admin-policy";
 describe("fixed GMT timezone", () => {
   it("keeps summer and winter timestamps at UTC+0", () => {
     expect(SCHOOL_TIME_ZONE).toBe("Etc/GMT");
-    expect(formatGMTDateTime("2026-06-01T12:00:00Z")).toContain("12:00 GMT");
-    expect(formatGMTDateTime("2026-12-01T12:00:00Z")).toContain("12:00 GMT");
+    expect(formatGMTDateTime("2026-06-01T12:00:00Z")).toMatch(/12:00\s*pm GMT/i);
+    expect(formatGMTDateTime("2026-12-01T12:00:00Z")).toMatch(/12:00\s*pm GMT/i);
   });
   it("does not accept a school timezone override in settings", () => {
     const parsed = schoolCommandSchema.parse({ kind: "settings", name: "School", timezone: "Europe/London" });

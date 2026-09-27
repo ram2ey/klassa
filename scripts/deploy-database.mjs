@@ -85,6 +85,11 @@ try {
     throw new Error("KLASSO_APP_DATABASE_PASSWORD must be a generated 32-128 character alphanumeric secret.");
   }
   await client.unsafe(`ALTER ROLE klassa_app LOGIN PASSWORD '${appPassword}'`);
+  const smsWorkerPassword = process.env.KLASSO_SMS_WORKER_PASSWORD ?? "";
+  if (!/^[A-Za-z0-9]{32,128}$/.test(smsWorkerPassword)) {
+    throw new Error("KLASSO_SMS_WORKER_PASSWORD must be a generated 32-128 character alphanumeric secret.");
+  }
+  await client.unsafe(`ALTER ROLE klassa_sms_worker LOGIN PASSWORD '${smsWorkerPassword}'`);
   const missingPolicies = await client`
     SELECT tables.relname AS table_name
     FROM pg_class AS tables

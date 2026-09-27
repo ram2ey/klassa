@@ -12,7 +12,6 @@ type Data = NonNullable<Awaited<ReturnType<typeof getPlatformSchoolDetailData>>>
 const steps = [
   { key: "schoolAdmin", label: "Active school administrator", guidance: "Assign an active school administrator account." },
   { key: "academicYear", label: "Academic year", guidance: "Ask the school administrator to create an academic year." },
-  { key: "safeguardingLead", label: "Active safeguarding lead", guidance: "Assign an active safeguarding lead account." },
   { key: "roster", label: "Student roster", guidance: "Ask the school administrator to enroll or import students." },
 ] as const;
 
@@ -74,7 +73,7 @@ export function PlatformSchoolDetail({ data }: { data: Data }) {
       <div className="grid gap-5 sm:grid-cols-2 xl:grid-cols-4">
         <Metric label="Staff accounts" value={data.staff.length} />
         <Metric label="Active sessions" value={data.staff.filter(member => member.hasActiveSession).length} />
-        <Metric label="Setup complete" value={`${complete}/4`} />
+        <Metric label="Setup complete" value={`${complete}/${steps.length}`} />
         <Metric label="Students" value={data.studentCount} />
       </div>
       <section className="border border-slate-200 bg-white p-5"><h2 className="font-bold">School data portability</h2><p className="mt-1 text-sm text-slate-600">Download the school&apos;s records as JSON for a controlled tenant transfer. The file contains personal and sensitive records; store it securely.</p><a href={`/platform/schools/${school.id}/export`} className="mt-3 inline-flex min-h-11 items-center bg-blue-700 px-4 text-sm font-semibold text-white">Download school export</a></section>
@@ -89,7 +88,7 @@ export function PlatformSchoolDetail({ data }: { data: Data }) {
               ? <button type="button" onClick={reactivate} disabled={pending} className="bg-emerald-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Reactivate school</button>
               : <button type="button" onClick={() => { setError(""); setSuspendOpen(true); }} disabled={pending} className="border border-red-300 px-4 py-2 text-sm font-semibold text-red-700 disabled:opacity-50">Suspend school</button>}</div></section>
       </div>
-      <section className="border border-slate-200 bg-white"><Heading title="Setup follow-up" description={`${complete} of 4 tracked steps complete`} /><div className="grid gap-px bg-slate-200 sm:grid-cols-2">{steps.map(step => <div key={step.key} className="bg-white p-5"><p className="text-sm font-semibold">{data.setup[step.key] ? "✓" : "○"} {step.label}</p><p className="mt-1 text-xs text-slate-500">{data.setup[step.key] ? "Complete" : step.guidance}</p></div>)}</div></section>
+      <section className="border border-slate-200 bg-white"><Heading title="Setup follow-up" description={`${complete} of ${steps.length} tracked steps complete`} /><div className="grid gap-px bg-slate-200 sm:grid-cols-2">{steps.map(step => <div key={step.key} className="bg-white p-5"><p className="text-sm font-semibold">{data.setup[step.key] ? "✓" : "○"} {step.label}</p><p className="mt-1 text-xs text-slate-500">{data.setup[step.key] ? "Complete" : step.guidance}</p></div>)}</div></section>
       <section className="border border-slate-200 bg-white"><Heading title="Staff status" description="School membership and account status" /><div className="overflow-x-auto"><table className="w-full min-w-[650px] text-left text-sm"><thead className="bg-slate-50 text-xs text-slate-500"><tr><th className="px-5 py-3">Name</th><th className="px-5 py-3">Role</th><th className="px-5 py-3">Account</th><th className="px-5 py-3">Session</th></tr></thead><tbody>{data.staff.map(member => <tr key={member.userId} className="border-t border-slate-100"><td className="px-5 py-3"><p className="font-semibold">{member.name}</p><p className="text-xs text-slate-500">{member.username ?? "No login"}</p></td><td className="px-5 py-3 capitalize">{member.role.replaceAll("_", " ")}</td><td className="px-5 py-3">{member.suspendedAt ? "Suspended" : member.mustChangePassword ? "Password change due" : "Ready"}</td><td className="px-5 py-3">{member.hasActiveSession ? "Active" : "Offline"}</td></tr>)}</tbody></table>{!data.staff.length && <p className="p-5 text-sm text-slate-500">No staff accounts yet.</p>}</div></section>
       <section className="border border-slate-200 bg-white"><Heading title="Recent activity" description="Latest 15 audited events for this school" /><div className="divide-y divide-slate-100">{data.activity.map(event => <div key={event.id} className="flex flex-wrap justify-between gap-2 p-5 text-sm"><div><p className="font-semibold">{event.action}</p><p className="mt-1 text-xs text-slate-500">{event.actorName ?? "System"} · {event.entityType}</p></div><time className="text-xs text-slate-500">{formatGMTDateTime(event.createdAt)}</time></div>)}{!data.activity.length && <p className="p-5 text-sm text-slate-500">No audit events yet.</p>}</div></section>
     </main>

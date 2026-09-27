@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { academicYears, attendanceRecords, attendanceSessions, classes, courtRestrictions, enrollments,
   gradeLevels, guardianAbsenceNotes, guardians, organizations, receptionLogs, smsDispatches, studentGuardians, students, users,
@@ -38,7 +38,7 @@ export async function getOfficeData(sessionDate: string) {
       .where(and(eq(receptionLogs.organizationId, org), eq(receptionLogs.logDate, sessionDate)))
       .orderBy(desc(receptionLogs.createdAt)),
     db.select().from(smsDispatches)
-      .where(eq(smsDispatches.organizationId, org))
+      .where(and(eq(smsDispatches.organizationId, org), ne(smsDispatches.purpose, "invitation")))
       .orderBy(desc(smsDispatches.sentAt))
       .limit(50),
   ]);

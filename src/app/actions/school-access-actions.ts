@@ -5,7 +5,7 @@ import { hashPassword } from "better-auth/crypto";
 import { and, eq } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { accounts, organizationMemberships, organizations, sessions, staffRole, users } from "@/db/schema";
+import { accounts, organizationMemberships, organizations, sessions, users } from "@/db/schema";
 import { requireAccount, requireLiveMode, requirePlatformAdmin, requireStaff } from "@/lib/action-access";
 import { logAuditEvent } from "@/lib/audit";
 import { revalidatePath } from "next/cache";
@@ -21,7 +21,7 @@ const schoolSchema = z.object({
   name: z.string().trim().min(2).max(180),
   slug: schoolTenantIdSchema,
 }).and(accountSchema);
-const schoolStaffSchema = accountSchema.extend({ role: z.enum(staffRole.enumValues) });
+const schoolStaffSchema = accountSchema.extend({ role: z.enum(["school_admin", "office_staff", "teacher"]) });
 const staffSchema = schoolStaffSchema.extend({ organizationId: z.uuid() });
 type Transaction = Parameters<Parameters<typeof db.transaction>[0]>[0];
 

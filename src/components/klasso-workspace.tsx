@@ -70,7 +70,6 @@ import {
   recordAnnouncementReadAction,
   updateGuardianConsentAction,
 } from "@/app/actions/communication-actions";
-import { SensitiveRecordsModule } from "@/components/sensitive/sensitive-records-module";
 import {
   type SensitiveCaseRecord,
   type NeedToKnowAlertRecord,
@@ -105,8 +104,8 @@ import { type AttendanceStatus, calculateAttendanceMetrics } from "@/lib/attenda
 import { dispatchAbsenceAlert, getSmsDispatchHistory, type SmsDispatchResult } from "@/lib/sms";
 import { addInAppNotification, getInAppNotifications, markAllNotificationsAsRead, type InAppNotification } from "@/lib/notifications";
 
-export type NavModule = "Overview" | "Attendance" | "Gradebook" | "Report cards" | "Communications" | "Sensitive records" | "Students" | "Guardians" | "Classes" | "Imports" | "Audit log" | "Settings";
-export type Persona = "admin" | "safeguarding" | "nurse" | "senco" | "teacher" | "guardian";
+export type NavModule = "Overview" | "Attendance" | "Gradebook" | "Report cards" | "Communications" | "Students" | "Guardians" | "Classes" | "Imports" | "Audit log" | "Settings";
+export type Persona = "admin" | "teacher" | "guardian";
 
 interface StudentRecord {
   id: string;
@@ -471,9 +470,6 @@ export function KlassoWorkspace({ roster }: { roster: Awaited<ReturnType<typeof 
   const currentKlassoRole: KlassoRole = useMemo(() => {
     switch (persona) {
       case "admin": return "school_admin";
-      case "safeguarding": return "safeguarding_lead";
-      case "nurse": return "health_nurse";
-      case "senco": return "senco";
       case "teacher": return "teacher";
       case "guardian": return "guardian";
       default: return "school_admin";
@@ -483,9 +479,6 @@ export function KlassoWorkspace({ roster }: { roster: Awaited<ReturnType<typeof 
   const currentSpecialistUser = useMemo(() => {
     switch (persona) {
       case "admin": return { id: "usr-admin-1", name: "Margaret Evans (Head of School)" };
-      case "safeguarding": return { id: "usr-safe-01", name: "Rachel Vance (Safeguarding Lead)" };
-      case "nurse": return { id: "usr-nurse-01", name: "Helena Thorne (School Nurse)" };
-      case "senco": return { id: "usr-senco-01", name: "Dr. Arthur Bell (SENCO Lead)" };
       case "teacher": return { id: "usr-teacher-1", name: "Elena Rostova (Class Teacher)" };
       case "guardian": return { id: "usr-guardian-1", name: "David Warren (Parent)" };
       default: return { id: "usr-admin-1", name: "Admin Staff" };
@@ -532,8 +525,6 @@ export function KlassoWorkspace({ roster }: { roster: Awaited<ReturnType<typeof 
       setActive("Attendance");
     } else if (newPersona === "teacher") {
       setActive("Attendance");
-    } else if (newPersona === "safeguarding" || newPersona === "nurse" || newPersona === "senco") {
-      setActive("Sensitive records");
     }
   }
 
@@ -1165,15 +1156,14 @@ export function KlassoWorkspace({ roster }: { roster: Awaited<ReturnType<typeof 
           <nav aria-label="Primary navigation" className="flex-1 space-y-1 p-2">
             {!collapsed && <p className="px-2 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Workspace</p>}
             {[
-              { label: "Overview" as const, icon: House, roles: ["admin", "safeguarding", "nurse", "senco", "teacher", "guardian"] },
-              { label: "Attendance" as const, icon: CalendarCheck, roles: ["admin", "safeguarding", "nurse", "senco", "teacher", "guardian"] },
-              { label: "Gradebook" as const, icon: Table, roles: ["admin", "safeguarding", "nurse", "senco", "teacher"] },
-              { label: "Report cards" as const, icon: FileText, roles: ["admin", "safeguarding", "nurse", "senco", "teacher"] },
-              { label: "Communications" as const, icon: Megaphone, roles: ["admin", "safeguarding", "nurse", "senco", "teacher", "guardian"] },
-              { label: "Sensitive records" as const, icon: LockKey, roles: ["admin", "safeguarding", "nurse", "senco", "teacher"] },
-              { label: "Students" as const, icon: Student, roles: ["admin", "safeguarding", "nurse", "senco", "teacher"] },
-              { label: "Guardians" as const, icon: UsersThree, roles: ["admin", "safeguarding"] },
-              { label: "Classes" as const, icon: GraduationCap, roles: ["admin", "safeguarding", "nurse", "senco", "teacher"] },
+              { label: "Overview" as const, icon: House, roles: ["admin", "teacher", "guardian"] },
+              { label: "Attendance" as const, icon: CalendarCheck, roles: ["admin", "teacher", "guardian"] },
+              { label: "Gradebook" as const, icon: Table, roles: ["admin", "teacher"] },
+              { label: "Report cards" as const, icon: FileText, roles: ["admin", "teacher"] },
+              { label: "Communications" as const, icon: Megaphone, roles: ["admin", "teacher", "guardian"] },
+              { label: "Students" as const, icon: Student, roles: ["admin", "teacher"] },
+              { label: "Guardians" as const, icon: UsersThree, roles: ["admin"] },
+              { label: "Classes" as const, icon: GraduationCap, roles: ["admin", "teacher"] },
               { label: "Imports" as const, icon: Archive, roles: ["admin"] },
             ].filter((item) => item.roles.includes(persona)).map((item) => {
               const Icon = item.icon;
@@ -1198,7 +1188,7 @@ export function KlassoWorkspace({ roster }: { roster: Awaited<ReturnType<typeof 
 
           <div className="border-t border-slate-800 p-2 space-y-1">
             {!collapsed && <p className="px-2 pb-1 pt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">System</p>}
-            {(persona === "admin" || persona === "safeguarding") && (
+            {(persona === "admin") && (
               <>
                 <button
                   title={collapsed ? "Settings" : undefined}
@@ -1270,24 +1260,6 @@ export function KlassoWorkspace({ roster }: { roster: Awaited<ReturnType<typeof 
               className={cn("px-2 py-0.5 font-semibold transition-colors", persona === "admin" ? "bg-white text-blue-700 shadow-xs border border-slate-200" : "text-slate-600 hover:text-slate-950")}
             >
               Admin
-            </button>
-            <button
-              onClick={() => handlePersonaSwitch("safeguarding")}
-              className={cn("px-2 py-0.5 font-semibold transition-colors", persona === "safeguarding" ? "bg-white text-blue-700 shadow-xs border border-slate-200" : "text-slate-600 hover:text-slate-950")}
-            >
-              Safeguarding
-            </button>
-            <button
-              onClick={() => handlePersonaSwitch("nurse")}
-              className={cn("px-2 py-0.5 font-semibold transition-colors", persona === "nurse" ? "bg-white text-blue-700 shadow-xs border border-slate-200" : "text-slate-600 hover:text-slate-950")}
-            >
-              Nurse
-            </button>
-            <button
-              onClick={() => handlePersonaSwitch("senco")}
-              className={cn("px-2 py-0.5 font-semibold transition-colors", persona === "senco" ? "bg-white text-blue-700 shadow-xs border border-slate-200" : "text-slate-600 hover:text-slate-950")}
-            >
-              SENCO
             </button>
             <button
               onClick={() => handlePersonaSwitch("teacher")}
@@ -1467,30 +1439,6 @@ export function KlassoWorkspace({ roster }: { roster: Awaited<ReturnType<typeof 
                   onInitiateEmergencyBroadcast={handleInitiateEmergencyBroadcast}
                   onRecordRead={handleRecordAnnouncementRead}
                   onUpdateConsent={handleUpdateGuardianConsent}
-                />
-              )}
-
-              {active === "Sensitive records" && (
-                <SensitiveRecordsModule
-                  currentUserRole={currentKlassoRole}
-                  currentUserId={currentSpecialistUser.id}
-                  currentUserName={currentSpecialistUser.name}
-                  cases={sensitiveCases}
-                  alerts={needToKnowAlerts}
-                  courtOrders={courtRestrictions}
-                  accessLogs={sensitiveAccessLogs}
-                  onCaseCreated={(newCase) => {
-                    setSensitiveCases((prev) => [newCase, ...prev]);
-                  }}
-                  onAlertCreated={(newAlert) => {
-                    setNeedToKnowAlerts((prev) => [newAlert, ...prev]);
-                  }}
-                  onOrderRegistered={(newOrder) => {
-                    setCourtRestrictions((prev) => [newOrder, ...prev]);
-                  }}
-                  onAccessAudited={(newLog) => {
-                    setSensitiveAccessLogs((prev) => [newLog, ...prev]);
-                  }}
                 />
               )}
 

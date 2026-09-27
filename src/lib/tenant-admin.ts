@@ -20,7 +20,6 @@ export interface OnboardingChecklist {
   initialAdminInvited: boolean;
   mfaPolicyActivated: boolean;
   academicYearCreated: boolean;
-  safeguardingLeadDesignated: boolean;
   initialRosterImported: boolean;
 }
 
@@ -82,25 +81,19 @@ export const INITIAL_ONBOARDING_CHECKLISTS: Record<string, OnboardingChecklist> 
     domainVerified: true,
     initialAdminInvited: true,
     mfaPolicyActivated: true,
-    academicYearCreated: true,
-    safeguardingLeadDesignated: true,
-    initialRosterImported: true,
+    academicYearCreated: true,    initialRosterImported: true,
   },
   "org-stjude": {
     domainVerified: true,
     initialAdminInvited: true,
     mfaPolicyActivated: true,
-    academicYearCreated: true,
-    safeguardingLeadDesignated: true,
-    initialRosterImported: true,
+    academicYearCreated: true,    initialRosterImported: true,
   },
   "org-riverdale": {
     domainVerified: true,
     initialAdminInvited: true,
     mfaPolicyActivated: true,
-    academicYearCreated: true,
-    safeguardingLeadDesignated: false,
-    initialRosterImported: false,
+    academicYearCreated: true,    initialRosterImported: false,
   },
 };
 
@@ -155,9 +148,7 @@ export function provisionSchoolOrganization(input: ProvisionSchoolInput): {
     domainVerified: false,
     initialAdminInvited: true,
     mfaPolicyActivated: true,
-    academicYearCreated: false,
-    safeguardingLeadDesignated: false,
-    initialRosterImported: false,
+    academicYearCreated: false,    initialRosterImported: false,
   };
 
   return { organization: newOrg, checklist };

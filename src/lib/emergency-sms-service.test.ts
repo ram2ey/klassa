@@ -81,25 +81,10 @@ describe("emergency parent SMS broadcast workflows", () => {
         targetId: "all",
         severity: "lockdown",
         message: "Emergency lockdown active.",
+        reason: "Security alert",
       })
     ).rejects.toThrow("Teachers cannot change this school record");
 
-    const nurseActor = {
-      organizationId: org,
-      userId: "nurse-1",
-      name: "School Nurse",
-      role: "health_nurse" as const,
-    };
-
-    await expect(
-      saveSchoolWorkflow(nurseActor, {
-        kind: "emergency_sms_broadcast",
-        scope: "whole_school",
-        targetId: "all",
-        severity: "lockdown",
-        message: "Emergency lockdown active.",
-      })
-    ).rejects.toThrow("cannot change this school record");
   });
 
   it("lets school admin broadcast to whole school and logs audit trail", async () => {
@@ -113,12 +98,12 @@ describe("emergency parent SMS broadcast workflows", () => {
       }
       if (query.includes('from "student_guardians"')) {
         return [
-          [studentId1, guardianId1, "John", "Doe", "+44 7700 900077"],
-          [studentId2, guardianId2, "Jane", "Smith", "07700 900088"],
+          [studentId1, guardianId1, "John", "Doe", "+233241111111", new Date()],
+          [studentId2, guardianId2, "Jane", "Smith", "+233242222222", new Date()],
         ];
       }
-      if (query.startsWith('insert into "sms_dispatches"')) {
-        return [["sms-disp-1"]];
+      if (query.startsWith('insert into "emergency_broadcasts"')) {
+        return [["broadcast-1"]];
       }
       if (query.startsWith('insert into "audit_events"')) {
         return [["audit-1"]];
@@ -132,6 +117,7 @@ describe("emergency parent SMS broadcast workflows", () => {
       targetId: "all",
       severity: "lockdown",
       message: "[Northfield] Precautionary campus lockdown in effect. All students safe.",
+      reason: "Verified security incident",
     });
 
     expect(result.entityId).toBeDefined();
@@ -141,7 +127,8 @@ describe("emergency parent SMS broadcast workflows", () => {
     const dispatchCalls = mocks.execute.mock.calls.filter(([query]) =>
       query.startsWith('insert into "sms_dispatches"')
     );
-    expect(dispatchCalls).toHaveLength(2);
+    expect(dispatchCalls).toHaveLength(0);
+    expect(mocks.execute.mock.calls.some(([query]) => query.startsWith('insert into "emergency_broadcasts"'))).toBe(true);
 
     const auditCall = mocks.execute.mock.calls.find(([query]) =>
       query.startsWith('insert into "audit_events"')
@@ -159,10 +146,10 @@ describe("emergency parent SMS broadcast workflows", () => {
         return [[studentId1]];
       }
       if (query.includes('from "student_guardians"')) {
-        return [[studentId1, guardianId1, "Alice", "Vance", "+354 555 1234"]];
+        return [[studentId1, guardianId1, "Alice", "Vance", "+233241111111", new Date()]];
       }
-      if (query.startsWith('insert into "sms_dispatches"')) {
-        return [["sms-disp-1"]];
+      if (query.startsWith('insert into "emergency_broadcasts"')) {
+        return [["broadcast-1"]];
       }
       if (query.startsWith('insert into "audit_events"')) {
         return [["audit-1"]];
@@ -176,6 +163,7 @@ describe("emergency parent SMS broadcast workflows", () => {
       targetId: gradeId,
       severity: "weather_alert",
       message: "[Northfield] Grade 10 field excursion delayed due to highway weather.",
+      reason: "Severe weather warning",
     });
 
     expect(result.recipientCount).toBe(1);
@@ -196,6 +184,7 @@ describe("emergency parent SMS broadcast workflows", () => {
         targetId: "all",
         severity: "school_closure",
         message: "School closed today due to snow.",
+        reason: "Unsafe road conditions",
       })
     ).rejects.toThrow("No active students found");
 
@@ -207,7 +196,7 @@ describe("emergency parent SMS broadcast workflows", () => {
       if (query.includes('from "organizations"')) return [[org, "Northfield Academy"]];
       if (query.includes('from "students"')) return [[studentId1, "active"]];
       if (query.includes('from "student_guardians"')) {
-        return [[studentId1, guardianId1, "No", "Phone", ""]];
+        return [[studentId1, guardianId1, "No", "Phone", "", null]];
       }
       return [];
     });
@@ -219,8 +208,9 @@ describe("emergency parent SMS broadcast workflows", () => {
         targetId: "all",
         severity: "urgent_alert",
         message: "Urgent bus delay for all routes.",
+        reason: "Transport disruption",
       })
-    ).rejects.toThrow("No guardians with registered phone numbers were found");
+    ).rejects.toThrow("No verified legal guardian numbers");
 
     expect(mocks.rollback).toHaveBeenCalledOnce();
   });

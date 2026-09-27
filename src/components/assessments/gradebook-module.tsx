@@ -349,9 +349,7 @@ export function GradebookModule({
                               {st.computedLetter}
                             </span>
                           </div>
-                          <span className="text-[10px] text-slate-500 font-medium">
-                            GPA: {st.computedGpa.toFixed(1)} / 4.0
-                          </span>
+
                         </div>
                       </div>
                     </td>
@@ -448,7 +446,6 @@ export function GradebookModule({
                       <th className="px-3">Grade Label</th>
                       <th className="px-3">Min %</th>
                       <th className="px-3">Max %</th>
-                      <th className="px-3">GPA Value</th>
                       <th className="px-3">Description</th>
                     </tr>
                   </thead>
@@ -458,7 +455,6 @@ export function GradebookModule({
                         <td className="px-3 font-bold text-slate-900">{item.label}</td>
                         <td className="px-3 font-mono">{item.minScore}%</td>
                         <td className="px-3 font-mono">{item.maxScore}%</td>
-                        <td className="px-3 font-mono font-bold text-blue-700">{item.gpaPoint.toFixed(1)}</td>
                         <td className="px-3 text-[11px] text-slate-500">{item.description}</td>
                       </tr>
                     ))}

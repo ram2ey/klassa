@@ -1,5 +1,7 @@
 # Klasso Project Roadmap & Implementation Progress
 
+> **Current release status:** Pre-release simplification for Ghana schools. The app has not been used and has no historical school data to preserve. Phase 1 removed specialist roles and unused records. Phase 2 aligns screens, workflows and documentation with the smaller release; validate migrations on a fresh database and complete staging checks before deployment.
+
 This document tracks architectural decisions, phase deliverables, completed features, and the immediate backlog. **Any AI assistant or developer continuing work on Klasso should review this document first.**
 
 ---
@@ -12,21 +14,21 @@ The live teacher workspace shows assigned current-year classes and rosters, atte
 
 The live office workspace covers student intake and placement, guardian relationships, CSV imports, submitted attendance corrections, school notices, and limited pickup or disclosure restriction flags. Office actions remain school-scoped and cannot alter grades, staff permissions, or confidential case notes.
 
-The live guardian portal now supports manually provisioned guardian accounts, linked legal-student access, submitted attendance, published report cards, targeted notices and category-only absence notes for office review. Email/SMS invitations and messaging, SMS and emergency delivery, delivery of specialist directives, operational enforcement of court restrictions, and GDPR still need production integration. The historical phase checklists below describe the demo implementation and must not be read as production completion. See README.md for current live boundaries.
+The live guardian portal now supports manually provisioned guardian accounts, linked legal-student access, submitted attendance, published report cards, targeted notices and category-only absence notes for office review. Staff invitations, SMS and emergency delivery, pickup and disclosure restrictions, and reviewed privacy actions are implemented in the current release candidate; staging acceptance is still required. Guardian account invitations and specialist directive delivery remain separate work. The historical phase checklists below describe the demo implementation and must not be read as production completion. See README.md for current live boundaries.
 
 ### Tenant isolation work still required
 
 Migration `0028_tenant_row_security` introduces row level security for school-owned records and a restricted web database role. The application places the verified staff school or guardian schools in transaction-local PostgreSQL settings; platform administrators use a separate verified context. The migration container runs a rollback-only two-school probe before the web service starts. This protection is **not active in an existing deployment until the new Compose configuration and migration are deployed successfully**. Authentication and invitation tables remain outside the school RLS policies because they are queried before a school context exists; application authorization still protects those workflows.
 
-### Historical demo roadmap
+### Archived demo roadmap (not current scope)
 
-- **Active Phase**: Preparing for **Phase 4 — School Communications**
+- **Active Phase**: Preparing for **Phase 4 Ã¢â‚¬â€ School Communications**
 - **Completed Phases**:
-  - **Phase 1 — Foundation and Student Records** (100% complete and verified)
-  - **Phase 2 — Attendance and Guardian Access** (100% complete and verified)
-  - **Phase 3 — Assessments and Report Cards** (100% complete and verified)
+  - **Phase 1 Ã¢â‚¬â€ Foundation and Student Records** (100% complete and verified)
+  - **Phase 2 Ã¢â‚¬â€ Attendance and Guardian Access** (100% complete and verified)
+  - **Phase 3 Ã¢â‚¬â€ Assessments and Report Cards** (100% complete and verified)
 - **Tech Stack**: Next.js 16 (App Router + Turbopack), PostgreSQL 17, Drizzle ORM, Better Auth (with TOTP MFA plugin), Docker / Coolify, Vitest, Tailwind CSS v4.
-- **Design System**: Institutional compact theme (0–2px radii, Plus Jakarta Sans, Phosphor icons, slate/royal blue palette). See [`docs/design-system.md`](docs/design-system.md).
+- **Design System**: Institutional compact theme (0Ã¢â‚¬â€œ2px radii, Plus Jakarta Sans, Phosphor icons, slate/royal blue palette). See [`docs/design-system.md`](docs/design-system.md).
 
 ---
 
@@ -44,7 +46,7 @@ npm run build       # Verify Next.js production build
 
 ## Master 6-Phase Roadmap
 
-### Phase 1 — Foundation and Student Records ✅ [COMPLETED]
+### Phase 1 Ã¢â‚¬â€ Foundation and Student Records Ã¢Å“â€¦ [COMPLETED]
 **Goal:** Establish a secure administrative system of record.
 **Exit Criteria Met:** Staff can securely import, validate, and maintain the complete school roster.
 
@@ -62,11 +64,11 @@ npm run build       # Verify Next.js production build
   - Invite-only admin and office staff tokens with role enforcement.
 - [x] **Academic Structure & School Setup**:
   - Classes & homeroom teacher assignments.
-  - 2026–27 Academic Year and Terms (Fall, Winter, Spring).
+  - 2026Ã¢â‚¬â€œ27 Academic Year and Terms (Fall, Winter, Spring).
   - Course catalog & curriculum subjects (`MATH-01`, `SCI-01`, `ENG-01`, etc.).
 - [x] **Student & Guardian Records Management**:
   - Searchable, filterable student directory with grade levels and enrollment statuses.
-  - Slide-out student detail drawer with status switching (`Active` ↔ `Pending`).
+  - Slide-out student detail drawer with status switching (`Active` Ã¢â€ â€ `Pending`).
   - Guardian directory with primary contact flags and legal custody indicators.
   - Full manual creation dialogs for students, guardians, classes, and subjects.
   - Dynamic CSV export of current student directory.
@@ -85,8 +87,8 @@ npm run build       # Verify Next.js production build
 
 ---
 
-### Phase 2 — Attendance and Guardian Access ✅ [COMPLETED]
-**Goal:** Support the school’s daily operational workflow.
+### Phase 2 Ã¢â‚¬â€ Attendance and Guardian Access Ã¢Å“â€¦ [COMPLETED]
+**Goal:** Support the schoolÃ¢â‚¬â„¢s daily operational workflow.
 **Exit Criteria Met:** Teachers can record attendance, guardians receive absence alerts, and office staff can resolve discrepancies with audit justifications.
 
 - [x] **Teacher Accounts & Class Assignments**:
@@ -95,7 +97,7 @@ npm run build       # Verify Next.js production build
 - [x] **Daily Attendance Model & Rapid Roll-Call Entry**:
   - Database tables: `attendance_sessions` and `attendance_records` supporting statuses `present`, `absent`, `late`, and `excused` in [`src/db/schema.ts`](src/db/schema.ts).
   - Migration script: [`drizzle/0002_phase2_attendance_guardians_sms.sql`](drizzle/0002_phase2_attendance_guardians_sms.sql).
-  - Server actions in [`src/app/actions/attendance-actions.ts`](src/app/actions/attendance-actions.ts) for roll-call initialization and submission with status transitions (`in_progress` ➔ `submitted` ➔ `locked`).
+  - Server actions in [`src/app/actions/attendance-actions.ts`](src/app/actions/attendance-actions.ts) for roll-call initialization and submission with status transitions (`in_progress` Ã¢Å¾â€ `submitted` Ã¢Å¾â€ `locked`).
   - Rapid roll-call sheet with quick status segment buttons (`P`/`A`/`L`/`E`), minutes late tracking, notes, and bulk "Mark All Present".
 - [x] **Attendance Corrections & Audit History**:
   - Table `attendance_corrections` tracking `previousStatus`, `newStatus`, `reason`, `authorizedBy`, and `createdAt`.
@@ -119,7 +121,7 @@ npm run build       # Verify Next.js production build
 
 ---
 
-### Phase 3 — Assessments and Report Cards ✅ [COMPLETED]
+### Phase 3 Ã¢â‚¬â€ Assessments and Report Cards Ã¢Å“â€¦ [COMPLETED]
 **Goal:** Manage academic results from entry through publication.
 **Exit Criteria Met:** Teachers can enter grades and the school can securely publish complete report cards with guardian portal access.
 
@@ -148,7 +150,7 @@ npm run build       # Verify Next.js production build
 
 ---
 
-### Phase 4 — School Communications ✅ [COMPLETED]
+### Phase 4 Ã¢â‚¬â€ School Communications Ã¢Å“â€¦ [COMPLETED]
 **Goal:** Provide controlled communication without turning Klasso into a general chat platform.
 **Exit Criteria Met:** Authorized staff can send traceable notices, track read receipts, enforce two-party emergency broadcasts, manage guardian SMS opt-in/opt-out consent, and audit telecommunication transit costs while preventing duplicate dispatches.
 
@@ -180,7 +182,7 @@ npm run build       # Verify Next.js production build
 
 ---
 
-### Phase 5 — Sensitive Student Records ✅ [COMPLETED]
+### Phase 5 Ã¢â‚¬â€ Sensitive Student Records Ã¢Å“â€¦ [COMPLETED]
 **Goal:** Introduce health, safeguarding, special-needs, and disciplinary case management safely.
 **Exit Criteria Met:** The sensitive modules pass security review and cannot expose raw case data through normal student or guardian screens. Raw narratives are AES-256-GCM encrypted, need-to-know teacher alerts are strictly sanitized, every read access is audited with mandatory justification, court orders restrict disclosure, and official redacted disclosure dossiers can be generated.
 
@@ -215,8 +217,8 @@ npm run build       # Verify Next.js production build
 
 ---
 
-### Phase 6 — Production Hardening and Expansion ⚪ [PENDING]
-### Phase 6 — Production Hardening and Expansion ✅ [COMPLETED]
+### Phase 6 Ã¢â‚¬â€ Production Hardening and Expansion Ã¢Å¡Âª [PENDING]
+### Phase 6 Ã¢â‚¬â€ Production Hardening and Expansion Ã¢Å“â€¦ [COMPLETED]
 **Goal:** Prepare for broader adoption and future schools.
 **Exit Criteria:** The system has documented security evidence, recovery procedures, operational ownership, and a repeatable onboarding process.
 **Exit Criteria Met:** The system has documented security evidence, recovery procedures, operational ownership, and a repeatable onboarding process. OWASP ASVS Level 2 verified, sliding-window rate limiting active, health diagnostics and incident telemetry live, monthly restore drills validating 24h RPO and 8h RTO, GDPR data subject rights engine (portability export, safeguarding non-disclosure, Article 17 erasure/anonymization, processing restriction), formal OpenAPI 3.1 contract, and multi-school tenant provisioning.

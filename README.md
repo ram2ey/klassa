@@ -1,6 +1,12 @@
 # Klassa
 
-Klassa is a secure K–12 school administration system. Phase 1 establishes the institutional design system, student and guardian records, enrollment history, CSV-import foundations, audit events, administrator-provisioned authentication, and a deployment baseline for Coolify.
+## Current live workflow status
+
+This app has not been used and has no school data to preserve. It is being trimmed for its first Ghana school release. The supported school roles are administrator, office staff and teacher, with guardians in a separate portal. The core flow covers pupil records, attendance, marks, reports, year placement, pickup checks and school notices.
+
+The current migration chain removes unused specialist, inquiry and calendar features. Validate it against a fresh or disposable database before deployment. The SMS queue and delivery tracking remain; production SMS must stay disabled until the mNotify flow has passed a controlled staging check. See the [simplified Ghana school plan](docs/simplified-ghana-school-plan.md), [Phase 3 staging acceptance checklist](docs/phase-3-staging-acceptance.md), and [Coolify deployment guide](docs/coolify-deployment.md).
+
+Klassa is a school administration app for Ghana. Schools configure their own grade names, classes and grading approach.
 
 ## Local development
 
@@ -17,7 +23,7 @@ For the synthetic local preview, set `KLASSO_DEMO_MODE=true` in `.env.local` and
 
 Demo mode is rejected in production. With demo mode disabled, the home page requires an existing staff account and school membership. Platform administrators also need enabled MFA. Live roster reads, student enrollment and status updates use PostgreSQL and enforce the authenticated organization. Enrollment requires an existing class/grade in the school's current academic year. Mutations and their audit entries commit atomically. Database errors are never converted into successful demo writes.
 
-The older demo action routes for attendance, assessments, communications and sensitive records remain preview-only; the live school administrator sections use separate school-scoped actions. GDPR workflows and the old school-provisioning preview remain local demonstrations. Anonymization is unavailable even in the preview: it cannot yet erase all related records and must not mark requests complete. Emergency approvals are simulations; live SMS, scheduled delivery and guardian messaging are not connected. SMS simulations have zero cost and are not marked delivered.
+The older demo action routes for attendance, assessments, communications and sensitive records remain preview-only; the live school administrator sections use separate school-scoped actions. The old school-provisioning preview remains local. Live privacy requests support reviewed export, rectification and processing restriction; erasure cannot be fulfilled until approved retention and dependency controls exist. Live emergency SMS requires two distinct staff approvals and enters a durable queue; scheduled SMS and guardian account invitations are not implemented. SMS simulations have zero cost and are not marked delivered.
 
 ### Live school administrator workspace
 
@@ -34,11 +40,11 @@ School administrators land on the school overview at `/`. Navigation links use `
 - Gradebook: create weighted categories and assessments, enter scores, publish complete class grades, and explain published-grade corrections.
 - Report cards: generate versioned cards from published grades and submitted attendance, inspect subject results, approve, publish, and print or save a PDF.
 - Communications: draft and publish school, grade and class in-app announcements. Staff see published notices relevant to their role and class assignment.
-- Sensitive records: create cases, store encrypted notes, require an access reason for decryption, maintain case status and access history, and record staff directives and court restrictions.
+- Pupil concerns and pickup: administrators review restricted flags that affect pupil release or access; private notes stay with administrators.
 - Audit history: search the latest 100 events for this school.
 - School settings: edit the school's display name. The sign-in tenant ID remains managed separately; the timezone is fixed at GMT.
 
-For a new school, create the academic year and mark it current, add grades and classes, then enroll students and link guardians. Every mutation checks the authenticated school and commits its audit entry in the same transaction. Guardian delivery, emergency two-party broadcasts, operational enforcement of court restrictions at pickup, delivery of specialist directives to other roles, and GDPR requests are not connected to the live administrator workspace.
+For a new school, create the academic year and mark it current, add grades and classes, then enroll students and link guardians. Every mutation checks the authenticated school and commits its audit entry in the same transaction. The live administrator workspace includes the guardian portal, two-staff emergency SMS approval, pickup checks, and reviewed privacy requests. Specialist directive delivery remains a separate workflow.
 
 Student numbers are assigned from a per-school counter inside the enrollment transaction, including CSV imports. Existing student numbers stay unchanged, and staff cannot edit assigned numbers. The CSV template does not require a student number; `externalReference` is optional for a school's old ID. Older CSVs with a `studentNumber` column are accepted and that value is stored as the external reference. A repeated external reference in the same school is rejected. After import, download the row-by-row mapping of old IDs and assigned numbers; both are searchable in the student directory. Apply migration `0011_student_number_counters` with `npm run db:migrate` before using live enrollment or import.
 
@@ -46,7 +52,7 @@ Student numbers are assigned from a per-school counter inside the enrollment tra
 
 Office staff land on their own overview at `/`. They can enroll and update students, change current-year class placement and status, maintain guardian contacts and relationships, import validated student CSV files, and correct a submitted roll call with a written reason. Student numbers are assigned automatically for both individual enrollment and CSV import. The student directory flags active pickup or disclosure restrictions for office follow-up. Staff can read published school notices. Server actions reject attempts to manage staff roles, academic setup, grades, report publication, or direct sensitive case editing.
 
-The shared enrollment wizard lets office staff flag safeguarding, health, learning support, or behaviour concerns. These create restricted cases with only a generic title and category; no sensitive narrative is collected on the enrollment form. School administrators review them under Sensitive records and add protected notes through that workflow. A safeguarding referral does not itself create or enforce a pickup or court restriction.
+The enrollment form collects basic pupil and guardian details. Administrators can review restricted pickup or access flags separately; do not enter clinical or case narratives into the general pupil record.
 
 ### Live teacher workspace
 
@@ -56,7 +62,7 @@ Homeroom teachers can record and submit attendance and generate draft report car
 
 ### Live guardian portal
 
-School administrators can enable a guardian account from the Guardian directory after linking that contact to a student with legal responsibility. The account is not added to staff memberships. Share its tenant ID, username and temporary password through a verified private channel; the guardian must change the password at first sign-in. The portal displays only students whose guardian link grants legal responsibility, submitted attendance from the most recent 120 days, published report cards, and published school, grade or current-class notices. Guardians can submit an absence date and reason category; office staff can mark the note reviewed. A note does not change attendance and contains no free-text health details. The portal does not expose sensitive case notes or attendance reasons. Direct messaging, email/SMS invitations and delivery remain future work.
+School administrators can enable a guardian account from the Guardian directory after linking that contact to a student with legal responsibility. The account is not added to staff memberships. Share its tenant ID, username and temporary password through a verified private channel; the guardian must change the password at first sign-in. The portal displays only students whose guardian link grants legal responsibility and has no active disclosure or processing restriction, plus submitted attendance, published report cards, and targeted notices. Guardians can submit an absence date and reason category; office staff can mark the note reviewed. A note does not change attendance and contains no free-text health details. The portal does not expose sensitive case notes or attendance reasons. Guardian direct messaging and inquiry conversations are not part of this release. Guardian accounts are provisioned by school administrators and shared through a verified private channel.
 
 Production startup requires `DATABASE_URL`, `BETTER_AUTH_SECRET` and `SENSITIVE_RECORD_ENCRYPTION_KEY`. Generate independent random secrets (at least 32 characters) and keep them outside source control. Keep the narrative key securely backed up; changing it without a migration makes existing ciphertext unreadable. No default production key is provided. Platform-managed school and staff provisioning, forced temporary-password replacement, and MFA enrollment are implemented. No SMS provider is required for the in-app workflows.
 
@@ -82,8 +88,8 @@ Follow the complete [Coolify deployment guide](docs/coolify-deployment.md). For 
 
 ## Documentation & Roadmap
 
-- **Progress & Roadmap:** See [`ROADMAP.md`](ROADMAP.md) for the master 6-phase status, completed Phase 1 checklist, and Phase 2 backlog.
-- **Visual Guidelines:** See [`docs/design-system.md`](docs/design-system.md) for Klassa’s design system rules.
+- **Progress & Roadmap:** See [`ROADMAP.md`](ROADMAP.md) for the historical project roadmap and current release status.
+- **Visual Guidelines:** See [`docs/design-system.md`](docs/design-system.md) for Klassaâ€™s design system rules.
 - **Backup & Disaster Recovery:** See [`docs/backup-and-restore.md`](docs/backup-and-restore.md) for Coolify and Docker automated backup runbooks.
 - **Coolify Deployment:** See [`docs/coolify-deployment.md`](docs/coolify-deployment.md) for the complete first deployment, verification, backup, update and rollback procedure.
 
@@ -91,7 +97,7 @@ Follow the complete [Coolify deployment guide](docs/coolify-deployment.md). For 
 
 1. Configure PostgreSQL, set `KLASSO_DEMO_MODE=false`, and apply migrations with `npm run db:migrate`. Supply `DATABASE_URL` to the migration process.
 2. Set the public `BETTER_AUTH_URL` to the production HTTPS origin.
-3. In a trusted administration shell, set `KLASSO_BOOTSTRAP_USERNAME` (for example, `admin`), `KLASSO_BOOTSTRAP_NAME`, and `KLASSO_BOOTSTRAP_PASSWORD` (12–128 characters). Run `npm run admin:bootstrap`. Clear the bootstrap variables afterward.
+3. In a trusted administration shell, set `KLASSO_BOOTSTRAP_USERNAME` (for example, `admin`), `KLASSO_BOOTSTRAP_NAME`, and `KLASSO_BOOTSTRAP_PASSWORD` (12â€“128 characters). Run `npm run admin:bootstrap`. Clear the bootstrap variables afterward.
 4. Sign in at `/login` and complete authenticator enrollment at `/setup-mfa`. Save the one-use recovery codes offline.
 5. Open `/platform`. Create each school together with its initial administrator, username, and a unique temporary password. Platform administrators can add more staff there; after setup, each school administrator can also create staff accounts directly inside their own school.
 6. Share the tenant ID, username and temporary password through a secure channel. On first sign-in, the account must replace the temporary password before school access.

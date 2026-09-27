@@ -3,7 +3,7 @@
 import { useState, useTransition } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Award, BookOpen, CalendarCheck, ChevronRight, ClipboardList, GraduationCap, LayoutDashboard, Megaphone, Menu, MessageSquare, X } from "lucide-react";
+import { Award, BookOpen, CalendarCheck, ChevronRight, ClipboardList, GraduationCap, LayoutDashboard, Megaphone, Menu, X } from "lucide-react";
 import { AccountSignOut } from "@/components/account-sign-out";
 import { saveTeacherWorkflowAction } from "@/app/actions/teacher-actions";
 import type { TeacherData } from "@/lib/teacher-data";
@@ -11,7 +11,6 @@ import { attendancePeriods, type AttendancePeriod, type WorkflowCommand } from "
 import type { announcements } from "@/db/schema";
 import { TeacherBehaviourPanel } from "@/components/teacher-behaviour-panel";
 import { StudentAcademicDrawer } from "@/components/student-academic-drawer";
-import { StaffInquiryList } from "@/components/staff-inquiry-list";
 
 const tabs = [
   { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -20,7 +19,6 @@ const tabs = [
   { id: "gradebook", label: "Gradebook", icon: BookOpen },
   { id: "reports", label: "Report cards", icon: ClipboardList },
   { id: "behaviour", label: "Behaviour & praise", icon: Award },
-  { id: "inquiries", label: "Inquiries", icon: MessageSquare },
   { id: "notices", label: "Notices", icon: Megaphone },
 ] as const;
 const inputStyle = "mt-1 block min-h-11 w-full border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-600";
@@ -140,7 +138,6 @@ export function TeacherWorkspace({ data, notices, section, date }: { data: Teach
         {current.id === "overview" && <><div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">{[
           { label: "Assigned classes", value: data.classes.length, href: "classes" },
           { label: "Active students", value: new Set(data.enrollments.filter(row => row.status === "active").map(row => row.studentId)).size, href: "classes" },
-          { label: "Open inquiries", value: (data.inquiries ?? []).filter(row => row.status === "open").length, href: "inquiries" },
           { label: "Praise merits", value: (data.behaviours ?? []).filter(row => row.type === "praise").reduce((sum, row) => sum + row.points, 0), href: "behaviour" },
           { label: "Assessments", value: data.assessments.length, href: "gradebook" },
         ].map(item => <Link key={item.label} href={`/?section=${item.href}`} className="border border-slate-200 bg-white p-5"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{item.label}</p><p className="mt-3 text-3xl font-bold">{item.value}</p></Link>)}</div><Card title="Your classes"><div className="grid gap-3 md:grid-cols-2">{data.classes.map(row => <Link key={row.id} href="/?section=classes" className="flex min-h-16 items-center justify-between border border-slate-200 p-4 text-sm hover:border-blue-500"><span><strong>{row.name}</strong><span className="ml-2 text-slate-500">{data.gradeLevels.find(grade => grade.id === row.gradeLevelId)?.name}</span></span><span className="text-slate-500">{roster(row.id).length} students</span></Link>)}</div></Card><Card title="Latest notices">{notices.slice(0, 3).map(notice => <div key={notice.id} className="border-b border-slate-100 py-3 text-sm"><strong>{notice.title}</strong><p className="mt-1 text-slate-600">{notice.content}</p></div>)}{!notices.length && <p className="text-sm text-slate-500">No published notices.</p>}</Card></>}
@@ -171,7 +168,7 @@ export function TeacherWorkspace({ data, notices, section, date }: { data: Teach
           {isAssessmentTermLocked && <p role="alert" className="mt-2 text-xs font-semibold text-amber-800 bg-amber-50 p-2 border border-amber-200">The gradebook for this term is closed and locked. Grades cannot be modified.</p>}
           <div className="mt-3 divide-y divide-slate-100">{roster(selectedAssessment.classId).map(student => { const grade = data.grades.find(row => row.assessmentId === selectedAssessment.id && row.studentId === student.id); return <form key={student.id} className="grid items-end gap-3 py-3 md:grid-cols-[1fr_130px_1fr_1fr_auto]" onSubmit={event => submit(event, form => ({ kind: "grade_entry", assessmentId: selectedAssessment.id, studentId: student.id, score: Number(str(form, "score")), feedback: str(form, "feedback"), correctionReason: str(form, "correctionReason") }))}><strong className="text-sm">{student.firstName} {student.lastName}</strong><Field label="Score" name="score" type="number" min={0} max={selectedAssessment.maxScore} defaultValue={grade?.score ?? ""} /><Field label="Feedback" name="feedback" required={false} defaultValue={grade?.feedback ?? ""} /><Field label="Correction reason" name="correctionReason" required={false} /><button className={primary} disabled={pending || isAssessmentTermLocked}>Save</button></form>; })}</div>{selectedAssessment.status === "draft" && roster(selectedAssessment.classId).length > 0 && <button className={secondary} disabled={pending || isAssessmentTermLocked} onClick={() => save({ kind: "assessment_publish", assessmentId: selectedAssessment.id })}>Publish assessment and grades</button>}</>}</Card></div>;
         })()}
-        {current.id === "reports" && <div className="space-y-5"><Card title="Generate draft report card"><p className="mb-3 text-sm text-slate-600">Uses published assessments and submitted attendance. School administration approves and publishes the draft.</p><form className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end" onSubmit={event => submit(event, form => ({ kind: "report_generate", studentId: str(form, "studentId"), termId: str(form, "termId") }))}><Select label="Homeroom student" name="studentId" choices={data.students.filter(student => data.enrollments.some(row => row.studentId === student.id && data.homeroomClassIds.includes(row.classId ?? ""))).map(row => ({ id: row.id, name: `${row.firstName} ${row.lastName}` }))} /><Select label="Term" name="termId" choices={data.terms.map(row => ({ id: row.id, name: row.name }))} /><button className={primary} disabled={pending}>Generate draft</button></form></Card><Card title="My class reports"><div className="space-y-4">{data.reports.map(card => <article key={card.id} className="border border-slate-200 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold">{studentName(card.studentId)} · {data.terms.find(row => row.id === card.termId)?.name} · Version {card.version}</h3><p className="mt-1 text-sm text-slate-500">{words(card.status)} · Overall {card.overallPercentage ?? "—"}% · GPA {card.gpa ?? "—"}</p></div><Link href={`/reports/${card.id}`} className="text-sm font-semibold text-blue-700">Open report</Link></div><ul className="mt-2 text-sm">{data.reportSubjects.filter(row => row.reportCardId === card.id).map(row => <li key={row.id}>{subjectName(row.subjectId)}: {row.scorePercentage}% ({row.letterGrade})</li>)}</ul>{card.status === "draft" && <form className="mt-3 space-y-2" onSubmit={event => submit(event, form => ({ kind: "report_remarks", reportCardId: card.id, teacherRemarks: str(form, "remarks") }))}><label className="block text-sm font-medium">Teacher remarks<textarea className={`${inputStyle} min-h-24`} name="remarks" defaultValue={card.teacherRemarks ?? ""} maxLength={5000} /></label><button className={secondary} disabled={pending}>Save remarks</button></form>}</article>)}{!data.reports.length && <p className="text-sm text-slate-500">No report cards for your homeroom classes yet.</p>}</div></Card></div>}
+        {current.id === "reports" && <div className="space-y-5"><Card title="Generate draft report card"><p className="mb-3 text-sm text-slate-600">Uses published assessments and submitted attendance. School administration approves and publishes the draft.</p><form className="grid gap-3 sm:grid-cols-[1fr_1fr_auto] sm:items-end" onSubmit={event => submit(event, form => ({ kind: "report_generate", studentId: str(form, "studentId"), termId: str(form, "termId") }))}><Select label="Homeroom student" name="studentId" choices={data.students.filter(student => data.enrollments.some(row => row.studentId === student.id && data.homeroomClassIds.includes(row.classId ?? ""))).map(row => ({ id: row.id, name: `${row.firstName} ${row.lastName}` }))} /><Select label="Term" name="termId" choices={data.terms.map(row => ({ id: row.id, name: row.name }))} /><button className={primary} disabled={pending}>Generate draft</button></form></Card><Card title="My class reports"><div className="space-y-4">{data.reports.map(card => <article key={card.id} className="border border-slate-200 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><h3 className="font-semibold">{studentName(card.studentId)} · {data.terms.find(row => row.id === card.termId)?.name} · Version {card.version}</h3><p className="mt-1 text-sm text-slate-500">{words(card.status)} · Overall {card.overallPercentage ?? "—"}% ·</p></div><Link href={`/reports/${card.id}`} className="text-sm font-semibold text-blue-700">Open report</Link></div><ul className="mt-2 text-sm">{data.reportSubjects.filter(row => row.reportCardId === card.id).map(row => <li key={row.id}>{subjectName(row.subjectId)}: {row.scorePercentage}% ({row.letterGrade})</li>)}</ul>{card.status === "draft" && <form className="mt-3 space-y-2" onSubmit={event => submit(event, form => ({ kind: "report_remarks", reportCardId: card.id, teacherRemarks: str(form, "remarks") }))}><label className="block text-sm font-medium">Teacher remarks<textarea className={`${inputStyle} min-h-24`} name="remarks" defaultValue={card.teacherRemarks ?? ""} maxLength={5000} /></label><button className={secondary} disabled={pending}>Save remarks</button></form>}</article>)}{!data.reports.length && <p className="text-sm text-slate-500">No report cards for your homeroom classes yet.</p>}</div></Card></div>}
         {current.id === "behaviour" && (
           <TeacherBehaviourPanel
             classes={data.classes}
@@ -181,14 +178,6 @@ export function TeacherWorkspace({ data, notices, section, date }: { data: Teach
             defaultDate={date}
             pending={pending}
             onSave={save}
-          />
-        )}
-        {current.id === "inquiries" && (
-          <StaffInquiryList
-            inquiries={data.inquiries ?? []}
-            title="Guardian Inquiries"
-            description="Two-way messages and inquiries submitted by verified guardians of students in your assigned classes."
-            onOpenStudentDrawer={(id) => setDrawerStudentId(id)}
           />
         )}
         {current.id === "notices" && <TeacherClassAnnouncement classes={data.classes} pending={pending} onSave={save} />}

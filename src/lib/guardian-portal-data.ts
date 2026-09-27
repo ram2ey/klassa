@@ -1,7 +1,7 @@
-import { and, asc, desc, eq, gte, inArray, lte } from "drizzle-orm";
+import { and, asc, desc, eq, gte, inArray, isNull, lte } from "drizzle-orm";
 import { db } from "@/db";
-import { academicYears, announcements, attendanceRecords, attendanceSessions, classes, classTimetablePeriods, enrollments, gradeLevels,
-  guardianAbsenceNotes, guardianConsents, guardianInquiries, guardianInquiryMessages, guardians, organizations, reportCardSubjectGrades, reportCards, studentGuardians, students, subjects, terms, users } from "@/db/schema";
+import { academicYears, announcements, attendanceRecords, attendanceSessions, classes, classTimetablePeriods, courtRestrictions, enrollments, gradeLevels,
+  guardianAbsenceNotes, organizations, reportCardSubjectGrades, reportCards, studentGuardians, students, subjects, terms, users } from "@/db/schema";
 import { requireGuardian } from "@/lib/action-access";
 import { formatPeriodLabel, type TimetablePeriodItem } from "@/lib/timetable-service";
 
@@ -12,23 +12,30 @@ export async function getGuardianPortalData() {
     organizationId: studentGuardians.organizationId, relationship: studentGuardians.relationship })
     .from(studentGuardians).innerJoin(students, and(eq(students.id, studentGuardians.studentId),
       eq(students.organizationId, studentGuardians.organizationId)))
-    .where(and(inArray(studentGuardians.guardianId, guardianIds), eq(studentGuardians.hasLegalResponsibility, true)));
-  const legalLinks = linkedRows.filter(link => account.guardians.some(profile =>
+    .where(and(inArray(studentGuardians.guardianId, guardianIds), eq(studentGuardians.hasLegalResponsibility, true),
+      isNull(students.processingRestrictedAt)));
+  const initialLegalLinks = linkedRows.filter(link => account.guardians.some(profile =>
     profile.id === link.guardianId && profile.organizationId === link.organizationId));
+  const today = new Date().toISOString().slice(0, 10);
+  const disclosureOrders = initialLegalLinks.length ? await db.select({ studentId: courtRestrictions.studentId,
+    organizationId: courtRestrictions.organizationId, guardianId: courtRestrictions.restrictedGuardianId,
+    effectiveDate: courtRestrictions.effectiveDate, expirationDate: courtRestrictions.expirationDate })
+    .from(courtRestrictions).where(and(inArray(courtRestrictions.studentId, initialLegalLinks.map(link => link.studentId)),
+      inArray(courtRestrictions.organizationId, initialLegalLinks.map(link => link.organizationId)),
+      eq(courtRestrictions.isEnforced, true), eq(courtRestrictions.prohibitDisclosure, true))) : [];
+  const legalLinks = initialLegalLinks.filter(link => !disclosureOrders.some(order => order.studentId === link.studentId &&
+    order.organizationId === link.organizationId && (!order.guardianId || order.guardianId === link.guardianId) &&
+    order.effectiveDate <= today && (!order.expirationDate || order.expirationDate >= today)));
   const studentIds = [...new Set(legalLinks.map(link => link.studentId))];
-  if (!studentIds.length) return { guardianName: account.name, students: [], announcements: [], consents: [], inquiries: [] };
+  if (!studentIds.length) return { guardianName: account.name, students: [], announcements: [] };
 
   const orgIds = [...new Set(legalLinks.map(link => link.organizationId))];
-  const [studentRows, schoolRows, guardianRows, consentRows, yearRows, classRows, gradeRows, termRows, enrollmentRows] = await Promise.all([
+  const [studentRows, schoolRows, yearRows, classRows, gradeRows, termRows, enrollmentRows] = await Promise.all([
     db.select({ id: students.id, organizationId: students.organizationId, firstName: students.firstName,
       preferredName: students.preferredName, lastName: students.lastName, studentNumber: students.studentNumber, status: students.status })
-      .from(students).where(and(inArray(students.id, studentIds), inArray(students.organizationId, orgIds))),
+      .from(students).where(and(inArray(students.id, studentIds), inArray(students.organizationId, orgIds),
+        isNull(students.processingRestrictedAt))),
     db.select({ id: organizations.id, name: organizations.name }).from(organizations).where(inArray(organizations.id, orgIds)),
-    db.select({ id: guardians.id, organizationId: guardians.organizationId, firstName: guardians.firstName, lastName: guardians.lastName })
-      .from(guardians).where(inArray(guardians.id, guardianIds)),
-    db.select({ guardianId: guardianConsents.guardianId, organizationId: guardianConsents.organizationId,
-      mediaConsent: guardianConsents.mediaConsent, excursionConsent: guardianConsents.excursionConsent })
-      .from(guardianConsents).where(and(inArray(guardianConsents.guardianId, guardianIds), inArray(guardianConsents.organizationId, orgIds))),
     db.select().from(academicYears).where(and(inArray(academicYears.organizationId, orgIds), eq(academicYears.isCurrent, true))),
     db.select().from(classes).where(inArray(classes.organizationId, orgIds)),
     db.select().from(gradeLevels).where(inArray(gradeLevels.organizationId, orgIds)),
@@ -54,7 +61,7 @@ export async function getGuardianPortalData() {
   const attendanceEnd = new Date();
   const attendanceStart = new Date(attendanceEnd);
   attendanceStart.setUTCDate(attendanceStart.getUTCDate() - 119);
-  const [attendanceRows, publishedCards, noticeRows, absenceNotes, inquiryRows] = await Promise.all([
+  const [attendanceRows, publishedCards, noticeRows, absenceNotes] = await Promise.all([
     db.select({ studentId: attendanceRecords.studentId, date: attendanceSessions.sessionDate,
       status: attendanceRecords.status, arrivalMinutesLate: attendanceRecords.arrivalMinutesLate })
       .from(attendanceRecords).innerJoin(attendanceSessions, eq(attendanceRecords.sessionId, attendanceSessions.id))
@@ -76,9 +83,6 @@ export async function getGuardianPortalData() {
       .from(guardianAbsenceNotes).where(and(inArray(guardianAbsenceNotes.organizationId, orgIds),
         inArray(guardianAbsenceNotes.guardianId, guardianIds), inArray(guardianAbsenceNotes.studentId, studentIds)))
       .orderBy(desc(guardianAbsenceNotes.createdAt)),
-    db.select().from(guardianInquiries).where(and(inArray(guardianInquiries.organizationId, orgIds),
-      inArray(guardianInquiries.guardianId, guardianIds)))
-      .orderBy(desc(guardianInquiries.updatedAt), desc(guardianInquiries.createdAt)),
   ]);
   const publishedSubjects = publishedCards.length ? await db.select({ reportCardId: reportCardSubjectGrades.reportCardId,
     subjectName: subjects.name, scorePercentage: reportCardSubjectGrades.scorePercentage,
@@ -140,52 +144,7 @@ export async function getGuardianPortalData() {
   })).map(notice => ({ id: notice.id, title: notice.title, content: notice.content, priority: notice.priority,
     publishedAt: notice.publishedAt, schoolName: schoolRows.find(school => school.id === notice.organizationId)?.name ?? "School" }));
 
-  const consentProfiles = [...new Map(legalLinks.map(link => [`${link.organizationId}:${link.guardianId}`, link])).values()];
-  const consents = consentProfiles.map(profile => {
-    const consent = consentRows.find(row => row.guardianId === profile.guardianId && row.organizationId === profile.organizationId);
-    const guardian = guardianRows.find(row => row.id === profile.guardianId && row.organizationId === profile.organizationId);
-    const coveredIds = new Set(legalLinks.filter(link => link.guardianId === profile.guardianId && link.organizationId === profile.organizationId)
-      .map(link => link.studentId));
-    return { guardianId: profile.guardianId, schoolId: profile.organizationId,
-      schoolName: schoolRows.find(school => school.id === profile.organizationId)?.name ?? "School",
-      guardianName: guardian ? `${guardian.firstName} ${guardian.lastName}` : account.name,
-      studentNames: studentsWithDetails.filter(child => coveredIds.has(child.id) && child.schoolId === profile.organizationId)
-        .map(child => `${child.firstName} ${child.lastName}`),
-      mediaConsent: consent?.mediaConsent ?? false, excursionConsent: consent?.excursionConsent ?? false };
-  });
-
-  const inquiryIds = inquiryRows.map(row => row.id);
-  const inquiryMessages = inquiryIds.length ? await db.select().from(guardianInquiryMessages)
-    .where(and(inArray(guardianInquiryMessages.organizationId, orgIds), inArray(guardianInquiryMessages.inquiryId, inquiryIds)))
-    .orderBy(guardianInquiryMessages.createdAt) : [];
-
-  const serializedInquiries = inquiryRows.map(row => {
-    const student = authorizedStudentRows.find(s => s.id === row.studentId);
-    const school = schoolRows.find(s => s.id === row.organizationId);
-    return {
-      id: row.id,
-      studentId: row.studentId,
-      studentName: student ? `${student.preferredName || student.firstName} ${student.lastName}` : "Student",
-      schoolId: row.organizationId,
-      schoolName: school?.name ?? "School",
-      targetRole: row.targetRole,
-      title: row.title,
-      category: row.category as "academic" | "pastoral" | "attendance" | "general",
-      status: row.status,
-      closedAt: row.closedAt,
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-      messages: inquiryMessages.filter(m => m.inquiryId === row.id).map(m => ({
-        id: m.id,
-        senderType: m.senderType,
-        senderName: m.senderName,
-        message: m.message,
-        createdAt: m.createdAt,
-      })),
-    };
-  });
-
-  return { guardianName: account.name, students: studentsWithDetails, announcements: visibleNotices, consents, inquiries: serializedInquiries };
+  return { guardianName: account.name, students: studentsWithDetails, announcements: visibleNotices };
 }
 
 export type GuardianPortalData = Awaited<ReturnType<typeof getGuardianPortalData>>;

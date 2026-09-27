@@ -1,19 +1,17 @@
-import { and, eq, inArray, sql } from "drizzle-orm";
+import { and, eq, inArray, or, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { academicYears, announcements, assessmentCategories, assessmentGrades, assessments,
-  attendanceCorrections, attendanceRecords, attendanceSessions, classes, clinicVisits, enrollments, gradeCorrections,
-  gradeLevels, guardians, organizations, receptionLogs, reportCards, reportCardSubjectGrades, sensitiveAccessLogs,
-  sensitiveCaseNotes, sensitiveCases, needToKnowAlerts, courtRestrictions, senProfiles, senReviews, smsDispatches, studentBehaviours, studentGuardians, students, subjects, terms, teacherClassAssignments } from "@/db/schema";
+  attendanceCorrections, attendanceRecords, attendanceSessions, classes, enrollments, gradeCorrections,
+  gradeLevels, guardians, guardianConsents, organizations, receptionLogs, reportCards, reportCardSubjectGrades, sensitiveAccessLogs, emergencyBroadcasts,
+  sensitiveCaseNotes, sensitiveCases, needToKnowAlerts, courtRestrictions, smsDispatches, studentBehaviours, studentGuardians, students, subjects, terms, teacherClassAssignments } from "@/db/schema";
 import { AuditActions, logAuditEvent } from "@/lib/audit";
 import type { requireStaff } from "@/lib/action-access";
 import { SchoolAdminError } from "@/lib/school-admin-policy";
 import { canTeacherTakeAttendance, workflowCommandSchema, type WorkflowCommand } from "@/lib/school-workflow-policy";
 import { calculateWeightedTermGrade, scoreToGrade } from "@/lib/assessments";
 import { decryptNarrative, encryptNarrative } from "@/lib/narrative-crypto";
-import { canUserAccessCaseArea, generateDisclosurePackage, type CourtRestrictionRecord, type DisclosurePackageResult, type SensitiveCaseRecord } from "@/lib/sensitive-records";
-import { canSpecialistRunCommand, isSpecialistRole } from "@/lib/specialist-access";
+import { canUserAccessCaseArea } from "@/lib/sensitive-records";
 import { normalizePhoneNumber } from "@/lib/sms";
-import { isDemoMode } from "@/lib/runtime-config";
 
 type Actor = Awaited<ReturnType<typeof requireStaff>>;
 function found<T>(row: T | undefined, label: string): T {
@@ -23,12 +21,11 @@ function found<T>(row: T | undefined, label: string): T {
 function decimal(value: number) { return value.toFixed(2); }
 
 export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
-  if (actor.role !== "school_admin" && actor.role !== "teacher" && actor.role !== "office_staff" && !isSpecialistRole(actor.role)) throw new SchoolAdminError("School staff access required.");
+  if (actor.role !== "school_admin" && actor.role !== "teacher" && actor.role !== "office_staff") throw new SchoolAdminError("School staff access required.");
   const value = workflowCommandSchema.parse(raw);
   if (actor.role === "office_staff" && value.kind !== "attendance" && value.kind !== "reception_log" && value.kind !== "emergency_sms_broadcast") {
     throw new SchoolAdminError("Office staff can only correct recorded attendance, log reception desk movements, or send emergency broadcasts.");
   }
-  if (isSpecialistRole(actor.role) && !canSpecialistRunCommand(actor.role, value.kind)) throw new SchoolAdminError("Your specialist role cannot change this school record.");
   const org = actor.organizationId;
   return db.transaction(async tx => {
     found((await tx.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, org)).for("update"))[0], "School");
@@ -101,7 +98,6 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
     }
     let entityId = "";
     let noteText: string[] | undefined;
-    let packageResult: DisclosurePackageResult | undefined;
     let broadcastRecipientCount = 0;
     switch (value.kind) {
       case "attendance":
@@ -127,6 +123,41 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
           const marked = await tx.select({ studentId: attendanceRecords.studentId }).from(attendanceRecords).where(and(eq(attendanceRecords.organizationId, org), eq(attendanceRecords.sessionId, session.id)));
           if (roster.some(item => !marked.some(row => row.studentId === item.studentId))) throw new SchoolAdminError("Mark every active student before submitting attendance.");
           await tx.update(attendanceSessions).set({ status: "submitted", submittedAt: new Date(), updatedAt: new Date() }).where(and(eq(attendanceSessions.id, session.id), eq(attendanceSessions.organizationId, org)));
+          if (session.period === "morning_roll_call") {
+            const absent = await tx.select({ studentId: attendanceRecords.studentId, firstName: students.firstName,
+              lastName: students.lastName, restrictedAt: students.processingRestrictedAt })
+              .from(attendanceRecords).innerJoin(students, eq(students.id, attendanceRecords.studentId))
+              .where(and(eq(attendanceRecords.organizationId, org), eq(attendanceRecords.sessionId, session.id),
+                eq(attendanceRecords.status, "absent")));
+            const [school] = await tx.select({ name: organizations.name }).from(organizations).where(eq(organizations.id, org));
+            if (absent.length) {
+              const contacts = await tx.select({ studentId: studentGuardians.studentId, guardianId: guardians.id,
+                firstName: guardians.firstName, lastName: guardians.lastName, phone: guardians.phone,
+                verifiedAt: guardians.phoneVerifiedAt, optIn: guardianConsents.optInSmsAttendance,
+                confirmedAt: guardianConsents.smsConfirmedAt }).from(studentGuardians)
+                .innerJoin(guardians, eq(guardians.id, studentGuardians.guardianId))
+                .leftJoin(guardianConsents, and(eq(guardianConsents.guardianId, guardians.id), eq(guardianConsents.organizationId, org)))
+                .where(and(eq(studentGuardians.organizationId, org), inArray(studentGuardians.studentId, absent.map(row => row.studentId)),
+                  eq(studentGuardians.hasLegalResponsibility, true)));
+              const orders = await tx.select().from(courtRestrictions).where(and(eq(courtRestrictions.organizationId, org),
+                inArray(courtRestrictions.studentId, absent.map(row => row.studentId)), eq(courtRestrictions.isEnforced, true),
+                or(eq(courtRestrictions.prohibitDirectContact, true), eq(courtRestrictions.prohibitDisclosure, true))));
+              for (const contact of contacts) {
+                const pupil = absent.find(row => row.studentId === contact.studentId);
+                if (!pupil || pupil.restrictedAt || !contact.optIn || !contact.confirmedAt || !contact.verifiedAt || !contact.phone) continue;
+                const phone = normalizePhoneNumber(contact.phone);
+                if (!/^\+233\d{9}$/.test(phone)) continue;
+                if (orders.some(order => order.studentId === contact.studentId && (!order.restrictedGuardianId || order.restrictedGuardianId === contact.guardianId) &&
+                  order.effectiveDate <= session.sessionDate && (!order.expirationDate || order.expirationDate >= session.sessionDate))) continue;
+                await tx.insert(smsDispatches).values({ organizationId: org, studentId: pupil.studentId,
+                  guardianId: contact.guardianId, recipientPhone: phone,
+                  recipientName: `${contact.firstName} ${contact.lastName}`, purpose: "attendance",
+                  idempotencyKey: `attendance:${session.id}:${pupil.studentId}:${contact.guardianId}`,
+                  message: `[${school?.name ?? "School"}] ${pupil.firstName} ${pupil.lastName} was marked absent on ${session.sessionDate}. Please contact the school office if this is unexpected.`,
+                  status: "queued" }).onConflictDoNothing({ target: smsDispatches.idempotencyKey });
+              }
+            }
+          }
           entityId = session.id;
           break;
         }
@@ -346,21 +377,21 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
       }
       case "need_to_know_resolve": {
         const alert = found((await tx.select().from(needToKnowAlerts).where(and(eq(needToKnowAlerts.id, value.alertId), eq(needToKnowAlerts.organizationId, org))))[0], "Directive");
-        if (isSpecialistRole(actor.role)) {
-          if (!alert.caseId) throw new SchoolAdminError("This directive has no case area for your role.");
-          const caseRow = found((await tx.select({ area: sensitiveCases.area }).from(sensitiveCases).where(and(
-            eq(sensitiveCases.id, alert.caseId), eq(sensitiveCases.organizationId, org))))[0], "Case");
-          if (!canUserAccessCaseArea(actor.role, caseRow.area)) throw new SchoolAdminError("You cannot access this case area.");
-        }
         await tx.update(needToKnowAlerts).set({ isActive: false, updatedAt: new Date() }).where(and(eq(needToKnowAlerts.id, alert.id), eq(needToKnowAlerts.organizationId, org)));
         entityId = alert.id;
         break;
       }
       case "court_restriction": {
+        if (value.restrictedGuardianId) {
+          found((await tx.select({ id: studentGuardians.id }).from(studentGuardians).where(and(
+            eq(studentGuardians.organizationId, org), eq(studentGuardians.studentId, value.studentId),
+            eq(studentGuardians.guardianId, value.restrictedGuardianId))))[0], "Linked guardian");
+        }
         found((await tx.select({ id: students.id }).from(students).where(and(eq(students.id, value.studentId), eq(students.organizationId, org))))[0], "Student");
         if (value.expirationDate && value.expirationDate < value.effectiveDate) throw new SchoolAdminError("Expiration date must follow the effective date.");
         const [row] = await tx.insert(courtRestrictions).values({ organizationId: org, studentId: value.studentId,
           restrictedPersonName: value.restrictedPersonName, orderType: value.orderType, docketNumber: value.docketNumber,
+          restrictedGuardianId: value.restrictedGuardianId ?? null,
           issuingCourt: value.issuingCourt, summary: value.summary, effectiveDate: value.effectiveDate,
           expirationDate: value.expirationDate || null, prohibitPickup: value.prohibitPickup,
           prohibitDisclosure: value.prohibitDisclosure, prohibitDirectContact: value.prohibitDirectContact }).returning();
@@ -373,86 +404,21 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
         entityId = restriction.id;
         break;
       }
-      case "statutory_disclosure": {
-        if (actor.role !== "safeguarding_lead" && actor.role !== "school_admin") throw new SchoolAdminError("Only the Designated Safeguarding Lead or School Admin can compile a statutory disclosure package.");
-        const student = found((await tx.select().from(students).where(and(eq(students.id, value.studentId), eq(students.organizationId, org))))[0], "Student");
-        const school = found((await tx.select().from(organizations).where(eq(organizations.id, org)))[0], "School");
-        const caseRows = await tx.select().from(sensitiveCases).where(and(eq(sensitiveCases.studentId, student.id), eq(sensitiveCases.organizationId, org)));
-        const restrictionRows = await tx.select().from(courtRestrictions).where(and(eq(courtRestrictions.studentId, student.id), eq(courtRestrictions.organizationId, org), eq(courtRestrictions.isEnforced, true)));
-        const studentFullName = `${student.firstName} ${student.lastName}`;
-        const mappedCases: SensitiveCaseRecord[] = caseRows.map(row => ({
-          id: row.id,
-          organizationId: row.organizationId,
-          studentId: row.studentId,
-          studentName: studentFullName,
-          studentGrade: "",
-          caseNumber: row.caseNumber,
-          area: row.area,
-          confidentialityTier: row.confidentialityTier,
-          title: row.title,
-          status: row.status,
-          leadSpecialistId: row.leadSpecialistId || "",
-          leadSpecialistName: "",
-          hasCourtOrder: row.hasCourtOrder,
-          reviewDate: row.reviewDate,
-          encryptedNotesCount: 0,
-          latestNoteSummary: "",
-          createdAt: row.createdAt.toISOString(),
-          updatedAt: row.updatedAt.toISOString(),
-        }));
-        const mappedRestrictions: CourtRestrictionRecord[] = restrictionRows.map(row => ({
-          id: row.id,
-          organizationId: row.organizationId,
-          studentId: row.studentId,
-          studentName: studentFullName,
-          restrictedGuardianId: null,
-          restrictedPersonName: row.restrictedPersonName,
-          orderType: row.orderType,
-          docketNumber: row.docketNumber,
-          issuingCourt: row.issuingCourt,
-          summary: row.summary,
-          prohibitPickup: row.prohibitPickup,
-          prohibitDisclosure: row.prohibitDisclosure,
-          prohibitDirectContact: row.prohibitDirectContact,
-          effectiveDate: row.effectiveDate,
-          expirationDate: row.expirationDate,
-          isEnforced: row.isEnforced,
-          createdAt: row.createdAt.toISOString(),
-        }));
-        packageResult = generateDisclosurePackage(
-          { id: student.id, name: studentFullName, studentNumber: student.studentNumber },
-          mappedCases,
-          mappedRestrictions,
-          actor.role,
-          { schoolName: school.name, recipientAgency: value.recipientAgency }
-        );
-        entityId = student.id;
-        break;
-      }
-      case "clinic_visit": {
-        if (actor.role !== "health_nurse" && actor.role !== "school_admin") throw new SchoolAdminError("Only the school nurse or school admin can record clinic visits.");
-        const student = found((await tx.select().from(students).where(and(eq(students.id, value.studentId), eq(students.organizationId, org))))[0], "Student");
-        const todayStr = new Date().toISOString().slice(0, 10);
-        const [row] = await tx.insert(clinicVisits).values({
-          organizationId: org,
-          studentId: student.id,
-          attendedBy: actor.userId,
-          category: value.category,
-          symptoms: value.symptoms,
-          treatment: value.treatment,
-          outcome: value.outcome,
-          guardianNotified: value.guardianNotified,
-          guardianNotificationNotes: value.guardianNotificationNotes || null,
-          visitDate: todayStr,
-        }).returning();
-        entityId = row.id;
-        break;
-      }
       case "reception_log": {
         if (actor.role !== "office_staff" && actor.role !== "school_admin") throw new SchoolAdminError("Only office staff or school administrators can record reception desk movements.");
         const student = found((await tx.select().from(students).where(and(eq(students.id, value.studentId), eq(students.organizationId, org))))[0], "Student");
 
         if (value.logType === "early_departure") {
+          if (!value.identityChecked || !value.identityDocumentType || !value.identityDocumentLast4 || !value.collectorGuardianId) {
+            throw new SchoolAdminError("Hold release: select a linked guardian and record the inspected identity document type and final four characters.");
+          }
+          const [collector] = await tx.select({ id: guardians.id, firstName: guardians.firstName, lastName: guardians.lastName })
+            .from(studentGuardians).innerJoin(guardians, eq(guardians.id, studentGuardians.guardianId))
+            .where(and(eq(studentGuardians.organizationId, org), eq(studentGuardians.studentId, student.id),
+              eq(studentGuardians.guardianId, value.collectorGuardianId), eq(studentGuardians.hasLegalResponsibility, true)));
+          if (!collector || `${collector.firstName} ${collector.lastName}`.trim().toLocaleLowerCase() !== value.actorPersonName.trim().toLocaleLowerCase()) {
+            throw new SchoolAdminError("Hold release: collector identity does not exactly match a linked legal guardian.");
+          }
           const activeCourtOrders = await tx.select().from(courtRestrictions)
             .where(and(
               eq(courtRestrictions.studentId, student.id),
@@ -461,15 +427,13 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
               eq(courtRestrictions.prohibitPickup, true)
             ));
 
-          if (activeCourtOrders.length > 0 && value.actorPersonName) {
-            const requestedCollector = value.actorPersonName.trim().toLowerCase();
-            const violation = activeCourtOrders.find(order => {
-              const restricted = order.restrictedPersonName.trim().toLowerCase();
-              return requestedCollector.includes(restricted) || restricted.includes(requestedCollector);
-            });
-            if (violation) {
-              throw new SchoolAdminError(`COURT RESTRICTION ALERT: ${violation.restrictedPersonName} is legally prohibited from picking up ${student.firstName} ${student.lastName} (Court order ref: ${violation.docketNumber}). Pickup cannot be authorized.`);
-            }
+          const today = value.logDate;
+          const applicable = activeCourtOrders.filter(order => order.effectiveDate <= today && (!order.expirationDate || order.expirationDate >= today));
+          if (applicable.some(order => order.restrictedGuardianId === collector.id)) {
+            throw new SchoolAdminError("COURT RESTRICTION ALERT: this linked guardian is prohibited from pickup. Release denied.");
+          }
+          if (applicable.some(order => !order.restrictedGuardianId)) {
+            throw new SchoolAdminError("Hold release: an active restriction has no structured guardian match. A school administrator must review the order before pickup.");
           }
         }
 
@@ -482,6 +446,10 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
           minutesLate: value.minutesLate,
           reason: value.reason,
           actorPersonName: value.actorPersonName || null,
+          collectorGuardianId: value.logType === "early_departure" ? value.collectorGuardianId : null,
+          identityDocumentType: value.logType === "early_departure" ? value.identityDocumentType : null,
+          identityDocumentLast4: value.logType === "early_departure" ? value.identityDocumentLast4 : null,
+          identityChecked: value.logType === "early_departure" && !!value.identityChecked,
           relationship: value.relationship || null,
           isExcused: value.isExcused,
           recordedBy: actor.userId,
@@ -577,34 +545,33 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
           firstName: guardians.firstName,
           lastName: guardians.lastName,
           phone: guardians.phone,
+          phoneVerifiedAt: guardians.phoneVerifiedAt,
         })
         .from(studentGuardians)
         .innerJoin(guardians, and(eq(studentGuardians.guardianId, guardians.id), eq(guardians.organizationId, org)))
-        .where(and(eq(studentGuardians.organizationId, org), inArray(studentGuardians.studentId, targetStudentIds)));
+        .where(and(eq(studentGuardians.organizationId, org), inArray(studentGuardians.studentId, targetStudentIds), eq(studentGuardians.hasLegalResponsibility, true)));
 
-        const validRecipients = recipientRows.filter(r => r.phone && r.phone.trim().length >= 4);
+        const activeDisclosureOrders = await tx.select().from(courtRestrictions).where(and(
+          eq(courtRestrictions.organizationId, org), inArray(courtRestrictions.studentId, targetStudentIds),
+          eq(courtRestrictions.isEnforced, true), or(eq(courtRestrictions.prohibitDirectContact, true),
+            eq(courtRestrictions.prohibitDisclosure, true))));
+        const today = new Date().toISOString().slice(0, 10);
+        const validRecipients = recipientRows.filter(r => r.phoneVerifiedAt && r.phone && /^\+233\d{9}$/.test(normalizePhoneNumber(r.phone)) &&
+          !activeDisclosureOrders.some(order => order.studentId === r.studentId &&
+            (!order.restrictedGuardianId || order.restrictedGuardianId === r.guardianId) &&
+            order.effectiveDate <= today && (!order.expirationDate || order.expirationDate >= today)));
         if (validRecipients.length === 0) {
-          throw new SchoolAdminError("No guardians with registered phone numbers were found for the selected recipients.");
+          throw new SchoolAdminError("No verified legal guardian numbers were found for this broadcast.");
         }
 
-        const broadcastId = crypto.randomUUID();
-        const sentAt = new Date();
-
-        for (const r of validRecipients) {
-          await tx.insert(smsDispatches).values({
-            organizationId: org,
-            recipientPhone: normalizePhoneNumber(r.phone!),
-            recipientName: `${r.firstName} ${r.lastName}`.trim(),
-            studentId: r.studentId,
-            message: value.message,
-            status: isDemoMode() ? "simulated" : "sent",
-            providerRef: `SM_emg_${Math.random().toString(36).substring(2, 10)}`,
-            sentAt,
-          });
-        }
-
-        broadcastRecipientCount = validRecipients.length;
-        entityId = broadcastId;
+        const [broadcast] = await tx.insert(emergencyBroadcasts).values({
+          organizationId: org, requestedBy: actor.userId, scope: value.scope, targetId: value.targetId,
+          severity: value.severity, message: value.message, reason: value.reason,
+          studentIds: targetStudentIds, unreachableStudentIds: targetStudentIds.filter(id => !validRecipients.some(r => r.studentId === id)),
+          recipientCount: new Set(validRecipients.map(r => r.guardianId)).size,
+        }).returning({ id: emergencyBroadcasts.id });
+        broadcastRecipientCount = new Set(validRecipients.map(r => r.guardianId)).size;
+        entityId = broadcast.id;
         break;
       }
       case "behaviour_log": {
@@ -627,118 +594,22 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
         entityId = behaviourRecord.id;
         break;
       }
-      case "sen_profile_save": {
-        if (actor.role !== "senco" && actor.role !== "school_admin") {
-          throw new SchoolAdminError("Only the SENCO or school administrator can manage SEN profiles.");
-        }
-        found((await tx.select({ id: students.id }).from(students).where(and(eq(students.id, value.studentId), eq(students.organizationId, org))))[0], "Student");
-
-        const existingProfile = value.profileId
-          ? (await tx.select().from(senProfiles).where(and(eq(senProfiles.id, value.profileId), eq(senProfiles.organizationId, org))))[0]
-          : (await tx.select().from(senProfiles).where(and(eq(senProfiles.studentId, value.studentId), eq(senProfiles.organizationId, org))))[0];
-
-        if (existingProfile) {
-          const [updated] = await tx.update(senProfiles).set({
-            tier: value.tier,
-            primaryNeed: value.primaryNeed,
-            secondaryNeeds: value.secondaryNeeds || null,
-            supportPlanSummary: value.supportPlanSummary,
-            examAccessArrangements: value.examAccessArrangements || null,
-            nextReviewDate: value.nextReviewDate,
-            reviewFrequencyWeeks: value.reviewFrequencyWeeks,
-            status: value.status,
-            updatedAt: new Date(),
-          }).where(and(eq(senProfiles.id, existingProfile.id), eq(senProfiles.organizationId, org))).returning();
-          entityId = updated.id;
-        } else {
-          const [inserted] = await tx.insert(senProfiles).values({
-            organizationId: org,
-            studentId: value.studentId,
-            tier: value.tier,
-            primaryNeed: value.primaryNeed,
-            secondaryNeeds: value.secondaryNeeds || null,
-            supportPlanSummary: value.supportPlanSummary,
-            examAccessArrangements: value.examAccessArrangements || null,
-            leadSpecialistId: actor.userId,
-            reviewFrequencyWeeks: value.reviewFrequencyWeeks,
-            nextReviewDate: value.nextReviewDate,
-            status: value.status,
-          }).returning();
-          entityId = inserted.id;
-        }
-        break;
-      }
-      case "sen_review_complete": {
-        if (actor.role !== "senco" && actor.role !== "school_admin") {
-          throw new SchoolAdminError("Only the SENCO or school administrator can complete SEN reviews.");
-        }
-        const profile = found((await tx.select().from(senProfiles).where(and(eq(senProfiles.id, value.profileId), eq(senProfiles.organizationId, org))))[0], "SEN profile");
-
-        const [reviewRecord] = await tx.insert(senReviews).values({
-          organizationId: org,
-          profileId: profile.id,
-          studentId: profile.studentId,
-          reviewerId: actor.userId,
-          reviewDate: value.reviewDate,
-          reviewType: value.reviewType,
-          attendees: value.attendees,
-          targetsMetSummary: value.targetsMetSummary,
-          newTargets: value.newTargets,
-          tierDecision: value.tierDecision,
-          nextReviewDate: value.nextReviewDate,
-          notes: value.notes || null,
-        }).returning();
-
-        await tx.update(senProfiles).set({
-          tier: value.tierDecision,
-          lastReviewedAt: new Date(),
-          nextReviewDate: value.nextReviewDate,
-          updatedAt: new Date(),
-        }).where(and(eq(senProfiles.id, profile.id), eq(senProfiles.organizationId, org)));
-
-        entityId = reviewRecord.id;
-        break;
-      }
     }
-    if (value.kind === "statutory_disclosure" && packageResult) {
-      await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action: AuditActions.DISCLOSURE_PACKAGE_EXPORTED,
-        entityType: "student", entityId, metadata: { dossierNumber: packageResult.dossierNumber, recipientAgency: value.recipientAgency, reason: value.reason, recordCount: packageResult.includedRecords.length, withheldSafeguardingCount: packageResult.withheldSafeguardingCount, checksum: packageResult.digitalIntegrityChecksum } }, tx);
-    } else if (value.kind === "clinic_visit") {
-      await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action: AuditActions.CLINIC_VISIT_LOGGED,
-        entityType: "clinic_visit", entityId, metadata: { category: value.category, outcome: value.outcome, guardianNotified: value.guardianNotified } }, tx);
-    } else if (value.kind === "reception_log") {
+    if (value.kind === "reception_log") {
       const action = value.logType === "late_arrival" ? AuditActions.LATE_ARRIVAL_LOGGED : AuditActions.EARLY_DEPARTURE_LOGGED;
       await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action,
         entityType: "reception_log", entityId, metadata: { logType: value.logType, studentId: value.studentId, timeString: value.timeString, minutesLate: value.minutesLate, reason: value.reason, actorPersonName: value.actorPersonName, isExcused: value.isExcused } }, tx);
     } else if (value.kind === "emergency_sms_broadcast") {
-      await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action: AuditActions.EMERGENCY_BROADCAST_CONFIRMED,
-        entityType: "sms_broadcast", entityId, metadata: { scope: value.scope, targetId: value.targetId, severity: value.severity, recipientCount: broadcastRecipientCount, messageLength: value.message.length } }, tx);
+      await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action: "emergency_broadcast.requested",
+        entityType: "sms_broadcast", entityId, metadata: { scope: value.scope, targetId: value.targetId, severity: value.severity, recipientCount: broadcastRecipientCount, reason: value.reason, messageLength: value.message.length } }, tx);
     } else if (value.kind === "behaviour_log") {
       const action = value.type === "praise" ? AuditActions.BEHAVIOUR_PRAISE_LOGGED : AuditActions.BEHAVIOUR_INCIDENT_LOGGED;
       await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action,
         entityType: "student_behaviour", entityId, metadata: { studentId: value.studentId, classId: value.classId, type: value.type, category: value.category, points: value.points, guardianVisible: value.guardianVisible, occurredAt: value.occurredAt } }, tx);
-    } else if (value.kind === "sen_profile_save") {
-      await logAuditEvent({
-        organizationId: org,
-        actorUserId: actor.userId,
-        action: value.profileId ? AuditActions.SEN_PROFILE_UPDATED : AuditActions.SEN_PROFILE_CREATED,
-        entityType: "sen_profile",
-        entityId,
-        metadata: { studentId: value.studentId, tier: value.tier, primaryNeed: value.primaryNeed, nextReviewDate: value.nextReviewDate }
-      }, tx);
-    } else if (value.kind === "sen_review_complete") {
-      await logAuditEvent({
-        organizationId: org,
-        actorUserId: actor.userId,
-        action: AuditActions.SEN_REVIEW_COMPLETED,
-        entityType: "sen_review",
-        entityId,
-        metadata: { profileId: value.profileId, reviewType: value.reviewType, tierDecision: value.tierDecision, nextReviewDate: value.nextReviewDate }
-      }, tx);
     } else {
       await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action: `${value.kind}.saved`,
         entityType: value.kind, entityId, metadata: "reason" in value ? { reason: value.reason } : {} }, tx);
     }
-    return { entityId, notes: noteText, disclosurePackage: packageResult, recipientCount: broadcastRecipientCount };
+    return { entityId, notes: noteText, recipientCount: broadcastRecipientCount };
   });
 }

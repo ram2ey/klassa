@@ -162,13 +162,12 @@ export function ReportCardsModule({
       {/* Report Cards Table */}
       <section className="border border-slate-200 bg-white">
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[850px] border-collapse text-left text-xs">
+          <table className="w-full min-w-[760px] border-collapse text-left text-xs">
             <thead>
               <tr className="h-10 border-b border-slate-200 bg-slate-50 text-[10px] uppercase tracking-[0.08em] text-slate-500">
                 <th className="px-4 font-bold">Student</th>
                 <th className="px-4 font-bold">Class & Term</th>
                 <th className="px-4 font-bold text-center">Version</th>
-                <th className="px-4 font-bold text-center">Term GPA</th>
                 <th className="px-4 font-bold text-center">Average %</th>
                 <th className="px-4 font-bold text-center">Attendance</th>
                 <th className="px-4 font-bold">Status</th>
@@ -188,9 +187,6 @@ export function ReportCardsModule({
                   </td>
                   <td className="px-4 text-center font-mono font-bold text-slate-700">
                     v{rc.version}.0
-                  </td>
-                  <td className="px-4 text-center font-mono font-black text-slate-900 text-sm">
-                    {rc.gpa.toFixed(2)}
                   </td>
                   <td className="px-4 text-center font-mono font-bold text-blue-700">
                     {rc.overallPercentage.toFixed(1)}%

@@ -32,6 +32,7 @@ export interface SystemHealthReport {
     cryptography: { status: HealthStatus; selfTestPassed: boolean };
     memory: { status: HealthStatus; heapUsedMb: number; heapTotalMb: number; rssMb: number };
     rateLimiter: { status: HealthStatus; trackedKeys: number; violations: number };
+    smsWorker?: { status: HealthStatus; queuedCount: number; failedCount: number; unknownCount: number; lastHeartbeatAt: string | null };
   };
   metrics: {
     rollingRequestCount: number;

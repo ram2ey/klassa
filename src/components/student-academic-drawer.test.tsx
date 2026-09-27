@@ -130,8 +130,9 @@ describe("StudentAcademicDrawer component", () => {
     expect(screen.getByText("ACTIVE")).toBeTruthy();
     expect(screen.getByText(/Year 5 Willow · Grade 5/)).toBeTruthy();
 
-    // Latest GPA and scores from report 2
-    expect(screen.getByText("3.95")).toBeTruthy();
+    // Latest term score is shown without the optional GPA summary.
+    expect(screen.queryByText("3.95")).toBeNull();
+    expect(screen.queryByText(/GPA/i)).toBeNull();
     expect(screen.getAllByText("92%").length).toBeGreaterThanOrEqual(1);
     // Net conduct: +3 - 1 = +2
     expect(screen.getByText("+2")).toBeTruthy();

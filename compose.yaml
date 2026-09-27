@@ -47,12 +47,38 @@ services:
       DATABASE_URL: postgresql://${SERVICE_USER_POSTGRES:-klasso}:${SERVICE_PASSWORD_64_POSTGRES:-}@postgres:5432/klassa
       KLASSO_DEMO_MODE: "false"
       KLASSO_APP_DATABASE_PASSWORD: ${SERVICE_PASSWORD_64_APP}
+      KLASSO_SMS_WORKER_PASSWORD: ${SERVICE_PASSWORD_64_SMS}
       KLASSO_BOOTSTRAP_USERNAME: ${KLASSO_BOOTSTRAP_USERNAME:-}
       KLASSO_BOOTSTRAP_NAME: ${KLASSO_BOOTSTRAP_NAME:-}
       KLASSO_BOOTSTRAP_PASSWORD: ${KLASSO_BOOTSTRAP_PASSWORD:-}
     depends_on:
       postgres:
         condition: service_healthy
+
+  sms-worker:
+    build:
+      context: .
+      target: sms-worker
+    restart: unless-stopped
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      PGDATABASE: klassa
+      PGUSER: klassa_sms_worker
+      PGPASSWORD: ${SERVICE_PASSWORD_64_SMS}
+      MNOTIFY_API_KEY: ${MNOTIFY_API_KEY:-}
+      MNOTIFY_SENDER_ID: ${MNOTIFY_SENDER_ID:-}
+      SMS_DELIVERY_ENABLED: ${SMS_DELIVERY_ENABLED:-false}
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ["CMD", "node", "-e", "const fs=require('fs');const age=Date.now()-Number(fs.readFileSync('/tmp/klassa-sms-worker-heartbeat','utf8'));process.exit(age<60000?0:1)"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
 
   postgres:
     image: postgres:17-alpine

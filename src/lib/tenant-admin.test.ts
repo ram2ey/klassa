@@ -33,9 +33,7 @@ describe("Phase 6 Multi-School Tenant Administration", () => {
       domainVerified: true,
       initialAdminInvited: true,
       mfaPolicyActivated: true,
-      academicYearCreated: true,
-      safeguardingLeadDesignated: true,
-      initialRosterImported: true,
+      academicYearCreated: true,      initialRosterImported: true,
     };
     expect(calculateOnboardingProgress(fullChecklist)).toBe(100);
 
@@ -43,11 +41,9 @@ describe("Phase 6 Multi-School Tenant Administration", () => {
       domainVerified: true,
       initialAdminInvited: true,
       mfaPolicyActivated: true,
-      academicYearCreated: false,
-      safeguardingLeadDesignated: false,
-      initialRosterImported: false,
+      academicYearCreated: false,      initialRosterImported: false,
     };
-    expect(calculateOnboardingProgress(partialChecklist)).toBe(50);
+    expect(calculateOnboardingProgress(partialChecklist)).toBe(60);
   });
 
   it("enforces cross-tenant isolation and flags breaches", () => {

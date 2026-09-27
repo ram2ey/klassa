@@ -20,8 +20,7 @@ export interface SmsProvider {
 export function normalizePhoneNumber(raw: string): string {
   const cleaned = raw.replace(/[^\d+]/g, "");
   if (!cleaned.startsWith("+")) {
-    // Default country code if missing (e.g., Iceland +354)
-    return `+354${cleaned.replace(/^0+/, "")}`;
+    return cleaned.startsWith("233") ? `+${cleaned}` : `+233${cleaned.replace(/^0+/, "")}`;
   }
   return cleaned;
 }
@@ -121,8 +120,34 @@ export class TwilioSmsProvider implements SmsProvider {
   }
 }
 
+export class MnotifySmsProvider implements SmsProvider {
+  async send(to: string, message: string): Promise<{ success: boolean; providerRef: string; error?: string }> {
+    const key = process.env.MNOTIFY_API_KEY;
+    const sender = process.env.MNOTIFY_SENDER_ID;
+    if (process.env.SMS_DELIVERY_ENABLED !== "true" || !key || !sender || !/^[A-Za-z0-9 _-]{1,11}$/.test(sender)) {
+      return { success: false, providerRef: "", error: "mNotify delivery is not configured." };
+    }
+    const url = new URL("https://api.mnotify.com/api/sms/quick");
+    url.searchParams.set("key", key);
+    try {
+      const response = await fetch(url, { method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ recipient: [normalizePhoneNumber(to)], sender, message, is_schedule: false, schedule_date: "" }),
+        signal: AbortSignal.timeout(15_000) });
+      const payload = await response.json();
+      const ref = payload?.summary?._id;
+      if (!response.ok || payload?.status !== "success" || typeof ref !== "string" || !ref) {
+        return { success: false, providerRef: "", error: "mNotify rejected the message." };
+      }
+      return { success: true, providerRef: ref };
+    } catch {
+      return { success: false, providerRef: "", error: "mNotify outcome unknown; check provider before retrying." };
+    }
+  }
+}
+
 export function getSmsProvider(): SmsProvider {
   if (isDemoMode()) return new MockSmsProvider();
+  if (process.env.SMS_PROVIDER === "mnotify") return new MnotifySmsProvider();
   if (process.env.SMS_PROVIDER === "twilio") {
     return new TwilioSmsProvider();
   }

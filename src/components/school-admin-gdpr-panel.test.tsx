@@ -4,10 +4,10 @@ import { SchoolAdminGdprPanel } from "./school-admin-gdpr-panel";
 import type { SchoolGdprData } from "@/lib/school-gdpr-data";
 import type { SchoolAdminData } from "@/lib/school-admin-data";
 
-const mocks = vi.hoisted(() => ({ create: vi.fn(), generate: vi.fn(), decide: vi.fn(), refresh: vi.fn() }));
+const mocks = vi.hoisted(() => ({ create: vi.fn(), decide: vi.fn(), refresh: vi.fn() }));
 vi.mock("next/navigation", () => ({ useRouter: () => ({ refresh: mocks.refresh }) }));
 vi.mock("@/app/actions/school-gdpr-actions", () => ({ createSchoolGdprRequestAction: mocks.create,
-  generateSchoolGdprExtractAction: mocks.generate, decideSchoolGdprRequestAction: mocks.decide }));
+  decideSchoolGdprRequestAction: mocks.decide }));
 
 const requestId = "00000000-0000-4000-8000-000000000003";
 const studentId = "00000000-0000-4000-8000-000000000002";
@@ -20,8 +20,7 @@ const data = { requests: [{ id: requestId, studentId, requestType: "export", sta
 
 beforeEach(() => {
   mocks.create.mockReset().mockResolvedValue({ success: true, requestId });
-  mocks.generate.mockReset().mockResolvedValue({ success: true, extract: { student: { firstName: "Ada" } } });
-  mocks.decide.mockReset(); mocks.refresh.mockClear();
+  mocks.decide.mockReset().mockResolvedValue({ success: true, requestId, status: "completed" }); mocks.refresh.mockClear();
 });
 afterEach(cleanup);
 
@@ -37,23 +36,16 @@ describe("live school data rights panel", () => {
       justification: "Requesting a student record extract" }));
     await waitFor(() => expect(mocks.refresh).toHaveBeenCalledOnce());
   });
-  it("keeps export fulfillment disabled until an extract has been generated", () => {
+  it("requires a decision note and does not offer an automated extract", () => {
     render(<SchoolAdminGdprPanel data={data} students={students} />);
-    expect(screen.getByRole("button", { name: "Generate JSON extract" })).toBeTruthy();
-    expect((screen.getByRole("button", { name: "Mark fulfilled" }) as HTMLButtonElement).disabled).toBe(true);
-    expect(screen.getByText(/Sensitive cases and third-party contacts are excluded/)).toBeTruthy();
+    expect(screen.queryByRole("button", { name: "Generate JSON extract" })).toBeNull();
+    expect((screen.getByRole("button", { name: "Record completed decision" }) as HTMLButtonElement).disabled).toBe(true);
   });
-  it("downloads an administrator extract and refreshes the ledger", async () => {
-    Object.defineProperty(URL, "createObjectURL", { configurable: true, value: vi.fn().mockReturnValue("blob:extract") });
-    Object.defineProperty(URL, "revokeObjectURL", { configurable: true, value: vi.fn() });
-    const click = vi.spyOn(HTMLAnchorElement.prototype, "click").mockImplementation(() => {});
-    try {
-      render(<SchoolAdminGdprPanel data={data} students={students} />);
-      fireEvent.click(screen.getByRole("button", { name: "Generate JSON extract" }));
-      await waitFor(() => expect(mocks.generate).toHaveBeenCalledWith(requestId));
-      await waitFor(() => expect(click).toHaveBeenCalledOnce());
-      expect(screen.getByRole("status").textContent).toContain("Review it and verify the requester");
-      expect(mocks.refresh).toHaveBeenCalledOnce();
-    } finally { click.mockRestore(); }
+  it("records the decision note and refreshes the ledger", async () => {
+    render(<SchoolAdminGdprPanel data={data} students={students} />);
+    fireEvent.change(screen.getByLabelText("Decision and action note"), { target: { value: "Identity checked and request handled" } });
+    fireEvent.click(screen.getByRole("button", { name: "Record completed decision" }));
+    await waitFor(() => expect(mocks.decide).toHaveBeenCalledWith({ requestId, status: "completed", note: "Identity checked and request handled" }));
+    expect(mocks.refresh).toHaveBeenCalledOnce();
   });
 });

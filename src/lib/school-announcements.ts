@@ -4,7 +4,7 @@ import { announcements, classes, teacherClassAssignments } from "@/db/schema";
 import { requireStaff } from "@/lib/action-access";
 
 export async function getStaffAnnouncements() {
-  const actor = await requireStaff(["school_admin", "office_staff", "teacher", "safeguarding_lead", "senco", "health_nurse"]);
+  const actor = await requireStaff(["school_admin", "office_staff", "teacher"]);
   const org = actor.organizationId;
   const [rows, assignments, classRows] = await Promise.all([
     db.select().from(announcements).where(and(eq(announcements.organizationId, org), eq(announcements.status, "published"))).orderBy(desc(announcements.publishedAt)).limit(100),

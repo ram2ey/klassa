@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 import { AccountSignOut } from "@/components/account-sign-out";
 
-const staffRoles = ["school_admin", "office_staff", "teacher", "safeguarding_lead", "senco", "health_nurse"] as const;
+const staffRoles = ["school_admin", "office_staff", "teacher"] as const;
 
 function roleLabel(role: string) {
   return role.replaceAll("_", " ").replace(/\b\w/g, letter => letter.toUpperCase());

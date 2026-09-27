@@ -70,6 +70,6 @@ export async function requireGuardian() {
 /** Keep unfinished, fixture-backed operations away from live accounts and databases. */
 export async function requireDemoAction(): Promise<void> {
   if (isDemoMode()) return;
-  await requireStaff(["school_admin", "office_staff", "teacher", "safeguarding_lead", "senco", "health_nurse"]);
+  await requireStaff(["school_admin", "office_staff", "teacher"]);
   throw new Error("This workflow is available only in the local demo. Live support is not implemented.");
 }

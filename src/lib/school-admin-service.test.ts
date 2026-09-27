@@ -139,6 +139,7 @@ describe("live school administration boundaries", () => {
   });
   it("serializes current-year changes and rolls back when the audit write fails", async () => {
     mocks.execute.mockImplementation(async query => {
+      if (query.includes('from "enrollments"')) return [];
       if (query.startsWith('select')) return [[org]];
       if (query.startsWith('insert into "academic_years"')) return [[record]];
       if (query.startsWith('insert into "audit_events"')) throw new Error("Audit unavailable");
@@ -147,8 +148,8 @@ describe("live school administration boundaries", () => {
     await expect(saveSchoolRecord(actor, { kind: "year", name: "2026/27", startsOn: "2026-08-01", endsOn: "2027-06-30", isCurrent: true })).rejects.toMatchObject({ cause: expect.objectContaining({ message: "Audit unavailable" }) });
     expect(mocks.execute.mock.calls[0][0]).toContain("for update");
     const [query, params] = mocks.execute.mock.calls[1];
-    expect(query).toContain('where "academic_years"."organization_id"');
-    expect(params.at(-1)).toBe(org);
+    expect(query).toContain('"academic_years"."organization_id"');
+    expect(params).toContain(org);
     expect(mocks.rollback).toHaveBeenCalledOnce();
     expect(mocks.commit).not.toHaveBeenCalled();
   });
@@ -172,10 +173,10 @@ describe("live school administration boundaries", () => {
   it("closes and locks a term, seals attendance sessions, and records audit event", async () => {
     mocks.execute.mockImplementation(async query => {
       if (query.includes('from "organizations"')) return [[org]];
-      if (query.includes('from "terms"')) return [[record, org, other, "Autumn Term", "2026-09-01", "2026-12-15", 1, false, null, null, null, now, now]];
-      if (query.includes('from "attendance_sessions"')) return [["submitted"]];
+      if (query.includes('from "terms"')) return [[record, org, other, "Autumn Term", "2026-09-26", "2026-09-26", 1, false, null, null, null, now, now]];
+      if (query.includes('from "attendance_sessions"')) return [[other, "2026-09-26", "morning_roll_call", "submitted"]];
       if (query.includes('from "assessments"')) return [[record, other, "published"]];
-      if (query.includes('from "enrollments"')) return [[record, other]];
+      if (query.includes('from "enrollments"')) return [[record, other, "2026-09-26", null]];
       if (query.includes('from "assessment_grades"')) return [[record, record, "published"]];
       if (query.includes('from "report_cards"')) return [[record, 1, "published"]];
       if (query.startsWith('update "terms"')) return [[record]];
@@ -195,17 +196,17 @@ describe("live school administration boundaries", () => {
     expect(mocks.commit).toHaveBeenCalledOnce();
   });
   it.each([
-    { incompleteTable: "attendance_sessions", rows: [["in_progress"]], message: "Submit every recorded roll call" },
+    { incompleteTable: "attendance_sessions", rows: [[other, "2026-09-26", "morning_roll_call", "in_progress"]], message: "Submit every recorded roll call" },
     { incompleteTable: "assessments", rows: [[record, other, "draft"]], message: "Publish every term assessment" },
     { incompleteTable: "assessment_grades", rows: [], message: "Publish a grade for every active student" },
     { incompleteTable: "report_cards", rows: [[record, 1, "published"], [record, 2, "draft"]], message: "Publish the latest report card" },
   ])("refuses term closure with incomplete $incompleteTable", async ({ incompleteTable, rows, message }) => {
     mocks.execute.mockImplementation(async query => {
       if (query.includes('from "organizations"')) return [[org]];
-      if (query.includes('from "terms"')) return [[record, org, other, "Autumn Term", "2026-09-01", "2026-12-15", 1, false, null, null, null, now, now]];
-      if (query.includes('from "attendance_sessions"')) return incompleteTable === "attendance_sessions" ? rows : [["submitted"]];
+      if (query.includes('from "terms"')) return [[record, org, other, "Autumn Term", "2026-09-26", "2026-09-26", 1, false, null, null, null, now, now]];
+      if (query.includes('from "attendance_sessions"')) return incompleteTable === "attendance_sessions" ? rows : [[other, "2026-09-26", "morning_roll_call", "submitted"]];
       if (query.includes('from "assessments"')) return incompleteTable === "assessments" ? rows : [[record, other, "published"]];
-      if (query.includes('from "enrollments"')) return [[record, other]];
+      if (query.includes('from "enrollments"')) return [[record, other, "2026-09-26", null]];
       if (query.includes('from "assessment_grades"')) return incompleteTable === "assessment_grades" ? rows : [[record, record, "published"]];
       if (query.includes('from "report_cards"')) return incompleteTable === "report_cards" ? rows : [[record, 1, "published"]];
       return [];
@@ -213,6 +214,23 @@ describe("live school administration boundaries", () => {
     await expect(saveSchoolRecord(actor, { kind: "term_lock", termId: record })).rejects.toThrow(message);
     expect(mocks.execute.mock.calls.some(([query]) => query.startsWith('update "terms"'))).toBe(false);
     expect(mocks.rollback).toHaveBeenCalledOnce();
+  });
+  it("allows closing when a weekday has no recorded morning roll call", async () => {
+    mocks.execute.mockImplementation(async query => {
+      if (query.includes('from "organizations"')) return [[org]];
+      if (query.includes('from "terms"')) return [[record, org, other, "Autumn", "2026-09-28", "2026-09-28", 1, false, null, null, null, now, now]];
+      if (query.includes('from "attendance_sessions"')) return [];
+      if (query.includes('from "assessments"')) return [];
+      if (query.includes('from "enrollments"')) return [[record, other, "2026-09-28", null]];
+      if (query.includes('from "report_cards"')) return [[record, 1, "published"]];
+      if (query.startsWith('update "terms"')) return [[record]];
+      if (query.startsWith('update "attendance_sessions"')) return [];
+      if (query.startsWith('insert into "audit_events"')) return [[record]];
+      return [];
+    });
+    await expect(saveSchoolRecord(actor, { kind: "term_lock", termId: record })).resolves.toEqual({ entityId: record });
+    expect(mocks.execute.mock.calls.some(([query]) => query.includes('from "attendance_sessions"'))).toBe(true);
+    expect(mocks.execute.mock.calls.some(([query]) => query.startsWith('update "terms"'))).toBe(true);
   });
   it("rejects locking an already closed term", async () => {
     mocks.execute.mockImplementation(async query => {

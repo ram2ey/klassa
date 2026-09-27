@@ -115,7 +115,6 @@ export function OfficialReportCardModal({ reportCard, onClose }: OfficialReportC
                           {sub.letterGrade}
                         </span>
                       </td>
-                      <td className="px-3 py-2.5 text-center font-mono text-slate-700">{sub.gpaPoint.toFixed(1)}</td>
                       <td className="px-3 py-2.5 text-[11px] text-slate-600 italic leading-relaxed">
                         &ldquo;{sub.teacherComments}&rdquo;
                       </td>
@@ -133,13 +132,10 @@ export function OfficialReportCardModal({ reportCard, onClose }: OfficialReportC
               <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">Term Academic Standing</h3>
               <div className="grid grid-cols-2 gap-3 text-xs">
                 <div>
-                  <span className="text-[10px] font-bold uppercase text-slate-500">Cumulative Term GPA</span>
-                  <p className="text-2xl font-black text-slate-950">{reportCard.gpa.toFixed(2)} <span className="text-xs font-normal text-slate-500">/ 4.00</span></p>
-                </div>
-                <div>
-                  <span className="text-[10px] font-bold uppercase text-slate-500">Weighted Average</span>
+                  <span className="text-[10px] font-bold uppercase text-slate-500">Term average</span>
                   <p className="text-2xl font-black text-blue-700">{reportCard.overallPercentage.toFixed(1)}%</p>
                 </div>
+
               </div>
               <div className="pt-2 border-t border-slate-200 flex items-center gap-2">
                 <CheckCircle size={16} className="text-green-700" />

@@ -1,6 +1,7 @@
 import "server-only";
 
 import { db } from "@/db";
+import { smsWorkerStatus } from "@/db/schema";
 import {
   getSystemHealthReport,
   type DatabaseHealth,
@@ -27,6 +28,17 @@ export async function getLiveSystemHealthReport(): Promise<SystemHealthReport> {
 
   const report = getSystemHealthReport(database);
   if (database.status === "unhealthy") report.status = "unhealthy";
+  try {
+    const [worker] = await db.select().from(smsWorkerStatus).limit(1);
+    const fresh = !!worker?.heartbeatAt && Date.now() - worker.heartbeatAt.getTime() < 90_000;
+    report.checks.smsWorker = { status: fresh ? (worker.failedCount || worker.unknownCount ? "degraded" : "healthy") : "unhealthy",
+      queuedCount: worker?.queuedCount ?? 0, failedCount: worker?.failedCount ?? 0,
+      unknownCount: worker?.unknownCount ?? 0, lastHeartbeatAt: worker?.heartbeatAt?.toISOString() ?? null };
+    if (report.checks.smsWorker.status !== "healthy" && report.status === "healthy") report.status = "degraded";
+  } catch {
+    report.checks.smsWorker = { status: "unhealthy", queuedCount: 0, failedCount: 0, unknownCount: 0, lastHeartbeatAt: null };
+    if (report.status === "healthy") report.status = "degraded";
+  }
   try {
     const telemetry = await getPlatformRequestMetrics();
     report.metrics = {

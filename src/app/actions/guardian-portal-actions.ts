@@ -2,15 +2,16 @@
 
 import { randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
-import { and, eq, inArray } from "drizzle-orm";
+import { and, eq, inArray, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { db } from "@/db";
-import { accounts, guardianAbsenceNotes, guardians, organizations, studentGuardians, students, users } from "@/db/schema";
+import { accounts, courtRestrictions, guardianAbsenceNotes, guardians, organizations, studentGuardians, students, users } from "@/db/schema";
 import { requireGuardian, requireStaff } from "@/lib/action-access";
 import { logAuditEvent } from "@/lib/audit";
 import { loginUsername, usernameSchema } from "@/lib/login-identity";
-import { SchoolConsentError, updateGuardianSchoolConsent, type SchoolConsentInput } from "@/lib/guardian-school-consent-service";
+import { SchoolConsentError, updateGuardianSmsPreferences,
+  type SmsPreferencesInput } from "@/lib/guardian-school-consent-service";
 
 const provisionSchema = z.object({ guardianId: z.uuid(), username: usernameSchema, temporaryPassword: z.string().min(12).max(128) });
 class GuardianPortalError extends Error {}
@@ -69,9 +70,19 @@ export async function submitGuardianAbsenceNoteAction(raw: z.input<typeof absenc
         .from(studentGuardians).innerJoin(students, and(eq(students.id, studentGuardians.studentId), eq(students.organizationId, studentGuardians.organizationId)))
         .where(and(inArray(studentGuardians.guardianId, guardian.guardians.map(item => item.id)),
           inArray(studentGuardians.organizationId, guardian.guardians.map(item => item.organizationId)),
-          eq(studentGuardians.studentId, input.studentId), eq(studentGuardians.hasLegalResponsibility, true)));
+          eq(studentGuardians.studentId, input.studentId), eq(studentGuardians.hasLegalResponsibility, true),
+          isNull(students.processingRestrictedAt)));
       const link = authorizedLinks.find(item => guardian.guardians.some(profile => profile.id === item.guardianId && profile.organizationId === item.organizationId));
       if (!link) throw new GuardianPortalError("You do not have permission to submit a note for this student.");
+      const restrictions = await tx.select({ guardianId: courtRestrictions.restrictedGuardianId,
+        effectiveDate: courtRestrictions.effectiveDate, expirationDate: courtRestrictions.expirationDate })
+        .from(courtRestrictions).where(and(eq(courtRestrictions.organizationId, link.organizationId),
+          eq(courtRestrictions.studentId, input.studentId), eq(courtRestrictions.isEnforced, true),
+          eq(courtRestrictions.prohibitDisclosure, true)));
+      if (restrictions.some(order => (!order.guardianId || order.guardianId === link.guardianId) &&
+        order.effectiveDate <= today && (!order.expirationDate || order.expirationDate >= today))) {
+        throw new GuardianPortalError("Access is restricted. Contact the school office.");
+      }
       const [duplicate] = await tx.select({ id: guardianAbsenceNotes.id }).from(guardianAbsenceNotes)
         .where(and(eq(guardianAbsenceNotes.organizationId, link.organizationId), eq(guardianAbsenceNotes.guardianId, link.guardianId),
           eq(guardianAbsenceNotes.studentId, input.studentId), eq(guardianAbsenceNotes.absenceDate, input.absenceDate), eq(guardianAbsenceNotes.status, "submitted"))).limit(1);
@@ -92,15 +103,14 @@ export async function submitGuardianAbsenceNoteAction(raw: z.input<typeof absenc
   }
 }
 
-export async function updateGuardianSchoolConsentAction(input: SchoolConsentInput) {
-  const account = await requireGuardian();
+export async function updateGuardianSmsPreferencesAction(input: SmsPreferencesInput) {
+  const guardian = await requireGuardian();
   try {
-    const result = await updateGuardianSchoolConsent(account, input);
+    const result = await updateGuardianSmsPreferences(guardian, input);
     revalidatePath("/");
     return { success: true as const, ...result };
   } catch (error) {
-    if (error instanceof z.ZodError) return { success: false as const, error: error.issues[0]?.message ?? "Check the consent choice." };
-    if (error instanceof SchoolConsentError) return { success: false as const, error: error.message };
-    return { success: false as const, error: "The consent choice could not be saved. Refresh and try again." };
+    if (error instanceof z.ZodError) return { success: false as const, error: error.issues[0]?.message ?? "Check the SMS choices." };
+    return { success: false as const, error: error instanceof SchoolConsentError ? error.message : "SMS preferences could not be saved." };
   }
 }

@@ -13,7 +13,7 @@ const data: SchoolAdminData = {
   school: { id: "school-1", name: "Northfield School", slug: "northfield", timezone: "Etc/GMT" },
   actor: { organizationId: "school-1", userId: "admin-1", name: "School Admin", role: "school_admin" },
   students: [], guardians: [], links: [], staff: [], classes: [], assignments: [], grades: [], years: [], terms: [], subjects: [], enrollments: [], audit: [], absenceNotes: [],
-  attendanceSummary: [], publishedReports: [], reportSubjects: [], behaviours: [], inquiries: [], timetable: [], activeAlerts: [], activeRestrictions: [],
+  attendanceSummary: [], publishedReports: [], reportSubjects: [], behaviours: [], timetable: [], activeAlerts: [], activeRestrictions: [],
 };
 const assignmentData = {
   ...data,
@@ -56,8 +56,8 @@ describe("school administration workspace", () => {
   });
   it("shows the live data rights panel in school settings", () => {
     render(<SchoolAdminWorkspace data={data} gdpr={{ requests: [] }} section="settings" />);
-    expect(screen.getByRole("heading", { name: "Data rights requests" })).toBeTruthy();
-    expect(screen.getByText("No data rights requests have been recorded for this school.")).toBeTruthy();
+    expect(screen.getByRole("heading", { name: "Privacy requests" })).toBeTruthy();
+    expect(screen.getByText("No privacy requests have been recorded for this school.")).toBeTruthy();
   });
   it.each([
     ["overview", "Overview"], ["students", "Students"], ["guardians", "Guardians"],

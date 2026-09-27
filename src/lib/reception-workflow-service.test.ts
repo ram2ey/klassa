@@ -157,7 +157,7 @@ describe("reception late-arrival and early-departure workflows", () => {
         relationship: "father",
         isExcused: false,
       })
-    ).rejects.toThrow("COURT RESTRICTION ALERT");
+    ).rejects.toThrow("Hold release");
 
     expect(mocks.commit).not.toHaveBeenCalled();
     expect(mocks.rollback).toHaveBeenCalledOnce();
@@ -170,6 +170,7 @@ describe("reception late-arrival and early-departure workflows", () => {
         return [[studentId, org, "ST-100", null, "Lucas", null, "Vance", null, "2012-05-10", "active", new Date(), new Date()]];
       }
       if (query.includes('from "court_restrictions"')) return [];
+      if (query.includes('from "student_guardians"')) return [["00000000-0000-4000-8000-000000000009", "Jane", "Vance"]];
       if (query.startsWith('insert into "reception_logs"')) {
         return [[logId, org, studentId, "early_departure", "2026-09-26", "13:30", 0, "Dentist appointment", "Jane Vance", "mother", true, officeActor.userId, null, new Date(), new Date()]];
       }
@@ -188,6 +189,10 @@ describe("reception late-arrival and early-departure workflows", () => {
       minutesLate: 0,
       reason: "Dentist appointment",
       actorPersonName: "Jane Vance",
+      collectorGuardianId: "00000000-0000-4000-8000-000000000009",
+      identityDocumentType: "Ghana card",
+      identityDocumentLast4: "1234",
+      identityChecked: true,
       relationship: "mother",
       isExcused: true,
     });

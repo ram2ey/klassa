@@ -1,5 +1,13 @@
 # Deploy Klassa to Coolify
 
+## First release rollout gate
+
+The app has not been used, so there are no school accounts or pupil records to migrate. Validate the current schema on a fresh or disposable PostgreSQL database before deploying. The migration chain removes specialist, inquiry, clinical, SEN and school-calendar exception features.
+
+Keep SMS disabled in production until staging verifies an mNotify parent announcement from composition through provider delivery status. Confirm recipient count and unreachable numbers before sending. Use Coolify secrets for provider credentials.
+
+Verify two-school data isolation, account setup, enrollment, attendance, marks, report publication, year placement, guardian access, pickup restrictions, backups and the health endpoint before enabling a school.
+
 This is the recommended production deployment path for Klassa. It uses the repository's `compose.yaml` so Coolify builds the web image, provisions a private PostgreSQL service, creates persistent storage, generates strong secrets, runs database migrations, creates the first platform administrator, and starts the web application only after database preparation succeeds.
 
 ## What the deployment creates
@@ -7,6 +15,7 @@ This is the recommended production deployment path for Klassa. It uses the repos
 - `web`: the public Next.js application on internal port `3000`
 - `postgres`: a private PostgreSQL 17 database with a persistent Docker volume
 - `migrate`: a one-time deployment container that applies Drizzle migrations and safely bootstraps the first platform administrator
+- `sms-worker`: a private mNotify queue processor with provider delivery reconciliation
 
 The database has no published host port. Coolify's proxy exposes only `web`. Every later deployment runs the migrations again; already-applied migrations are skipped. The bootstrap command is idempotent and skips itself after any platform administrator exists.
 
@@ -22,7 +31,7 @@ Have the following ready:
    - **Free wildcard IP domain (`sslip.io`)** if you do not own a domain yet (e.g. `https://<YOUR_SERVER_IP>.sslip.io:3000`), which requires zero DNS configuration and automatically supports Let's Encrypt SSL.
 4. The username, display name, and a new password for the first platform administrator.
 
-Use a username such as `admin` (3-64 letters, numbers, dots, underscores or hyphens). The initial password must contain 12–128 characters. Use a unique password; do not reuse a personal password.
+Use a username such as `admin` (3-64 letters, numbers, dots, underscores or hyphens). The initial password must contain 12â€“128 characters. Use a unique password; do not reuse a personal password.
 
 ## 1. Create the application
 
@@ -34,7 +43,7 @@ Use a username such as `admin` (3-64 letters, numbers, dots, underscores or hyph
 6. Set **Base Directory** to `/`.
 7. Set **Docker Compose Location** to `/compose.yaml` (some Coolify versions display this as `compose.yaml`).
 8. Leave **Raw Compose Deployment** disabled. Coolify should manage proxy labels and the resource network.
-9. Save and allow Coolify to parse the three services.
+9. Save and allow Coolify to parse the four services.
 
 Do not create PostgreSQL as a separate public application. It is already defined in the stack and is reachable only as `postgres` on the private Compose network.
 
@@ -56,7 +65,7 @@ If your Coolify instance has a wildcard domain configured:
 1. Select **Generate Domain** under the `web` service settings.
 2. Confirm the generated URL targets port `3000` (e.g. `https://random-id.your-server.domain:3000`).
 
-### Method C: Free wildcard IP domain (`sslip.io` — No domain purchase required)
+### Method C: Free wildcard IP domain (`sslip.io` â€” No domain purchase required)
 If you do not have a public domain yet and Coolify has no wildcard domain set up, you can use your server's public IP address with `sslip.io`. It resolves to your IP automatically without any DNS setup, and Coolify's proxy can provision a free Let's Encrypt SSL certificate for it:
 
 ```text
@@ -82,6 +91,7 @@ Coolify should automatically create and persist these values from the Compose de
 - `SERVICE_USER_POSTGRES`
 - `SERVICE_PASSWORD_64_POSTGRES`
 - `SERVICE_PASSWORD_64_APP` (restricted web database role)
+- `SERVICE_PASSWORD_64_SMS` (restricted SMS worker database role)
 - `SERVICE_REALBASE64_64_AUTH`
 - `SERVICE_REALBASE64_64_RECORDS`
 - `SERVICE_URL_WEB_3000`
@@ -101,14 +111,14 @@ Under **Environment Variables**, set the following values.
 ```text
 KLASSO_BOOTSTRAP_USERNAME=admin
 KLASSO_BOOTSTRAP_NAME=Your Name
-KLASSO_BOOTSTRAP_PASSWORD=<a unique 12–128 character password>
+KLASSO_BOOTSTRAP_PASSWORD=<a unique 12â€“128 character password>
 ```
 
 These variables are passed only to the one-time migration container, not to the public web container. On the first deployment, deployment intentionally fails if no platform administrator exists and these values are missing or invalid.
 
 After the first administrator has signed in successfully, you may blank or remove all three bootstrap values. Future deployments detect the existing administrator and skip bootstrap safely.
 
-Mark the bootstrap password as secret if the Coolify UI offers that option. Klassa does not require an SMS provider: platform administrators create school and staff accounts directly and assign temporary passwords.
+Mark the bootstrap password as secret if the Coolify UI offers that option. The app does not require SMS to run: administrators can provision accounts and share temporary credentials through a verified private channel. mNotify credentials are required before enabling queued SMS.
 
 ### Optional database pool size
 
@@ -220,7 +230,7 @@ Open the migration service logs. On the first deployment, the most common cause 
 
 Open `/api/health` and inspect the `database` and `cryptography` checks. Confirm PostgreSQL is healthy and that the generated auth and record-encryption secrets are still populated.
 
-### Domain shows “No Available Server”
+### Domain shows â€œNo Available Serverâ€
 
 Confirm the domain is assigned to `web`, includes the internal `:3000` target, DNS resolves to the Coolify server, and the `web` container is healthy. Do not publish PostgreSQL or port `3000` directly on the host.
 
@@ -230,7 +240,7 @@ Confirm the tenant ID and username match the account, and that the password was 
 
 ## Production-readiness boundary
 
-The deployed live system supports authentication, forced temporary-password replacement, MFA, platform-managed schools and staff accounts, school membership selection, and the connected roster workflows described in the README. Attendance, assessments, communications, sensitive cases, GDPR workflows, and some role-specific modules remain demonstrations whose live mutations are intentionally rejected. Do not use unfinished modules as systems of record until their roadmap items are completed and tested.
+The first release supports school staff and guardian workflows described in the README. This app has not been used; start with a fresh database and complete the staging acceptance gate above before admitting school data or enabling SMS.
 
 Relevant Coolify documentation:
 

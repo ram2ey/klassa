@@ -127,7 +127,7 @@ export function GdprCompliancePanel({
       const res = await toggleProcessingRestrictionAction(
         studentId,
         !currentlyRestricted,
-        "Parental request to freeze communications processing under GDPR Article 18.",
+        "Parental request to freeze communications processing under privacy request.",
         currentUserId
       );
       if (res.success) {
@@ -179,11 +179,11 @@ export function GdprCompliancePanel({
               GDPR & Statutory Data Protection Management (Articles 15–20)
             </h2>
             <span className="rounded-xs border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-800">
-              EU 2016/679 & UK DPA 2018
+              School privacy process
             </span>
           </div>
           <p className="text-xs text-slate-600">
-            Fulfill and audit student data portability requests, process rectification notices, manage processing restrictions, and execute irreversible PII anonymization while preserving statutory academic retention marks.
+            Record a privacy request and the administrator?s decision. Review and complete any action through the school?s verified process.
           </p>
         </div>
 
@@ -213,10 +213,10 @@ export function GdprCompliancePanel({
       <div className="border border-blue-200 bg-blue-50/70 p-3 text-xs text-blue-950 space-y-1 rounded-xs">
         <div className="flex items-center gap-2 font-bold">
           <FileText size={16} className="text-blue-700" weight="bold" />
-          <span>Statutory Safeguarding Non-Disclosure Enforcement</span>
+          <span>Privacy review reminder</span>
         </div>
         <p className="text-[11px] text-blue-900 leading-relaxed">
-          Pursuant to UK DPA 2018 Schedule 2 and EU GDPR Recital 38, confidential child safeguarding case files, clinical medical diagnoses, and disciplinary investigation notes are <strong>automatically redacted</strong> from parental portability packages to prevent child endangerment.
+          Review each access or disclosure request individually. This preview does not determine what information may be shared or change pupil records.
         </p>
       </div>
 
@@ -306,7 +306,7 @@ export function GdprCompliancePanel({
                 <FileText size={20} className="text-blue-700" weight="bold" />
                 <div>
                   <h3 className="text-base font-bold text-slate-900">
-                    GDPR Article 20 Data Portability Dossier
+                    Data access export
                   </h3>
                   <p className="text-xs text-slate-600 font-mono">
                     {selectedPackage.exportMetadata.exportId} • {selectedPackage.exportMetadata.studentName}
@@ -328,7 +328,7 @@ export function GdprCompliancePanel({
                 <div className="border border-amber-300 bg-amber-50 p-3 rounded-xs text-amber-950 space-y-1">
                   <div className="font-bold flex items-center gap-1.5 text-amber-900">
                     <ShieldCheck size={16} weight="bold" />
-                    Statutory Safeguarding Redaction Active
+                    Manual review required
                   </div>
                   <p className="text-[11px] leading-relaxed">
                     {selectedPackage.exportMetadata.safeguardingExemptionReason}

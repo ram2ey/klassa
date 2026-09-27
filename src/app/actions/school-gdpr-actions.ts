@@ -3,7 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
 import { requireStaff } from "@/lib/action-access";
-import { createSchoolGdprRequest, decideSchoolGdprRequest, generateSchoolGdprExtract,
+import { createSchoolGdprRequest, decideSchoolGdprRequest,
   SchoolGdprError, type GdprDecisionInput, type GdprRequestInput } from "@/lib/school-gdpr-service";
 
 function failure(error: unknown) {
@@ -18,15 +18,6 @@ export async function createSchoolGdprRequestAction(input: GdprRequestInput) {
     const result = await createSchoolGdprRequest(actor, input);
     revalidatePath("/");
     return { success: true as const, ...result };
-  } catch (error) { return { success: false as const, error: failure(error) }; }
-}
-
-export async function generateSchoolGdprExtractAction(requestId: string) {
-  const actor = await requireStaff(["school_admin"]);
-  try {
-    const extract = await generateSchoolGdprExtract(actor, requestId);
-    revalidatePath("/");
-    return { success: true as const, extract };
   } catch (error) { return { success: false as const, error: failure(error) }; }
 }
 

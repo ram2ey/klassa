@@ -3,206 +3,248 @@
   "dialect": "postgresql",
   "entries": [
     {
-      "idx": 0,
+      "idx": -1,
       "version": "7",
       "when": 1790029498996,
       "tag": "0000_pink_karma",
       "breakpoints": true
     },
     {
-      "idx": 1,
+      "idx": 0,
       "version": "7",
       "when": 1790029498997,
       "tag": "0001_phase1_subjects_invitations",
       "breakpoints": true
     },
     {
-      "idx": 2,
+      "idx": 1,
       "version": "7",
       "when": 1790029498998,
       "tag": "0002_phase2_attendance_guardians_sms",
       "breakpoints": true
     },
     {
-      "idx": 3,
+      "idx": 2,
       "version": "7",
       "when": 1790029498999,
       "tag": "0003_phase3_assessments_report_cards",
       "breakpoints": true
     },
     {
-      "idx": 4,
+      "idx": 3,
       "version": "7",
       "when": 1790029499000,
       "tag": "0004_phase4_communications",
       "breakpoints": true
     },
     {
-      "idx": 5,
+      "idx": 4,
       "version": "7",
       "when": 1790029499001,
       "tag": "0005_phase5_sensitive_records",
       "breakpoints": true
     },
     {
-      "idx": 6,
+      "idx": 5,
       "version": "7",
       "when": 1790029499002,
       "tag": "0006_phase6_production_hardening",
       "breakpoints": true
     },
     {
-      "idx": 7,
+      "idx": 6,
       "version": "7",
       "when": 1790042090704,
       "tag": "0007_sms_school_invitations",
       "breakpoints": true
     },
     {
-      "idx": 8,
+      "idx": 7,
       "version": "7",
       "when": 1790075064679,
       "tag": "0008_boring_gladiator",
       "breakpoints": true
     },
     {
-      "idx": 9,
+      "idx": 8,
       "version": "7",
       "when": 1790292079519,
       "tag": "0009_tenant_usernames",
       "breakpoints": true
     },
     {
-      "idx": 10,
+      "idx": 9,
       "version": "7",
       "when": 1790292079520,
       "tag": "0010_platform_admin_mfa",
       "breakpoints": true
     },
     {
-      "idx": 11,
+      "idx": 10,
       "version": "7",
       "when": 1790292079521,
       "tag": "0011_student_number_counters",
       "breakpoints": true
     },
     {
-      "idx": 12,
+      "idx": 11,
       "version": "7",
       "when": 1790339192737,
       "tag": "0012_curved_sage",
       "breakpoints": true
     },
     {
-      "idx": 13,
+      "idx": 12,
       "version": "7",
       "when": 1790347286608,
       "tag": "0013_platform_request_metrics",
       "breakpoints": true
     },
     {
-      "idx": 14,
+      "idx": 13,
       "version": "7",
       "when": 1790351215486,
       "tag": "0014_charming_stryfe",
       "breakpoints": true
     },
     {
-      "idx": 15,
+      "idx": 14,
       "version": "7",
       "when": 1790352317095,
       "tag": "0015_rich_krista_starr",
       "breakpoints": true
     },
     {
-      "idx": 16,
+      "idx": 15,
       "version": "7",
       "when": 1790353807661,
       "tag": "0016_public_roulette",
       "breakpoints": true
     },
     {
-      "idx": 17,
+      "idx": 16,
       "version": "7",
       "when": 1790355222158,
       "tag": "0017_flippant_preak",
       "breakpoints": true
     },
     {
-      "idx": 18,
+      "idx": 17,
       "version": "7",
       "when": 1790356417811,
       "tag": "0018_free_trish_tilby",
       "breakpoints": true
     },
     {
-      "idx": 19,
+      "idx": 18,
       "version": "7",
       "when": 1790357794494,
       "tag": "0019_gigantic_rocket_raccoon",
       "breakpoints": true
     },
     {
-      "idx": 20,
+      "idx": 19,
       "version": "7",
       "when": 1790403111616,
       "tag": "0020_long_polaris",
       "breakpoints": true
     },
     {
-      "idx": 21,
+      "idx": 20,
       "version": "7",
       "when": 1790413931472,
       "tag": "0021_minor_cerebro",
       "breakpoints": true
     },
     {
-      "idx": 22,
+      "idx": 21,
       "version": "7",
       "when": 1790415310128,
       "tag": "0022_fresh_captain_universe",
       "breakpoints": true
     },
     {
-      "idx": 23,
+      "idx": 22,
       "version": "7",
       "when": 1790420137715,
       "tag": "0023_sloppy_praxagora",
       "breakpoints": true
     },
     {
-      "idx": 24,
+      "idx": 23,
       "version": "7",
       "when": 1790425000000,
       "tag": "0024_dazzling_inquiries",
       "breakpoints": true
     },
     {
-      "idx": 25,
+      "idx": 24,
       "version": "7",
       "when": 1790430000000,
       "tag": "0025_yielding_timetables",
       "breakpoints": true
     },
     {
-      "idx": 26,
+      "idx": 25,
       "version": "7",
       "when": 1790435000000,
       "tag": "0026_term_closure_gradebook_lock",
       "breakpoints": true
     },
     {
-      "idx": 27,
+      "idx": 26,
       "version": "7",
       "when": 1790440000000,
       "tag": "0027_sen_tiered_register_and_reviews",
       "breakpoints": true
     },
     {
-      "idx": 28,
+      "idx": 27,
       "version": "7",
       "when": 1790445000000,
       "tag": "0028_tenant_row_security",
+      "breakpoints": true
+    },
+    {
+      "idx": 29,
+      "version": "7",
+      "when": 1790475000000,
+      "tag": "0030_sms_delivery",
+      "breakpoints": true
+    },
+    {
+      "idx": 30,
+      "version": "7",
+      "when": 1790480000000,
+      "tag": "0031_emergency_approval",
+      "breakpoints": true
+    },
+    {
+      "idx": 31,
+      "version": "7",
+      "when": 1790485000000,
+      "tag": "0032_pickup_identity",
+      "breakpoints": true
+    },
+    {
+      "idx": 32,
+      "version": "7",
+      "when": 1790490000000,
+      "tag": "0033_privacy_actions",
+      "breakpoints": true
+    },
+    {
+      "idx": 33,
+      "version": "7",
+      "when": 1790495000000,
+      "tag": "0034_sms_worker_status",
+      "breakpoints": true
+    },
+    {
+      "idx": 34,
+      "version": "7",
+      "when": 1790500000000,
+      "tag": "0035_remove_unused_phase1_records",
       "breakpoints": true
     }
   ]

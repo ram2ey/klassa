@@ -23,7 +23,7 @@ export const schoolCommandSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("term_lock"), termId: id, lockNotes: z.string().trim().max(500).optional() }),
   z.object({ kind: z.literal("term_unlock"), termId: id, unlockReason: z.string().trim().min(4, "Explain why this locked term is being reopened.").max(500) }),
   z.object({ kind: z.literal("settings"), name: z.string().trim().min(2).max(180) }),
-  z.object({ kind: z.literal("staff_role"), membershipId: id, role: z.enum(["school_admin", "office_staff", "teacher", "safeguarding_lead", "senco", "health_nurse"]) }),
+  z.object({ kind: z.literal("staff_role"), membershipId: id, role: z.enum(["school_admin", "office_staff", "teacher"]) }),
 ]).superRefine((value, context) => {
   if ((value.kind === "year" || value.kind === "term") && value.endsOn < value.startsOn) {
     context.addIssue({ code: "custom", path: ["endsOn"], message: "End date must be on or after the start date." });

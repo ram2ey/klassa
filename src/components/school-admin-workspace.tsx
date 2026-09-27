@@ -19,6 +19,7 @@ import { StudentCsvImport } from "@/components/student-csv-import";
 import { StudentEnrollmentFlow } from "@/components/student-enrollment-flow";
 import { SchoolAdminStudentDirectory } from "@/components/school-admin-student-directory";
 import { GuardianPortalAccess } from "@/components/guardian-portal-access";
+import { SchoolRolloverPanel } from "@/components/school-rollover-panel";
 import type { SchoolCommand } from "@/lib/school-admin-policy";
 
 const sections = [
@@ -38,7 +39,7 @@ const sections = [
   { id: "audit", label: "Audit history", icon: FileClock },
   { id: "settings", label: "School settings", icon: Settings },
 ] as const;
-const roles = ["school_admin", "office_staff", "teacher", "safeguarding_lead", "senco", "health_nurse"] as const;
+const roles = ["school_admin", "office_staff", "teacher"] as const;
 const fieldStyle = "mt-1.5 block min-h-11 w-full border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-600";
 const panelStyle = "border border-slate-200 bg-white";
 const words = (value: string) => value.replaceAll("_", " ").replace(/\b\w/g, letter => letter.toUpperCase());
@@ -62,7 +63,7 @@ export function SchoolAdminWorkspace({ data, workflow, gdpr, section, date: sele
   const attendanceRate = attendanceTotals.marks ? `${Math.round(attendanceTotals.attended / attendanceTotals.marks * 100)}%` : "—";
   const alertedStudents = new Set(data.activeAlerts.map(alert => alert.studentId)).size;
   const restrictedStudents = new Set(data.activeRestrictions.map(restriction => restriction.studentId)).size;
-  const date = (value: string | Date) => new Intl.DateTimeFormat("en-GB", { dateStyle: "medium", timeZone: SCHOOL_TIME_ZONE }).format(new Date(value));
+  const date = (value: string | Date) => new Intl.DateTimeFormat("en-GH", { dateStyle: "medium", timeZone: SCHOOL_TIME_ZONE }).format(new Date(value));
   const matches = (...values: unknown[]) => values.join(" ").toLowerCase().includes(query.toLowerCase());
   const yearName = (id: string) => data.years.find(year => year.id === id)?.name ?? "Unknown year";
   const gradeName = (id: string) => data.grades.find(grade => grade.id === id)?.name ?? "Unknown grade";
@@ -160,7 +161,7 @@ export function SchoolAdminWorkspace({ data, workflow, gdpr, section, date: sele
 
         {current.id === "academic" && <div className="space-y-6"><section className={panelStyle}><PanelHeading title="Academic years" description="The current year is used for student enrollment and class placement." action={add("year", "Add academic year")} />
           <DataTable caption="Academic years" headers={["Year", "Starts", "Ends", "Status", "Actions"]} rows={data.years.filter(year => matches(year.name)).map(year => ({ key: year.id, cells: [<strong key="name">{year.name}</strong>, date(year.startsOn), date(year.endsOn), <Status key="status" value={year.isCurrent ? "current" : "not current"} />, editButton("year", `Edit ${year.name}`, { id: year.id, name: year.name, startsOn: year.startsOn, endsOn: year.endsOn, isCurrent: year.isCurrent })] }))} empty="Add an academic year and mark it current to begin school setup." />
-        </section><section className={panelStyle}><PanelHeading title="Terms" description="Term dates must be within their academic year. Closing requires submitted roll calls, published grades and report cards." action={add("term", "Add term")} />
+        </section><section className={panelStyle}><PanelHeading title="Terms" description="Term dates must be within their academic year. Check attendance, grades and reports before closing. Unrecorded weekdays do not block closeout." action={add("term", "Add term")} />
           <DataTable caption="Academic terms" headers={["Term", "Academic year", "Starts", "Ends", "Status", "Actions"]} rows={data.terms.filter(term => matches(term.name, yearName(term.academicYearId))).map(term => {
             const isLocked = !!term.isLocked;
             return {
@@ -181,7 +182,7 @@ export function SchoolAdminWorkspace({ data, workflow, gdpr, section, date: sele
               ],
             };
           })} empty="Create an academic year, then add its terms." />
-        </section></div>}
+        </section><SchoolRolloverPanel data={data} /></div>}
 
         {current.id === "audit" && <section className={panelStyle}><PanelHeading title="School audit history" description="The latest 100 recorded events for this school, newest first." />
           <DataTable caption="School audit history" headers={["Event", "Actor", "Record type", "Record ID", "Time"]} rows={data.audit.filter(event => matches(event.action, event.actorName, event.entityType, event.entityId)).map(event => ({ key: event.id, cells: [event.action, event.actorName ?? "System", words(event.entityType), <span key="id" className="break-all font-mono text-xs">{event.entityId}</span>, formatGMTDateTime(event.createdAt)] }))} empty="No audit events match this view." />

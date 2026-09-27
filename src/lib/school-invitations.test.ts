@@ -1,13 +1,13 @@
 // @vitest-environment node
 import { beforeEach, describe, expect, it, vi } from "vitest";
-import { accounts, organizationMemberships, smsInvitations, users } from "@/db/schema";
+import { accounts, organizationMemberships, smsDispatches, smsInvitations, users } from "@/db/schema";
 const mocks = vi.hoisted(() => ({ reads: [] as unknown[][], writes: [] as { table: unknown; data: Record<string, unknown> }[],
   platform: vi.fn(), live: vi.fn(), session: vi.fn(), audit: vi.fn(), send: vi.fn(), commit: vi.fn(), rollback: vi.fn(), quota: true }));
 vi.mock("@/lib/action-access", () => ({ requirePlatformAdmin: mocks.platform, requireLiveMode: mocks.live }));
 vi.mock("@/lib/auth", () => ({ getAuth: () => ({ api: { getSession: mocks.session } }) }));
 vi.mock("next/headers", () => ({ headers: async () => new Headers() }));
 vi.mock("@/lib/audit", () => ({ logAuditEvent: mocks.audit }));
-vi.mock("@/lib/sms", () => ({ getSmsProvider: () => ({ send: mocks.send }) }));
+vi.mock("@/lib/sms", () => ({ normalizePhoneNumber: (phone: string) => phone }));
 vi.mock("@/db", async () => {
   const schema = await import("@/db/schema");
   function read() {
@@ -32,7 +32,7 @@ import { acceptSchoolInvitation, issueSchoolInvitation, revokeSchoolInvitation }
 import { hashInvitationToken, newInvitationToken } from "./invitation-policy";
 
 const org = "00000000-0000-4000-8000-000000000002";
-const phone = "+3545551234";
+const phone = "+233241234567";
 const invitation = () => ({ id: "00000000-0000-4000-8000-000000000008", organizationId: org, phoneNumber: phone,
   role: "school_admin", expiresAt: new Date(Date.now() + 3600_000), acceptedAt: null, revokedAt: null, lastSentAt: new Date(Date.now() - 120_000) });
 beforeEach(() => {
@@ -43,19 +43,26 @@ beforeEach(() => {
 });
 
 describe("SMS invitation lifecycle", () => {
+  it("does not issue invitations for unsupported roles", async () => {
+    await expect(issueSchoolInvitation({ organizationId: org, phoneNumber: phone,
+      role: "senco" as "teacher" })).rejects.toThrow();
+    expect(mocks.writes).toHaveLength(0);
+  });
   it("requires superuser authorization before issuing anything", async () => {
     mocks.platform.mockRejectedValue(new Error("Access denied"));
     await expect(issueSchoolInvitation({ organizationId: org, phoneNumber: phone, role: "school_admin" })).rejects.toThrow("Access denied");
     expect(mocks.writes).toHaveLength(0); expect(mocks.send).not.toHaveBeenCalled();
   });
-  it("commits a hashed invitation before sending, and returns no bearer secret", async () => {
+  it("commits a hashed invitation and durable queue item without returning the bearer secret", async () => {
     mocks.reads.push([{ id: org }], []);
-    mocks.send.mockImplementation(async () => { expect(mocks.commit).toHaveBeenCalledOnce(); return { success: true, providerRef: "SM-test" }; });
     const result = await issueSchoolInvitation({ organizationId: org, phoneNumber: phone, role: "school_admin" });
-    const message = String(mocks.send.mock.calls[0][1]);
+    const message = String(mocks.writes.find(write => write.table === smsDispatches)?.data.message);
     const token = message.match(/#([A-Za-z0-9_-]{43})/)![1];
     const stored = mocks.writes.find(write => write.table === smsInvitations && write.data.tokenHash)?.data;
     expect(stored?.tokenHash).toBe(hashInvitationToken(token));
+    expect(mocks.writes.find(write => write.table === smsDispatches)?.data.status).toBe("queued");
+    expect(result.deliveryStatus).toBe("pending");
+    expect(mocks.commit).toHaveBeenCalledOnce();
     expect(JSON.stringify(result)).not.toContain(token); expect(JSON.stringify(mocks.audit.mock.calls)).not.toContain(token);
   });
   it("does not send when quota reservation fails", async () => {
@@ -70,7 +77,7 @@ describe("SMS invitation lifecycle", () => {
     const replacement = mocks.writes.find(write => write.table === smsInvitations && write.data.tokenHash)?.data;
     expect(replacement?.tokenHash).not.toBe(oldHash);
     expect(mocks.writes.some(write => write.table === smsInvitations && write.data.revokedAt instanceof Date)).toBe(true);
-    expect(mocks.send).toHaveBeenCalledOnce();
+    expect(mocks.writes.some(write => write.table === smsDispatches && write.data.status === "queued")).toBe(true);
   });
   it("rejects an immediate resend before sending or changing the invitation", async () => {
     mocks.reads.push([{ id: org }], [{ ...invitation(), lastSentAt: new Date() }]);
@@ -82,18 +89,18 @@ describe("SMS invitation lifecycle", () => {
     await expect(issueSchoolInvitation({ organizationId: org, phoneNumber: phone, role: "school_admin" })).rejects.toThrow("Audit failed");
     expect(mocks.send).not.toHaveBeenCalled(); expect(mocks.commit).not.toHaveBeenCalled();
   });
-  it("reports provider failure without pretending delivery succeeded", async () => {
-    mocks.reads.push([{ id: org }], []); mocks.send.mockRejectedValue(new Error("Provider offline"));
+  it("does not report delivery before the worker checks the provider", async () => {
+    mocks.reads.push([{ id: org }], []);
     const result = await issueSchoolInvitation({ organizationId: org, phoneNumber: phone, role: "school_admin" });
-    expect(result.deliveryStatus).toBe("failed");
-    expect(mocks.writes.at(-1)?.data.deliveryStatus).toBe("failed");
+    expect(result.deliveryStatus).toBe("pending");
+    expect(mocks.writes.find(write => write.table === smsDispatches)?.data.status).toBe("queued");
   });
   it.each(["expired", "revoked", "accepted", "phone-mismatch"])("rejects %s acceptance before creating an account", async condition => {
     const record = invitation();
     const invalid = { ...record, expiresAt: condition === "expired" ? new Date(0) : record.expiresAt,
       acceptedAt: condition === "accepted" ? new Date() : null, revokedAt: condition === "revoked" ? new Date() : null };
     mocks.reads.push([invalid]);
-    await expect(acceptSchoolInvitation({ token: newInvitationToken().token, phoneNumber: condition === "phone-mismatch" ? "+3545559999" : phone, name: "New Admin", username: "new.admin", password: "long-test-password" })).rejects.toThrow("invalid, expired or already used");
+    await expect(acceptSchoolInvitation({ token: newInvitationToken().token, phoneNumber: condition === "phone-mismatch" ? "+233241234568" : phone, name: "New Admin", username: "new.admin", password: "long-test-password" })).rejects.toThrow("invalid, expired or already used");
     expect(mocks.writes).toHaveLength(0);
   });
   it("creates a credential account and membership using only the invitation's role and school", async () => {

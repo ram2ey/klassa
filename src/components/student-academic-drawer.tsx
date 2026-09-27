@@ -109,12 +109,6 @@ export type StudentAcademicDrawerProps = {
   timetablePeriods?: TimetablePeriodItem[];
   guardians?: StudentDrawerGuardian[];
   safetyNotices?: StudentDrawerSafetyNotice[];
-  senProfile?: {
-    tier: "universal" | "targeted" | "specialist";
-    primaryNeed: string;
-    examAccessArrangements?: string | null;
-    supportPlanSummary?: string | null;
-  } | null;
   onClose: () => void;
   onEditStudent?: () => void;
 };
@@ -138,7 +132,6 @@ export function StudentAcademicDrawer({
   timetablePeriods = [],
   guardians = [],
   safetyNotices = [],
-  senProfile,
   onClose,
   onEditStudent,
 }: StudentAcademicDrawerProps) {
@@ -263,24 +256,6 @@ export function StudentAcademicDrawer({
                 >
                   {student.status.toUpperCase()}
                 </span>
-                {senProfile && (
-                  <span
-                    className={`border px-2 py-0.5 text-[11px] font-semibold ${
-                      senProfile.tier === "specialist"
-                        ? "border-purple-300 bg-purple-50 text-purple-800"
-                        : senProfile.tier === "targeted"
-                        ? "border-amber-300 bg-amber-50 text-amber-800"
-                        : "border-sky-300 bg-sky-50 text-sky-800"
-                    }`}
-                  >
-                    SEN {senProfile.tier.toUpperCase()}: {senProfile.primaryNeed}
-                  </span>
-                )}
-                {senProfile?.examAccessArrangements && (
-                  <span className="border border-indigo-200 bg-indigo-50 px-2 py-0.5 text-[11px] font-semibold text-indigo-900">
-                    Exam Concessions: {senProfile.examAccessArrangements}
-                  </span>
-                )}
               </div>
               <h2 id="student-profile-title" className="mt-1.5 text-2xl font-bold text-slate-950">
                 {student.firstName} {student.lastName}
@@ -306,20 +281,7 @@ export function StudentAcademicDrawer({
           </div>
 
           {/* KPI Summary Cards */}
-          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
-            {/* GPA */}
-            <div className="border border-slate-200 bg-white p-3 shadow-xs">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
-                Latest GPA
-              </span>
-              <p className="mt-1 text-2xl font-bold text-slate-900">
-                {latestReport?.gpa != null ? Number(latestReport.gpa).toFixed(2) : "—"}
-              </p>
-              <span className="text-[10px] text-slate-500">
-                {latestReport ? "Official transcript" : "No reports yet"}
-              </span>
-            </div>
-
+          <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-3">
             {/* Overall Score */}
             <div className="border border-slate-200 bg-white p-3 shadow-xs">
               <span className="text-[10px] font-bold uppercase tracking-wider text-slate-500">
@@ -427,7 +389,7 @@ export function StudentAcademicDrawer({
                   <div>
                     <h3 className="font-bold text-slate-900">Multi-Term Grade Progression</h3>
                     <p className="mt-0.5 text-xs text-slate-500">
-                      Visual overall performance and GPA trajectories across terms.
+                      Visual overall performance across terms.
                     </p>
                   </div>
                   <TrendingUp className="h-5 w-5 text-blue-600" />
@@ -457,9 +419,6 @@ export function StudentAcademicDrawer({
                                 ) : null}
                                 {trend.delta > 0 ? `+${trend.delta.toFixed(1)}%` : `${trend.delta.toFixed(1)}%`}
                               </span>
-                            )}
-                            {trend.gpa != null && (
-                              <span className="font-mono text-slate-500">GPA {trend.gpa.toFixed(2)}</span>
                             )}
                             <span className="font-bold text-slate-950">
                               {trend.score != null ? `${trend.score}%` : "—"}
@@ -516,7 +475,6 @@ export function StudentAcademicDrawer({
                             <strong className="text-slate-900">
                               {card.overallPercentage != null ? `${card.overallPercentage}%` : "—"}
                             </strong>
-                            {card.gpa != null && ` • GPA: ${card.gpa}`}
                             {card.attendanceRate != null && ` • Attendance: ${card.attendanceRate}%`}
                           </p>
                           {card.teacherRemarks && (

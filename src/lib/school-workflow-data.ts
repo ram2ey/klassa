@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, ne } from "drizzle-orm";
 import { db } from "@/db";
 import { attendanceSessions, attendanceRecords, assessmentCategories, assessments, assessmentGrades,
   reportCards, reportCardSubjectGrades, announcements, sensitiveCases, sensitiveCaseNotes, sensitiveAccessLogs,
@@ -35,7 +35,7 @@ export async function getSchoolWorkflowData(section: string, sessionDate: string
   if (section === "communications") {
     const [announcementRows, dispatchRows] = await Promise.all([
       db.select().from(announcements).where(eq(announcements.organizationId, org)).orderBy(desc(announcements.createdAt)),
-      db.select().from(smsDispatches).where(eq(smsDispatches.organizationId, org)).orderBy(desc(smsDispatches.sentAt)).limit(50),
+      db.select().from(smsDispatches).where(and(eq(smsDispatches.organizationId, org), ne(smsDispatches.purpose, "invitation"))).orderBy(desc(smsDispatches.sentAt)).limit(50),
     ]);
     return { ...empty, announcements: announcementRows, dispatches: dispatchRows };
   }

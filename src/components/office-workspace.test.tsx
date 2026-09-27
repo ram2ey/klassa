@@ -35,11 +35,11 @@ const mockData: OfficeData = {
   grades: [{ id: "grade-1", organizationId: "org-1", name: "Grade 10", position: 10, createdAt: new Date(), updatedAt: new Date() }],
   classes: [{ id: "class-1", organizationId: "org-1", academicYearId: "year-1", gradeLevelId: "grade-1", name: "10-A", homeroomTeacherId: null, createdAt: new Date(), updatedAt: new Date() }],
   students: [
-    { id: "student-1", organizationId: "org-1", studentNumber: "STU-1", externalReference: null, firstName: "Leo", middleName: null, lastName: "Valdez", preferredName: null, dateOfBirth: "2010-03-15", status: "active", createdAt: new Date(), updatedAt: new Date() },
-    { id: "student-2", organizationId: "org-1", studentNumber: "STU-2", externalReference: null, firstName: "Maya", middleName: null, lastName: "Lin", preferredName: null, dateOfBirth: "2010-07-22", status: "active", createdAt: new Date(), updatedAt: new Date() },
+    { id: "student-1", organizationId: "org-1", studentNumber: "STU-1", externalReference: null, firstName: "Leo", middleName: null, lastName: "Valdez", preferredName: null, dateOfBirth: "2010-03-15", status: "active", processingRestrictedAt: null, processingRestrictionReason: null, createdAt: new Date(), updatedAt: new Date() },
+    { id: "student-2", organizationId: "org-1", studentNumber: "STU-2", externalReference: null, firstName: "Maya", middleName: null, lastName: "Lin", preferredName: null, dateOfBirth: "2010-07-22", status: "active", processingRestrictedAt: null, processingRestrictionReason: null, createdAt: new Date(), updatedAt: new Date() },
   ],
   guardians: [
-    { id: "guardian-1", organizationId: "org-1", userId: null, firstName: "Esperanza", lastName: "Valdez", email: "esperanza@example.com", phone: "+447700900077", createdAt: new Date(), updatedAt: new Date() },
+    { id: "guardian-1", organizationId: "org-1", userId: null, firstName: "Esperanza", lastName: "Valdez", email: "esperanza@example.com", phone: "+447700900077", phoneVerifiedAt: null, phoneVerifiedBy: null, createdAt: new Date(), updatedAt: new Date() },
   ],
   links: [
     { id: "link-1", organizationId: "org-1", studentId: "student-1", guardianId: "guardian-1", relationship: "parent", isPrimary: true, hasLegalResponsibility: true, createdAt: new Date(), updatedAt: new Date() },
@@ -76,6 +76,10 @@ const mockData: OfficeData = {
       minutesLate: 20,
       reason: "Bus delay",
       actorPersonName: "Unaccompanied",
+      collectorGuardianId: null,
+      identityDocumentType: null,
+      identityDocumentLast4: null,
+      identityChecked: false,
       relationship: "self",
       isExcused: true,
       recordedBy: "user-1",
@@ -128,6 +132,10 @@ describe("OfficeWorkspace reception desk component", () => {
         minutesLate: 30,
         reason: "Medical / Dental appointment",
         actorPersonName: "Esperanza Valdez",
+        collectorGuardianId: null,
+        identityDocumentType: "",
+        identityDocumentLast4: "",
+        identityChecked: false,
         relationship: "mother",
         isExcused: true,
         remarks: "",
@@ -137,7 +145,7 @@ describe("OfficeWorkspace reception desk component", () => {
     await waitFor(() => expect(mocks.refresh).toHaveBeenCalledOnce());
   });
 
-  it("switches to early departure, shows pickup restriction warning, and records departure", async () => {
+  it("switches to early departure and holds release without a linked legal guardian", async () => {
     render(<OfficeWorkspace data={mockData} notices={[]} section="reception" date="2026-09-26" />);
 
     // Switch to Early departure
@@ -157,23 +165,9 @@ describe("OfficeWorkspace reception desk component", () => {
     fireEvent.change(screen.getByLabelText("Collected by (adult's full name)"), { target: { value: "Aunt Sarah Lin" } });
     fireEvent.change(screen.getByLabelText("Relationship to student"), { target: { value: "aunt" } });
 
+    expect((screen.getByLabelText("Linked legal guardian") as HTMLSelectElement).options.length).toBe(1);
     fireEvent.click(screen.getByRole("button", { name: "Sign out student" }));
-
-    await waitFor(() => {
-      expect(mocks.recordReception).toHaveBeenCalledWith({
-        kind: "reception_log",
-        studentId: "student-2",
-        logType: "early_departure",
-        logDate: "2026-09-26",
-        timeString: "13:15",
-        minutesLate: 0,
-        reason: "Illness during school day",
-        actorPersonName: "Aunt Sarah Lin",
-        relationship: "aunt",
-        isExcused: false,
-        remarks: "",
-      });
-    });
+    expect(mocks.recordReception).not.toHaveBeenCalled();
   });
 
   it("displays existing reception entries in the chronological register", () => {
@@ -195,6 +189,13 @@ describe("OfficeWorkspace reception desk component", () => {
               id: "disp-1",
               organizationId: "org-1",
               studentId: "student-1",
+              guardianId: null,
+              invitationId: null,
+              purpose: "emergency",
+              idempotencyKey: null,
+              attemptCount: 0,
+              leasedUntil: null,
+              deliveredAt: null,
               recipientName: "Parent One",
               recipientPhone: "+354 555 1234",
               message: "Test emergency alert",

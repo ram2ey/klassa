@@ -9,6 +9,7 @@ import { StudentCsvImport } from "@/components/student-csv-import";
 import { StudentEnrollmentFlow } from "@/components/student-enrollment-flow";
 import { correctOfficeAttendanceAction, dispatchEmergencySmsAction, markGuardianAbsenceNoteReviewedAction, recordReceptionDeskAction, reviewAndExcuseGuardianAbsenceAction, saveOfficeRecordAction } from "@/app/actions/office-actions";
 import { EmergencySmsBroadcast } from "@/components/emergency-sms-broadcast";
+import { confirmGuardianPhoneAction } from "@/app/actions/guardian-phone-actions";
 import type { OfficeData } from "@/lib/office-data";
 import type { SchoolCommand } from "@/lib/school-admin-policy";
 import type { announcements } from "@/db/schema";
@@ -123,6 +124,19 @@ export function OfficeWorkspace({ data, notices, section, date }: { data: Office
           </Card>
           <Card title="Guardian absence notes"><p className="mb-3 text-sm text-slate-600">Review a note on its own, or review and excuse the matching absent morning mark in one audited step.</p><div className="space-y-3">{data.absenceNotes.map(note => { const matchingSession = note.absenceDate === date ? data.sessions.find(session => session.period === "morning_roll_call" && session.status === "submitted" && data.records.some(record => record.sessionId === session.id && record.studentId === note.studentId && record.status === "absent")) : undefined; return <article key={note.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3"><div><strong className="text-sm">{name(note.studentId)}</strong><p className="mt-1 text-xs text-slate-600">{note.absenceDate} · {note.reasonCategory.replaceAll("_", " ")} · Guardian: {note.guardianName} {note.guardianLastName}</p><p className="mt-1 text-xs text-slate-500">{words(note.status)}{note.reviewerName ? ` by ${note.reviewerName}` : ""}</p></div>{note.status === "submitted" && <div className="flex flex-wrap gap-2"><button className={secondary} disabled={pending} onClick={() => start(async () => { setMessage(""); const result = await markGuardianAbsenceNoteReviewedAction(note.id); setMessage(result.success ? "Absence note marked reviewed." : result.error); if (result.success) router.refresh(); })}>Review only</button>{matchingSession ? <button className={primary} disabled={pending} onClick={() => start(async () => { setMessage(""); const result = await reviewAndExcuseGuardianAbsenceAction(note.id); setMessage(result.success ? "Absence note reviewed and attendance excused." : result.error); if (result.success) router.refresh(); })}>Review and excuse</button> : note.absenceDate !== date ? <Link className={secondary} href={`/?section=attendance&date=${encodeURIComponent(note.absenceDate)}`}>Load note date</Link> : null}</div>}</article>; })}{!data.absenceNotes.length && <p className="text-sm text-slate-500">No guardian absence notes have been submitted.</p>}</div></Card>
           {attendanceSession && <Card title="Attendance records"><div className="space-y-3">{attendanceRecords.map(record => <form key={record.id} className={`grid items-end gap-3 border-b border-slate-100 pb-3 md:grid-cols-[1fr_170px_1fr_1fr_auto] ${record.status === "absent" || record.status === "late" ? "bg-amber-50/50" : ""}`} onSubmit={event => { event.preventDefault(); const form = new FormData(event.currentTarget); start(async () => { setMessage(""); const result = await correctOfficeAttendanceAction({ kind: "attendance", classId: attendanceSession.classId, sessionDate: date, studentId: record.studentId, status: str(form, "status") as "present", reason: str(form, "reason"), correctionReason: str(form, "correctionReason") }); setMessage(result.success ? "Attendance correction saved." : result.error); if (result.success) router.refresh(); }); }}><div><strong className="text-sm">{name(record.studentId)}</strong><span className="block text-xs text-slate-500">Previously {words(record.status)}</span></div><Select label="Status" name="status" choices={["present", "absent", "late", "excused"].map(value => ({ id: value, name: words(value) }))} defaultValue={record.status} /><Field label="Attendance reason" name="reason" required={false} defaultValue={record.reason} /><Field label="Correction explanation" name="correctionReason" /><button className={primary} disabled={pending || attendanceSession.status !== "submitted"}>Correct</button></form>)}{!attendanceRecords.length && <p className="text-sm text-slate-500">No student marks recorded in this roll call.</p>}</div></Card>}</div>}
+        {current.id === "guardians" && <Card title="Confirm guardian phone for SMS">
+          <p className="mb-3 text-sm text-slate-600">Confirm the number with the guardian. The confirmation is audited and resets if the number changes.</p>
+          <form className="grid gap-3 sm:grid-cols-2" onSubmit={event => { event.preventDefault(); const form = new FormData(event.currentTarget);
+            start(async () => { const result = await confirmGuardianPhoneAction({ guardianId: str(form, "guardianId"),
+              confirmedPhone: str(form, "confirmedPhone"), evidence: str(form, "evidence") });
+              setMessage(result.success ? "Guardian number confirmed." : result.error); if (result.success) router.refresh(); }); }}>
+            <Select label="Guardian" name="guardianId" choices={guardianOptions} />
+            <Field label="Confirmed phone number" name="confirmedPhone" />
+            <Field label="Confirmation evidence (method and date)" name="evidence" />
+            <button className={primary} disabled={pending}>Record confirmation</button>
+          </form>
+          <ul className="mt-4 text-sm">{data.guardians.map(guardian => <li key={guardian.id}>{guardian.firstName} {guardian.lastName}: {guardian.phoneVerifiedAt ? "Confirmed" : "Unconfirmed"}</li>)}</ul>
+        </Card>}
         {current.id === "reception" && (
           <div className="space-y-5">
             <Card title="Front desk reception log">
@@ -182,6 +196,10 @@ export function OfficeWorkspace({ data, notices, section, date }: { data: Office
                       minutesLate: Number(form.get("minutesLate") ?? 0),
                       reason: str(form, "reason"),
                       actorPersonName: str(form, "actorPersonName"),
+                      collectorGuardianId: str(form, "collectorGuardianId") || null,
+                      identityDocumentType: str(form, "identityDocumentType"),
+                      identityDocumentLast4: str(form, "identityDocumentLast4"),
+                      identityChecked: form.has("identityChecked"),
                       relationship: str(form, "relationship"),
                       isExcused: form.has("isExcused"),
                       remarks: str(form, "remarks"),
@@ -254,6 +272,20 @@ export function OfficeWorkspace({ data, notices, section, date }: { data: Office
                   name="relationship"
                   defaultValue={receptionType === "late_arrival" ? "self" : "parent"}
                 />
+                {receptionType === "early_departure" && <div className="grid gap-3 sm:col-span-2 sm:grid-cols-2">
+                  <label className="text-sm font-medium">Linked legal guardian
+                    <select name="collectorGuardianId" className={field} required defaultValue="">
+                      <option value="">Choose verified collector</option>
+                      {data.links.filter(link => link.studentId === selectedReceptionStudent && link.hasLegalResponsibility).map(link => {
+                        const guardian = data.guardians.find(row => row.id === link.guardianId);
+                        return guardian && <option key={link.id} value={guardian.id}>{guardian.firstName} {guardian.lastName}</option>;
+                      })}
+                    </select>
+                  </label>
+                  <label className="text-sm font-medium">Inspected document type<input name="identityDocumentType" className={field} required placeholder="Ghana card, passport" /></label>
+                  <label className="text-sm font-medium">Document final four characters<input name="identityDocumentLast4" className={field} minLength={4} maxLength={4} required /></label>
+                  <label className="flex items-center gap-2 text-sm font-medium"><input type="checkbox" name="identityChecked" required /> I inspected the original identity document</label>
+                </div>}
                 <div className="flex items-center gap-2 pt-6 sm:col-span-2">
                   <label className="flex items-center gap-2 text-sm font-medium">
                     <input type="checkbox" name="isExcused" defaultChecked={receptionType === "late_arrival"} />
@@ -315,6 +347,7 @@ export function OfficeWorkspace({ data, notices, section, date }: { data: Office
         )}
         {current.id === "broadcast" && (
           <EmergencySmsBroadcast
+            students={data.students}
             grades={data.grades}
             classes={data.classes}
             dispatches={data.dispatches}

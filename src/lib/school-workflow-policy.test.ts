@@ -30,7 +30,7 @@ describe("period attendance policy", () => {
     expect(canTeacherTakeAttendance("morning_roll_call", true, false)).toBe(true);
   });
 
-  it("validates reception log and specialist workflow commands", () => {
+  it("validates reception, broadcast, and behaviour commands", () => {
     const late = workflowCommandSchema.parse({
       kind: "reception_log",
       studentId,
@@ -42,32 +42,13 @@ describe("period attendance policy", () => {
     });
     expect(late).toMatchObject({ kind: "reception_log", minutesLate: 30, isExcused: false });
 
-    const clinic = workflowCommandSchema.parse({
-      kind: "clinic_visit",
-      studentId,
-      category: "illness",
-      symptoms: "Fever and headache",
-      treatment: "Temperature taken, rested with water",
-      outcome: "resting_in_clinic",
-      guardianNotified: true,
-      guardianNotificationNotes: "Called mom",
-    });
-    expect(clinic).toMatchObject({ outcome: "resting_in_clinic", guardianNotified: true });
-
-    const disclosure = workflowCommandSchema.parse({
-      kind: "statutory_disclosure",
-      studentId,
-      recipientAgency: "Social Services",
-      reason: "Section 47 child protection inquiry",
-    });
-    expect(disclosure).toMatchObject({ kind: "statutory_disclosure" });
-
     const sms = workflowCommandSchema.parse({
       kind: "emergency_sms_broadcast",
       scope: "whole_school",
       targetId: "all",
       severity: "lockdown",
       message: "Campus lockdown in effect. All students secure indoors.",
+      reason: "Verified security incident",
     });
     expect(sms).toMatchObject({ kind: "emergency_sms_broadcast", severity: "lockdown" });
 
@@ -78,6 +59,7 @@ describe("period attendance policy", () => {
       targetId: "all",
       severity: "lockdown",
       message: "Hi",
+      reason: "Verified security incident",
     }).success).toBe(false);
 
     // Invalid message length (greater than 320 chars)
@@ -87,6 +69,7 @@ describe("period attendance policy", () => {
       targetId: "all",
       severity: "lockdown",
       message: "A".repeat(321),
+      reason: "Verified security incident",
     }).success).toBe(false);
 
     const praise = workflowCommandSchema.parse({
@@ -134,54 +117,5 @@ describe("period attendance policy", () => {
       occurredAt: "2026-09-26",
     }).success).toBe(false);
 
-    // SEN profile save valid
-    const senProfile = workflowCommandSchema.parse({
-      kind: "sen_profile_save",
-      studentId,
-      tier: "targeted",
-      primaryNeed: "Cognition and Learning",
-      secondaryNeeds: "Dyslexia",
-      supportPlanSummary: "1-to-1 reading support twice weekly, visual timetable",
-      examAccessArrangements: "25% extra time, rest breaks",
-      nextReviewDate: "2026-12-15",
-      reviewFrequencyWeeks: 12,
-    });
-    expect(senProfile).toMatchObject({
-      kind: "sen_profile_save",
-      tier: "targeted",
-      primaryNeed: "Cognition and Learning",
-      status: "active",
-      reviewFrequencyWeeks: 12,
-    });
-
-    // SEN review complete valid
-    const senReview = workflowCommandSchema.parse({
-      kind: "sen_review_complete",
-      profileId: "00000000-0000-4000-8000-000000000003",
-      reviewDate: "2026-09-26",
-      reviewType: "termly",
-      attendees: "Dr. Bell (SENCO), Mrs. Smith (Teacher), Guardians",
-      targetsMetSummary: "Phonics score improved by 20%, completed writing tasks",
-      newTargets: "Independent writing for 15 minutes",
-      tierDecision: "targeted",
-      nextReviewDate: "2026-12-15",
-      notes: "Progress is consistent with term expectations",
-    });
-    expect(senReview).toMatchObject({
-      kind: "sen_review_complete",
-      reviewType: "termly",
-      tierDecision: "targeted",
-    });
-
-    // SEN profile save invalid: missing required primaryNeed or summary
-    expect(workflowCommandSchema.safeParse({
-      kind: "sen_profile_save",
-      studentId,
-      tier: "targeted",
-      primaryNeed: "",
-      supportPlanSummary: "",
-      nextReviewDate: "2026-12-15",
-    }).success).toBe(false);
   });
 });
-

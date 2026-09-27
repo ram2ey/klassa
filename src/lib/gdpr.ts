@@ -29,7 +29,7 @@ export interface StudentDataPortabilityPackage {
     organizationName: string;
     studentId: string;
     studentName: string;
-    complianceStandard: string; // "GDPR Article 20 / UK DPA 2018"
+    complianceStandard: string; // "School privacy request review"
     dpoContact: string;
     safeguardingExemptionApplied: boolean;
     safeguardingRedacted: boolean;
@@ -100,7 +100,7 @@ export const INITIAL_GDPR_REQUESTS: GdprRequestRecord[] = [
     requesterName: "David Warren",
     requesterRole: "guardian",
     requesterEmail: "david.warren@example.com",
-    justification: "Annual parental copy of machine-readable educational and attendance data under GDPR Article 20.",
+    justification: "Guardian request for access to school records.",
     safeguardingRedacted: true,
     resultExportUrl: "/api/v1/gdpr/export/st-amelia-warren",
     processedAt: "2026-09-18T11:30:00.000Z",
@@ -200,7 +200,7 @@ export function generateStudentDataPortabilityPackage(
     },
     confidentialSafeguardingDossier: {
       status: "REDACTED_BY_STATUTORY_EXEMPTION",
-      statutoryLegalBasis: "UK DPA 2018 Schedule 2 Part 2 / GDPR Recital 38 (Child Safety)",
+      statutoryLegalBasis: "Manual review required under school policy.",
       notice: "Confidential child safeguarding, medical diagnoses, and disciplinary investigation narratives are segregated and exempt from open portability to safeguard the safety and well-being of the minor.",
     },
   };

@@ -128,9 +128,7 @@ export function MultiSchoolPanel({
             domainVerified: false,
             initialAdminInvited: false,
             mfaPolicyActivated: false,
-            academicYearCreated: false,
-            safeguardingLeadDesignated: false,
-            initialRosterImported: false,
+            academicYearCreated: false,            initialRosterImported: false,
           };
           const progress = calculateOnboardingProgress(checklist);
 
@@ -167,7 +165,7 @@ export function MultiSchoolPanel({
                 <div>
                   <span className="text-[10px] text-slate-400 block uppercase">Grading Scheme</span>
                   <span className="font-semibold text-slate-800">
-                    {org.gradingScheme === "letter" ? "A-F (4.0 GPA)" : "Standards-Based"}
+                    {org.gradingScheme === "letter" ? "Letter grades" : "Standards-Based"}
                   </span>
                 </div>
               </div>
@@ -246,18 +244,14 @@ export function MultiSchoolPanel({
                   domainVerified: false,
                   initialAdminInvited: false,
                   mfaPolicyActivated: false,
-                  academicYearCreated: false,
-                  safeguardingLeadDesignated: false,
-                  initialRosterImported: false,
+                  academicYearCreated: false,                  initialRosterImported: false,
                 };
 
                 const items: Array<{ key: keyof OnboardingChecklist; label: string; desc: string }> = [
                   { key: "domainVerified", label: "Educational Domain Verified", desc: "DNS TXT & MX verification" },
                   { key: "initialAdminInvited", label: "Executive Admin Account Provisioned", desc: "Initial principal credentials" },
                   { key: "mfaPolicyActivated", label: "Mandatory Staff MFA Enforced", desc: "TOTP two-factor compliance" },
-                  { key: "academicYearCreated", label: "Academic Year & Terms Configured", desc: "2026–27 calendar defined" },
-                  { key: "safeguardingLeadDesignated", label: "Safeguarding Lead Appointed", desc: "Statutory child protection officer" },
-                  { key: "initialRosterImported", label: "Student & Guardian Roster Ingested", desc: "Validated CSV import completed" },
+                  { key: "academicYearCreated", label: "Academic Year & Terms Configured", desc: "2026–27 calendar defined" },                  { key: "initialRosterImported", label: "Student & Guardian Roster Ingested", desc: "Validated CSV import completed" },
                 ];
 
                 return items.map((item) => (
@@ -359,7 +353,7 @@ export function MultiSchoolPanel({
                     onChange={(e) => setSchoolGradingScheme(e.target.value as "letter" | "standards_based")}
                     className="w-full border border-slate-300 bg-white px-3 py-2 text-xs focus:outline-hidden"
                   >
-                    <option value="letter">Letter Grade (A–F, 4.0 GPA)</option>
+                    <option value="letter">Letter grades</option>
                     <option value="standards_based">Standards-Based (4-point Rubric)</option>
                   </select>
                 </div>
