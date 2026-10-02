@@ -2,7 +2,7 @@
 
 import { useMemo, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
+
 import type { SchoolAdminData } from "@/lib/school-admin-data";
 import { Button } from "@/components/ui/button";
 import { bulkUpdateSchoolStudentsAction } from "@/app/actions/school-admin-actions";
@@ -158,7 +158,7 @@ export function SchoolAdminStudentDirectory({ data, query, currentYearId, onEnro
         })}
         safetyNotices={[
           ...studentAlerts.map(a => ({ type: "directive" as const, title: a.category.replace(/_/g, " "), detail: `Active directive (${a.severity})` })),
-          ...studentRestrictions.map(r => ({ type: "pickup" as const, title: "Safety restriction", detail: "Enforced court order on file" })),
+          ...studentRestrictions.map(() => ({ type: "pickup" as const, title: "Safety restriction", detail: "Enforced court order on file" })),
         ]}
         onClose={() => setProfileId(null)}
         onEditStudent={() => {

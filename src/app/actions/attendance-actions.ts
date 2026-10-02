@@ -10,7 +10,6 @@ import {
   calculateAttendanceMetrics,
   formatAttendanceCsvReport,
 } from "@/lib/attendance";
-import { dispatchAbsenceAlert } from "@/lib/sms";
 import { addInAppNotification } from "@/lib/notifications";
 
 const DEFAULT_ORG_ID = "00000000-0000-0000-0000-000000000001";
@@ -177,7 +176,6 @@ export async function saveAttendanceRollCallAction(params: {
       metadata: { classId: session.classId, date: session.date, total: session.records.length },
     });
 
-    // Generate alerts for unexcused absences
     const absentees = session.records.filter((r) => r.status === "absent");
     for (const absentStudent of absentees) {
       addInAppNotification({
@@ -186,16 +184,6 @@ export async function saveAttendanceRollCallAction(params: {
         type: "absence_alert",
         metadata: { studentId: absentStudent.studentId, class: session.className },
       });
-
-      if (absentStudent.guardianPhone) {
-        await dispatchAbsenceAlert({
-          recipientPhone: absentStudent.guardianPhone,
-          recipientName: absentStudent.guardianName,
-          studentId: absentStudent.studentId,
-          studentName: absentStudent.studentName,
-          dateStr: session.date,
-        });
-      }
     }
   }
 

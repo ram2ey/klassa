@@ -23,7 +23,7 @@ For the synthetic local preview, set `KLASSO_DEMO_MODE=true` in `.env.local` and
 
 Demo mode is rejected in production. With demo mode disabled, the home page requires an existing staff account and school membership. Platform administrators also need enabled MFA. Live roster reads, student enrollment and status updates use PostgreSQL and enforce the authenticated organization. Enrollment requires an existing class/grade in the school's current academic year. Mutations and their audit entries commit atomically. Database errors are never converted into successful demo writes.
 
-The older demo action routes for attendance, assessments, communications and sensitive records remain preview-only; the live school administrator sections use separate school-scoped actions. The old school-provisioning preview remains local. Live privacy requests support reviewed export, rectification and processing restriction; erasure cannot be fulfilled until approved retention and dependency controls exist. Live emergency SMS requires two distinct staff approvals and enters a durable queue; scheduled SMS and guardian account invitations are not implemented. SMS simulations have zero cost and are not marked delivered.
+The older demo action routes for attendance, assessments, communications and sensitive records remain preview-only; the live school sections use separate school-scoped actions. The old school-provisioning preview remains local. Live privacy requests support reviewed export, rectification and processing restriction; erasure cannot be fulfilled until approved retention and dependency controls exist. Parent SMS is limited to staff-written announcements, reviewed by recipient count before they enter the durable queue. Automated absence texts, invitation texts, scheduling and emergency approval broadcasts are removed. SMS simulations have zero cost and are not marked delivered.
 
 ### Live school administrator workspace
 
@@ -44,7 +44,7 @@ School administrators land on the school overview at `/`. Navigation links use `
 - Audit history: search the latest 100 events for this school.
 - School settings: edit the school's display name. The sign-in tenant ID remains managed separately; the timezone is fixed at GMT.
 
-For a new school, create the academic year and mark it current, add grades and classes, then enroll students and link guardians. Every mutation checks the authenticated school and commits its audit entry in the same transaction. The live administrator workspace includes the guardian portal, two-staff emergency SMS approval, pickup checks, and reviewed privacy requests. Specialist directive delivery remains a separate workflow.
+For a new school, create the academic year and mark it current, add grades and classes, then enroll students and link guardians. Every mutation checks the authenticated school and commits its audit entry in the same transaction. The live administrator workspace includes the guardian portal, parent announcements, pickup checks, and reviewed privacy requests.
 
 Student numbers are assigned from a per-school counter inside the enrollment transaction, including CSV imports. Existing student numbers stay unchanged, and staff cannot edit assigned numbers. The CSV template does not require a student number; `externalReference` is optional for a school's old ID. Older CSVs with a `studentNumber` column are accepted and that value is stored as the external reference. A repeated external reference in the same school is rejected. After import, download the row-by-row mapping of old IDs and assigned numbers; both are searchable in the student directory. Apply migration `0011_student_number_counters` with `npm run db:migrate` before using live enrollment or import.
 
@@ -76,9 +76,18 @@ The migration journal includes the phone identity, platform administration, scho
 npm run typecheck
 npm run lint
 npm test
+npm run test:sms
 npm run db:check
 npm run build
 ```
+
+Release verification also requires `npm run test:integration` and `npm run test:e2e` against a migrated disposable PostgreSQL database. Set `RLS_TEST_ADMIN_URL` to its owner connection, `RLS_TEST_APP_URL` to its `klassa_app` connection, and `KLASSO_SMS_WORKER_PASSWORD` to its restricted worker password. These commands fail when the database URLs are missing; browser checks use synthetic records and require a local database. Install Chromium once with `npx playwright install chromium`, and run `npm run build` before the browser checks. The integration suite checks tenant isolation, enrollment through report publication and rollover, complete rollover receipts, SMS eligibility at send time, lease recovery, concurrent retries, and transactional rollback. Browser checks exercise real staff and guardian sign-in, scoped rosters, and an audited administrator save against the production server behind a local HTTPS proxy. The certificate and key in `e2e/fixtures` are public test fixtures for localhost only; never use them in a deployment.
+
+The verification workflow in `.github/workflows/verify.yml` creates a fresh PostgreSQL 17 database, applies the entire migration chain, runs the unit and integration checks, then builds production code and runs the browser checks. Test-only credentials in that workflow are for its ephemeral database. Keep live SMS disabled until the separate controlled mNotify staging acceptance is complete.
+
+Parent SMS uses only current-year classes and active pupils without processing restrictions. A reviewed announcement keeps one request ID across retries; its audit receipt and dispatches commit together. Repeating that request returns the original counts without queueing messages again. Editing the audience or message starts a new request.
+
+The worker rechecks the stored recipient against the current verified phone, legal link, SMS preference, pupil status and contact restrictions immediately before claiming a message. Ineligible dispatches are cancelled. Each provider request owns one lease; health reporting continues independently, and unknown outcomes are never automatically resent. Apply migration `0039_sms_send_eligibility` before starting the updated worker. Rollover receipts also compare all move, graduate and withdraw decisions; earlier receipts without a fingerprint require manual review instead of being treated as a verified retry.
 
 ## Deployment
 

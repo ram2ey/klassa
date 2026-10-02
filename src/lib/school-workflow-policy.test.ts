@@ -30,7 +30,7 @@ describe("period attendance policy", () => {
     expect(canTeacherTakeAttendance("morning_roll_call", true, false)).toBe(true);
   });
 
-  it("validates reception, broadcast, and behaviour commands", () => {
+  it("validates reception and behaviour commands while rejecting emergency broadcasts", () => {
     const late = workflowCommandSchema.parse({
       kind: "reception_log",
       studentId,
@@ -42,33 +42,12 @@ describe("period attendance policy", () => {
     });
     expect(late).toMatchObject({ kind: "reception_log", minutesLate: 30, isExcused: false });
 
-    const sms = workflowCommandSchema.parse({
+    expect(workflowCommandSchema.safeParse({
       kind: "emergency_sms_broadcast",
       scope: "whole_school",
       targetId: "all",
       severity: "lockdown",
       message: "Campus lockdown in effect. All students secure indoors.",
-      reason: "Verified security incident",
-    });
-    expect(sms).toMatchObject({ kind: "emergency_sms_broadcast", severity: "lockdown" });
-
-    // Invalid message length (less than 5 chars)
-    expect(workflowCommandSchema.safeParse({
-      kind: "emergency_sms_broadcast",
-      scope: "whole_school",
-      targetId: "all",
-      severity: "lockdown",
-      message: "Hi",
-      reason: "Verified security incident",
-    }).success).toBe(false);
-
-    // Invalid message length (greater than 320 chars)
-    expect(workflowCommandSchema.safeParse({
-      kind: "emergency_sms_broadcast",
-      scope: "whole_school",
-      targetId: "all",
-      severity: "lockdown",
-      message: "A".repeat(321),
       reason: "Verified security incident",
     }).success).toBe(false);
 

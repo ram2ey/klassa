@@ -8,7 +8,7 @@ import type { requireGuardian } from "@/lib/action-access";
 type GuardianAccount = Awaited<ReturnType<typeof requireGuardian>>;
 export class SchoolConsentError extends Error {}
 export const smsPreferencesSchema = z.object({ guardianId: z.uuid(), schoolId: z.uuid(),
-  announcements: z.boolean(), attendance: z.boolean() });
+  announcements: z.boolean() });
 export type SmsPreferencesInput = z.input<typeof smsPreferencesSchema>;
 
 export async function updateGuardianSmsPreferences(account: GuardianAccount, raw: SmsPreferencesInput) {
@@ -28,14 +28,14 @@ export async function updateGuardianSmsPreferences(account: GuardianAccount, raw
     const [existing] = await tx.select().from(guardianConsents).where(and(eq(guardianConsents.organizationId, input.schoolId),
       eq(guardianConsents.guardianId, input.guardianId))).for("update");
     const now = new Date();
-    const fields = { optInSmsAnnouncements: input.announcements, optInSmsAttendance: input.attendance,
+    const fields = { optInSmsAnnouncements: input.announcements,
       smsConfirmedAt: now, phone: guardian.phone ?? "", updatedAt: now };
     const [saved] = existing ? await tx.update(guardianConsents).set(fields).where(eq(guardianConsents.id, existing.id)).returning({ id: guardianConsents.id }) :
       await tx.insert(guardianConsents).values({ ...fields, organizationId: input.schoolId, guardianId: input.guardianId })
         .returning({ id: guardianConsents.id });
     await logAuditEvent({ organizationId: input.schoolId, actorUserId: account.userId,
       action: "guardian.sms_preferences_confirmed", entityType: "guardian_consent", entityId: saved.id,
-      metadata: { guardianId: input.guardianId, announcements: input.announcements, attendance: input.attendance } }, tx);
+      metadata: { guardianId: input.guardianId, announcements: input.announcements } }, tx);
     return { confirmedAt: now };
   });
 }

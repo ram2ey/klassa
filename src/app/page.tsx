@@ -18,7 +18,7 @@ import { TeacherWorkspace } from "@/components/teacher-workspace";
 import { getOfficeData } from "@/lib/office-data";
 import { OfficeWorkspace } from "@/components/office-workspace";
 import { db } from "@/db";
-import { guardians, organizationMemberships } from "@/db/schema";
+import { organizationMemberships } from "@/db/schema";
 import { eq } from "drizzle-orm";
 import { getGuardianPortalData } from "@/lib/guardian-portal-data";
 import { GuardianPortalWorkspace } from "@/components/guardian-portal-workspace";
@@ -35,10 +35,9 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
   if (user.isPlatformAdmin && !user.twoFactorEnabled) redirect("/setup-mfa");
   if (user.isPlatformAdmin) redirect("/platform");
   const memberships = await db.select({ id: organizationMemberships.id }).from(organizationMemberships).where(eq(organizationMemberships.userId, user.id)).limit(1);
-  if (!memberships.length) {
-    const linkedGuardian = await db.select({ id: guardians.id }).from(guardians).where(eq(guardians.userId, user.id)).limit(1);
-    if (linkedGuardian.length) return <GuardianPortalWorkspace data={await getGuardianPortalData()} />;
-  }
+  // The portal loader establishes the guardian's RLS identity before looking up
+  // their profile. An unscoped guardian query here would always be denied.
+  if (!memberships.length && user.role === null) return <GuardianPortalWorkspace data={await getGuardianPortalData()} />;
   if (!accountSession.session.activeOrganizationId && !user.organizationId) redirect("/schools");
   const actor = await requireStaff(["school_admin", "office_staff", "teacher"]);
   if (actor.role === "school_admin") {

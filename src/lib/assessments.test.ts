@@ -7,10 +7,21 @@ import {
   gradeCorrectionSchema,
   isGradeVisibleToPersona,
   scoreToGrade,
+  STANDARD_LETTER_SCALE,
   STANDARDS_BASED_SCALE,
 } from "./assessments";
 
 describe("Assessments & Grading Calculations", () => {
+  it("grades fractional marks consistently with the saved percentage", () => {
+    expect(scoreToGrade(185.06 / 199 * 100).label).toBe("A-");
+    expect(scoreToGrade(92.995).label).toBe("A");
+    expect(scoreToGrade(96.994).label).toBe("A");
+    expect(scoreToGrade(96.995).label).toBe("A+");
+    expect(scoreToGrade(74.994, STANDARDS_BASED_SCALE).label).toBe("2 - Approaching");
+    expect(scoreToGrade(74.995, STANDARDS_BASED_SCALE).label).toBe("3 - Meeting");
+    for (const band of STANDARD_LETTER_SCALE.filter(item => item.minScore > 60))
+      expect(scoreToGrade(band.minScore - 0.004).label).toBe(band.label);
+  });
   it("accurately converts percentage scores to letter grades and GPA points", () => {
     expect(scoreToGrade(98).label).toBe("A+");
     expect(scoreToGrade(98).gpaPoint).toBe(4.0);

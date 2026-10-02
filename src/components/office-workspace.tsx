@@ -7,8 +7,9 @@ import { CalendarCheck, ChevronRight, ClipboardList, DoorOpen, GraduationCap, La
 import { AccountSignOut } from "@/components/account-sign-out";
 import { StudentCsvImport } from "@/components/student-csv-import";
 import { StudentEnrollmentFlow } from "@/components/student-enrollment-flow";
-import { correctOfficeAttendanceAction, dispatchEmergencySmsAction, markGuardianAbsenceNoteReviewedAction, recordReceptionDeskAction, reviewAndExcuseGuardianAbsenceAction, saveOfficeRecordAction } from "@/app/actions/office-actions";
-import { EmergencySmsBroadcast } from "@/components/emergency-sms-broadcast";
+import { correctOfficeAttendanceAction, markGuardianAbsenceNoteReviewedAction, recordReceptionDeskAction, reviewAndExcuseGuardianAbsenceAction, saveOfficeRecordAction } from "@/app/actions/office-actions";
+import { previewParentSmsAction, queueParentSmsAction } from "@/app/actions/parent-sms-actions";
+import { ParentSmsAnnouncements } from "@/components/parent-sms-announcements";
 import { confirmGuardianPhoneAction } from "@/app/actions/guardian-phone-actions";
 import type { OfficeData } from "@/lib/office-data";
 import type { SchoolCommand } from "@/lib/school-admin-policy";
@@ -20,7 +21,7 @@ const tabs = [
   { id: "guardians", label: "Guardians", icon: UsersRound },
   { id: "attendance", label: "Attendance follow-up", icon: CalendarCheck },
   { id: "reception", label: "Reception desk", icon: DoorOpen },
-  { id: "broadcast", label: "Emergency broadcast", icon: Radio },
+  { id: "broadcast", label: "Parent SMS", icon: Radio },
   { id: "imports", label: "CSV imports", icon: ClipboardList },
   { id: "notices", label: "Notices", icon: Megaphone },
 ] as const;
@@ -104,7 +105,7 @@ export function OfficeWorkspace({ data, notices, section, date }: { data: Office
           { label: "Guardian contacts", value: data.guardians.length, target: "guardians" },
           { label: "Submitted roll calls", value: submitted.length, target: "attendance" },
           { label: "Reception desk logs", value: data.receptionLogs?.length ?? 0, target: "reception" },
-          { label: "SMS broadcasts", value: data.dispatches?.length ?? 0, target: "broadcast" },
+          { label: "Parent SMS messages", value: data.dispatches?.length ?? 0, target: "broadcast" },
         ].map(item => <Link key={item.label} href={`/?section=${item.target}`} className="border border-slate-200 bg-white p-5"><p className="text-xs font-semibold uppercase tracking-wide text-slate-500">{item.label}</p><p className="mt-3 text-3xl font-bold">{item.value}</p></Link>)}</div><div className="grid gap-5 xl:grid-cols-2"><Card title="Office tasks"><div className="space-y-3 text-sm">{[
           { label: "Review students awaiting intake", count: data.students.filter(row => row.status === "pending").length, target: "students" },
           { label: "Link guardians to students", count: data.students.filter(row => !data.links.some(link => link.studentId === row.id)).length, target: "guardians" },
@@ -119,7 +120,7 @@ export function OfficeWorkspace({ data, notices, section, date }: { data: Office
         {current.id === "attendance" && <div className="space-y-5"><Card title="Submitted roll calls"><div className="grid gap-3 sm:grid-cols-2"><label className="block text-sm font-medium">Class<select className={field} value={selectedAttendanceClass} onChange={event => setAttendanceClass(event.target.value)}><option value="">Choose a class</option>{classOptions.map(row => <option key={row.id} value={row.id}>{row.name}</option>)}</select></label><form onSubmit={event => { event.preventDefault(); router.push(`/?section=attendance&date=${encodeURIComponent(str(new FormData(event.currentTarget), "date"))}`); }}><Field label="Date" name="date" type="date" defaultValue={date} /><button className={`${secondary} mt-2`} type="submit">Load date</button></form></div><p className="mt-4 text-sm text-slate-600">Teachers submit roll calls. Office staff can correct submitted records with a written explanation.</p><p className="mt-3 text-sm font-semibold">{attendanceSession ? `Roll call: ${words(attendanceSession.status)}` : "No roll call for this class and date."}</p></Card>
           <Card title={`Unexplained absences for ${date}`}>
             <p className="mb-3 text-sm text-slate-600">Absent marks from submitted morning roll calls without a guardian note for this date. Contact the guardian to follow up.</p>
-            <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b border-slate-200 text-slate-500"><th className="py-2">Student</th><th>Class</th><th>Guardian</th><th>Contact</th></tr></thead><tbody>{data.unexplainedAbsences.map(absence => <tr key={absence.studentId} className="border-b border-slate-100"><td className="py-3 font-semibold">{name(absence.studentId)}</td><td>{classLabel(absence.classId)}</td><td>{absence.guardianName ?? "No linked guardian"}</td><td>{absence.phone ? <a className="text-blue-700 underline" href={`tel:${absence.phone}`}>{absence.phone}</a> : absence.email ? <a className="text-blue-700 underline" href={`mailto:${absence.email}`}>{absence.email}</a> : "No contact details"}</td></tr>)}</tbody></table>
+            <div className="overflow-x-auto"><table className="w-full text-left text-sm"><thead><tr className="border-b border-slate-200 text-slate-500"><th className="py-2">Student</th><th>Class</th><th>Guardian</th><th>Contact</th></tr></thead><tbody>{data.unexplainedAbsences.map(absence => <tr key={absence.studentId} className="border-b border-slate-100"><td className="py-3 font-semibold">{name(absence.studentId)}</td><td>{classLabel(absence.classId)}</td><td>{absence.guardianName ?? (absence.contactBlocked ? "Contact withheld" : "No authorised guardian")}</td><td>{absence.contactBlocked ? <span className="font-semibold text-amber-800">Contact restricted: ask the school administrator</span> : absence.phone ? <a className="text-blue-700 underline" href={`tel:${absence.phone}`}>{absence.phone}</a> : absence.email ? <a className="text-blue-700 underline" href={`mailto:${absence.email}`}>{absence.email}</a> : "No contact details"}</td></tr>)}</tbody></table>
               {!data.unexplainedAbsences.length && <p className="py-4 text-sm text-slate-500">No unexplained absences in submitted morning roll calls for this date.</p>}</div>
           </Card>
           <Card title="Guardian absence notes"><p className="mb-3 text-sm text-slate-600">Review a note on its own, or review and excuse the matching absent morning mark in one audited step.</p><div className="space-y-3">{data.absenceNotes.map(note => { const matchingSession = note.absenceDate === date ? data.sessions.find(session => session.period === "morning_roll_call" && session.status === "submitted" && data.records.some(record => record.sessionId === session.id && record.studentId === note.studentId && record.status === "absent")) : undefined; return <article key={note.id} className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-100 pb-3"><div><strong className="text-sm">{name(note.studentId)}</strong><p className="mt-1 text-xs text-slate-600">{note.absenceDate} · {note.reasonCategory.replaceAll("_", " ")} · Guardian: {note.guardianName} {note.guardianLastName}</p><p className="mt-1 text-xs text-slate-500">{words(note.status)}{note.reviewerName ? ` by ${note.reviewerName}` : ""}</p></div>{note.status === "submitted" && <div className="flex flex-wrap gap-2"><button className={secondary} disabled={pending} onClick={() => start(async () => { setMessage(""); const result = await markGuardianAbsenceNoteReviewedAction(note.id); setMessage(result.success ? "Absence note marked reviewed." : result.error); if (result.success) router.refresh(); })}>Review only</button>{matchingSession ? <button className={primary} disabled={pending} onClick={() => start(async () => { setMessage(""); const result = await reviewAndExcuseGuardianAbsenceAction(note.id); setMessage(result.success ? "Absence note reviewed and attendance excused." : result.error); if (result.success) router.refresh(); })}>Review and excuse</button> : note.absenceDate !== date ? <Link className={secondary} href={`/?section=attendance&date=${encodeURIComponent(note.absenceDate)}`}>Load note date</Link> : null}</div>}</article>; })}{!data.absenceNotes.length && <p className="text-sm text-slate-500">No guardian absence notes have been submitted.</p>}</div></Card>
@@ -346,20 +347,12 @@ export function OfficeWorkspace({ data, notices, section, date }: { data: Office
           </div>
         )}
         {current.id === "broadcast" && (
-          <EmergencySmsBroadcast
-            students={data.students}
+          <ParentSmsAnnouncements
             grades={data.grades}
-            classes={data.classes}
+            classes={yearClasses}
             dispatches={data.dispatches}
-            onDispatch={async (cmd) => {
-              const res = await dispatchEmergencySmsAction(cmd);
-              if (res.success) {
-                router.refresh();
-                return { success: true, recipientCount: res.recipientCount };
-              }
-              return { success: false, error: res.error };
-            }}
-            schoolName={data.school.name}
+            onPreview={previewParentSmsAction}
+            onQueue={async input => { const result = await queueParentSmsAction(input); if (result.success) router.refresh(); return result; }}
           />
         )}
         {current.id === "imports" && <StudentCsvImport role="office_staff" />}

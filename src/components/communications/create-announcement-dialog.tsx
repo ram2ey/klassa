@@ -29,7 +29,6 @@ export function CreateAnnouncementDialog({
   const [channels, setChannels] = useState<"in_app" | "sms" | "both">(
     prefilledTemplate?.suggestedChannel ?? "in_app",
   );
-  const [scheduledFor, setScheduledFor] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -40,9 +39,7 @@ export function CreateAnnouncementDialog({
     if (tpl) {
       setTitle(tpl.title);
       setContent(tpl.contentTemplate);
-      if (tpl.defaultPriority !== "emergency") {
-        setPriority(tpl.defaultPriority);
-      }
+      setPriority(tpl.defaultPriority);
       setChannels(tpl.suggestedChannel);
     }
   }
@@ -68,7 +65,6 @@ export function CreateAnnouncementDialog({
         targetId,
         priority,
         channels,
-        scheduledFor: scheduledFor ? new Date(scheduledFor).toISOString() : undefined,
       });
       onClose();
     } catch (err: unknown) {
@@ -120,9 +116,7 @@ export function CreateAnnouncementDialog({
                   <option value="" disabled>
                     Choose template...
                   </option>
-                  {templates
-                    .filter((t) => t.defaultPriority !== "emergency")
-                    .map((t) => (
+                  {templates.map((t) => (
                       <option key={t.id} value={t.id}>
                         {t.title} ({t.category})
                       </option>
@@ -265,19 +259,6 @@ export function CreateAnnouncementDialog({
             </div>
           )}
 
-          {/* Scheduling (Optional) */}
-          <label className="block">
-            <span className="mb-1 block font-semibold text-slate-800">
-              Scheduled Dispatch (Optional - leave blank for immediate publishing)
-            </span>
-            <input
-              type="datetime-local"
-              value={scheduledFor}
-              onChange={(e) => setScheduledFor(e.target.value)}
-              className="h-9 w-full border border-slate-300 bg-white px-3 font-mono text-xs focus:border-blue-600 focus:outline-none"
-            />
-          </label>
-
           {/* Actions */}
           <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-3">
             <Button
@@ -293,7 +274,7 @@ export function CreateAnnouncementDialog({
               disabled={loading}
               className="h-8 rounded-none bg-blue-700 text-xs font-semibold text-white hover:bg-blue-800"
             >
-              {loading ? "Publishing..." : scheduledFor ? "Schedule Announcement" : "Publish Announcement"}
+              {loading ? "Publishing..." : "Publish Announcement"}
             </Button>
           </div>
         </form>

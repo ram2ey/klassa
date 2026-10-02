@@ -21,8 +21,6 @@ export const AuditActions = {
   REPORT_CARD_PUBLISHED: "report_card.published",
   ANNOUNCEMENT_CREATED: "announcement.created",
   ANNOUNCEMENT_PUBLISHED: "announcement.published",
-  EMERGENCY_BROADCAST_INITIATED: "emergency_broadcast.initiated",
-  EMERGENCY_BROADCAST_CONFIRMED: "emergency_broadcast.confirmed",
   GUARDIAN_CONSENT_UPDATED: "guardian_consent.updated",
   SENSITIVE_CASE_CREATED: "sensitive_case.created",
   SENSITIVE_CASE_UPDATED: "sensitive_case.updated",

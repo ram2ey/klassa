@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray, ne } from "drizzle-orm";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { academicYears, attendanceRecords, attendanceSessions, classes, courtRestrictions, enrollments,
   gradeLevels, guardianAbsenceNotes, guardians, organizations, receptionLogs, smsDispatches, studentGuardians, students, users,
@@ -22,6 +22,7 @@ export async function getOfficeData(sessionDate: string) {
     db.select().from(attendanceSessions).where(and(eq(attendanceSessions.organizationId, org), eq(attendanceSessions.sessionDate, sessionDate))),
     db.select({ id: courtRestrictions.id, studentId: courtRestrictions.studentId,
       prohibitPickup: courtRestrictions.prohibitPickup, prohibitDisclosure: courtRestrictions.prohibitDisclosure,
+      prohibitDirectContact: courtRestrictions.prohibitDirectContact, restrictedGuardianId: courtRestrictions.restrictedGuardianId,
       effectiveDate: courtRestrictions.effectiveDate, expirationDate: courtRestrictions.expirationDate, isEnforced: courtRestrictions.isEnforced,
       restrictedPersonName: courtRestrictions.restrictedPersonName, docketNumber: courtRestrictions.docketNumber })
       .from(courtRestrictions).where(eq(courtRestrictions.organizationId, org)),
@@ -38,7 +39,7 @@ export async function getOfficeData(sessionDate: string) {
       .where(and(eq(receptionLogs.organizationId, org), eq(receptionLogs.logDate, sessionDate)))
       .orderBy(desc(receptionLogs.createdAt)),
     db.select().from(smsDispatches)
-      .where(and(eq(smsDispatches.organizationId, org), ne(smsDispatches.purpose, "invitation")))
+      .where(and(eq(smsDispatches.organizationId, org), eq(smsDispatches.purpose, "announcement")))
       .orderBy(desc(smsDispatches.sentAt))
       .limit(50),
   ]);
@@ -46,7 +47,7 @@ export async function getOfficeData(sessionDate: string) {
   const sessionIds = sessionRows.map(row => row.id);
   const records = sessionIds.length ? await db.select().from(attendanceRecords)
     .where(and(eq(attendanceRecords.organizationId, org), inArray(attendanceRecords.sessionId, sessionIds))) : [];
-  const unexplainedAbsences = buildUnexplainedAbsenceCallList(sessionRows, records, dateNotes, links, guardianRows);
+  const unexplainedAbsences = buildUnexplainedAbsenceCallList(sessionRows, records, dateNotes, links, guardianRows, restrictions, new Date().toISOString().slice(0, 10));
   const medicalRows = await db.select({ id: needToKnowAlerts.id, studentId: needToKnowAlerts.studentId,
     category: needToKnowAlerts.category, severity: needToKnowAlerts.severity,
     directiveSummary: needToKnowAlerts.directiveSummary, actionRequired: needToKnowAlerts.actionRequired,

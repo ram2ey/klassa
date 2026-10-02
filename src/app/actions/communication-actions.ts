@@ -6,16 +6,13 @@ import { revalidatePath } from "next/cache";
 import { logAuditEvent, AuditActions } from "@/lib/audit";
 import {
   type AnnouncementInput,
-  type EmergencyBroadcastInput,
   type GuardianConsentInput,
   type AnnouncementRecord,
   type GuardianConsentRecord,
   type CommunicationTemplateItem,
   type SmsDeliveryItem,
   announcementInputSchema,
-  emergencyBroadcastInputSchema,
   guardianConsentInputSchema,
-  validateEmergencyApproval,
   canDispatchSms,
   calculateSmsSegments,
   INITIAL_ANNOUNCEMENTS,
@@ -101,14 +98,6 @@ export async function createAnnouncementAction(
 
   const input = parseResult.data;
 
-  // Emergency announcements cannot be dispatched via single-party standard creation
-  if (input.priority === "emergency") {
-    return {
-      success: false,
-      error: "Emergency broadcasts require Four-Eyes two-party authorization in the Emergency Command Center.",
-    };
-  }
-
   if ((input.channels === "sms" || input.channels === "both") && input.targetType !== "school") {
     return { success: false, error: "Class and grade SMS audiences are not implemented. Use an in-app preview or school-wide SMS simulation." };
   }
@@ -138,14 +127,12 @@ export async function createAnnouncementAction(
     targetLabel,
     priority: input.priority,
     channels: input.channels,
-    status: input.scheduledFor ? "scheduled" : "published",
-    requiresTwoParty: false,
+    status: "published",
     authorId: "usr-admin-1",
     authorName: actorName,
     targetRecipientCount: targetCount,
     readCount: 0,
-    scheduledFor: input.scheduledFor ?? null,
-    publishedAt: input.scheduledFor ? null : nowStr,
+    publishedAt: nowStr,
     createdAt: nowStr,
     updatedAt: nowStr,
   };
@@ -153,12 +140,12 @@ export async function createAnnouncementAction(
   localAnnouncements.unshift(newAnnouncement);
 
   // If SMS channel is included, simulate telecommunication dispatch filtered by guardian consent
-  if (!input.scheduledFor && (input.channels === "sms" || input.channels === "both")) {
+  if (input.channels === "sms" || input.channels === "both") {
     const { segments } = calculateSmsSegments(input.content);
 
     // Filter by consent
     for (const consent of localConsents) {
-      const consentCheck = canDispatchSms(consent, "announcements", false);
+      const consentCheck = canDispatchSms(consent);
       if (consentCheck.allowed) {
         localSmsLedger.unshift({
           id: `sms-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 5)}`,
@@ -190,142 +177,17 @@ export async function createAnnouncementAction(
     },
   });
 
-  if (!input.scheduledFor) {
-    await logAuditEvent({
-      organizationId: DEFAULT_ORG_ID,
-      actorUserId: actorName,
-      action: AuditActions.ANNOUNCEMENT_PUBLISHED,
-      entityType: "announcement",
-      entityId: newId,
-      metadata: { title: input.title, publishedAt: nowStr },
-    });
-  }
+  await logAuditEvent({
+    organizationId: DEFAULT_ORG_ID,
+    actorUserId: actorName,
+    action: AuditActions.ANNOUNCEMENT_PUBLISHED,
+    entityType: "announcement",
+    entityId: newId,
+    metadata: { title: input.title, publishedAt: nowStr },
+  });
 
   revalidatePath("/");
   return { success: true, announcement: newAnnouncement };
-}
-
-export async function initiateEmergencyBroadcastAction(
-  rawInput: EmergencyBroadcastInput,
-  initiatorName = "Sarah Jenkins (Registrar)",
-) {
-  await requireDemoAction();
-  const parseResult = emergencyBroadcastInputSchema.safeParse(rawInput);
-  if (!parseResult.success) {
-    return {
-      success: false,
-      error: parseResult.error.issues[0]?.message ?? "Invalid emergency broadcast parameters",
-    };
-  }
-
-  const input = parseResult.data;
-
-  // Four-Eyes Principle validation
-  const approvalValidation = validateEmergencyApproval(
-    input.firstApproverId,
-    input.secondApproverId,
-  );
-  if (!approvalValidation.valid) {
-    return {
-      success: false,
-      error: approvalValidation.error ?? "Two-party authorization failure.",
-    };
-  }
-
-  const newId = `anc-emerg-${Date.now().toString(36)}`;
-  const nowStr = new Date().toISOString();
-  const targetCount = 142; // School-wide emergency recipient baseline
-
-  const approverNames: Record<string, string> = {
-    "usr-admin-1": "Sarah Jenkins (Registrar)",
-    "usr-principal-1": "Dr. Arthur Vance (Headmaster)",
-    "usr-vp-1": "Marcus Brody (Vice Principal)",
-    "usr-safety-1": "Capt. James Cole (Campus Safety Director)",
-  };
-
-  if (!Object.hasOwn(approverNames, input.firstApproverId) || !Object.hasOwn(approverNames, input.secondApproverId)) {
-    return { success: false, error: "Select two recognized demo approvers. This does not constitute live authorization." };
-  }
-
-  const firstApproverName = approverNames[input.firstApproverId] ?? "Authorized Officer A";
-  const secondApproverName = approverNames[input.secondApproverId] ?? "Authorized Officer B";
-
-  const newEmergency: AnnouncementRecord = {
-    id: newId,
-    organizationId: DEFAULT_ORG_ID,
-    title: input.title,
-    content: input.content,
-    targetType: input.targetType,
-    targetId: input.targetId,
-    targetLabel: "Entire Northfield Academy (All Campuses)",
-    priority: "emergency",
-    channels: input.channels,
-    status: "published",
-    requiresTwoParty: true,
-    firstApproverId: input.firstApproverId,
-    firstApproverName,
-    secondApproverId: input.secondApproverId,
-    secondApproverName,
-    authorId: input.firstApproverId,
-    authorName: initiatorName,
-    targetRecipientCount: targetCount,
-    readCount: 1, // Author read receipt
-    publishedAt: nowStr,
-    createdAt: nowStr,
-    updatedAt: nowStr,
-  };
-
-  localAnnouncements.unshift(newEmergency);
-
-  // Dispatch emergency SMS with emergency override active across all guardians
-  const { segments } = calculateSmsSegments(input.content);
-  for (const consent of input.channels === "in_app" ? [] : localConsents) {
-    const consentCheck = canDispatchSms(consent, "emergency", true);
-    if (consentCheck.allowed) {
-      localSmsLedger.unshift({
-        id: `sms-emerg-${Date.now().toString(36)}-${Math.random().toString(36).substring(2, 5)}`,
-        recipientPhone: consent.phone,
-        recipientName: consent.guardianName,
-        announcementTitle: `[EMERGENCY] ${input.title}`,
-        channel: "sms",
-        segments,
-        cost: 0,
-        status: "simulated",
-        sentAt: nowStr,
-      });
-    }
-  }
-
-  // Dual audit trail
-  await logAuditEvent({
-    organizationId: DEFAULT_ORG_ID,
-    actorUserId: firstApproverName,
-    action: AuditActions.EMERGENCY_BROADCAST_INITIATED,
-    entityType: "emergency_broadcast",
-    entityId: newId,
-    metadata: {
-      title: input.title,
-      channels: input.channels,
-      firstApproverId: input.firstApproverId,
-    },
-  });
-
-  await logAuditEvent({
-    organizationId: DEFAULT_ORG_ID,
-    actorUserId: secondApproverName,
-    action: AuditActions.EMERGENCY_BROADCAST_CONFIRMED,
-    entityType: "emergency_broadcast",
-    entityId: newId,
-    metadata: {
-      title: input.title,
-      firstApproverId: input.firstApproverId,
-      secondApproverId: input.secondApproverId,
-      publishedAt: nowStr,
-    },
-  });
-
-  revalidatePath("/");
-  return { success: true, emergencyAnnouncement: newEmergency };
 }
 
 export async function recordAnnouncementReadAction(announcementId: string, userId: string) {
@@ -364,11 +226,9 @@ export async function updateGuardianConsentAction(
       ...localConsents[consentIndex],
       phone: input.phone,
       optInSmsAnnouncements: input.optInSmsAnnouncements,
-      optInSmsAttendance: input.optInSmsAttendance,
-      optInSmsEmergency: input.optInSmsEmergency,
       optOutReason: input.optOutReason ?? null,
       optOutAt:
-        !input.optInSmsAnnouncements || !input.optInSmsAttendance ? nowStr : null,
+        !input.optInSmsAnnouncements ? nowStr : null,
       updatedAt: nowStr,
     };
   } else {
@@ -379,11 +239,9 @@ export async function updateGuardianConsentAction(
       studentName: "Student",
       phone: input.phone,
       optInSmsAnnouncements: input.optInSmsAnnouncements,
-      optInSmsAttendance: input.optInSmsAttendance,
-      optInSmsEmergency: input.optInSmsEmergency,
       optOutReason: input.optOutReason ?? null,
       optOutAt:
-        !input.optInSmsAnnouncements || !input.optInSmsAttendance ? nowStr : null,
+        !input.optInSmsAnnouncements ? nowStr : null,
       updatedAt: nowStr,
     });
   }
@@ -397,8 +255,6 @@ export async function updateGuardianConsentAction(
     metadata: {
       phone: input.phone,
       optInSmsAnnouncements: input.optInSmsAnnouncements,
-      optInSmsAttendance: input.optInSmsAttendance,
-      optInSmsEmergency: input.optInSmsEmergency,
     },
   });
 

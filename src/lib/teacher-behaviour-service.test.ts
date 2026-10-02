@@ -101,7 +101,7 @@ describe("teacher and admin behaviour conduct workflow", () => {
   });
 
   it("allows teacher to log praise merit points for enrolled student", async () => {
-    mocks.execute.mockImplementation(async (query, params) => {
+    mocks.execute.mockImplementation(async (query) => {
       if (query.includes('from "organizations"')) return [[org]];
       // Teacher assignments check
       if (query.includes('from "teacher_class_assignments"')) return [[classId, null, teacherActor.userId, true]];
@@ -140,7 +140,7 @@ describe("teacher and admin behaviour conduct workflow", () => {
   });
 
   it("allows teacher to log incident sanctions and writes incident audit event", async () => {
-    mocks.execute.mockImplementation(async (query, params) => {
+    mocks.execute.mockImplementation(async (query) => {
       if (query.includes('from "organizations"')) return [[org]];
       if (query.includes('from "teacher_class_assignments"')) return [[classId, null, teacherActor.userId, true]];
       if (query.includes('from "classes"')) return [[teacherActor.userId]];
@@ -169,7 +169,7 @@ describe("teacher and admin behaviour conduct workflow", () => {
   });
 
   it("blocks teacher if student is not actively enrolled in teacher class", async () => {
-    mocks.execute.mockImplementation(async (query, params) => {
+    mocks.execute.mockImplementation(async (query) => {
       if (query.includes('from "organizations"')) return [[org]];
       if (query.includes('from "teacher_class_assignments"')) return [[classId, null, teacherActor.userId, true]];
       if (query.includes('from "classes"')) return [[teacherActor.userId]];
@@ -191,7 +191,7 @@ describe("teacher and admin behaviour conduct workflow", () => {
   });
 
   it("allows school_admin to log behaviour for any student across school", async () => {
-    mocks.execute.mockImplementation(async (query, params) => {
+    mocks.execute.mockImplementation(async (query) => {
       if (query.includes('from "organizations"')) return [[org]];
       if (query.includes('from "students"')) return [[studentId]];
       if (query.includes('from "classes"')) return [[classId]];

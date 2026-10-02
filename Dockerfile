@@ -20,7 +20,7 @@ CMD ["node", "scripts/deploy-database.mjs"]
 
 FROM dependencies AS sms-worker
 WORKDIR /app
-COPY scripts/sms-worker.mjs scripts/mnotify-delivery.mjs ./scripts/
+COPY scripts/sms-worker.mjs scripts/sms-worker-core.mjs scripts/mnotify-delivery.mjs ./scripts/
 CMD ["node", "scripts/sms-worker.mjs"]
 
 FROM node:22-alpine AS runner

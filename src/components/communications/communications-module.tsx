@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useTransition, useMemo } from "react";
-import { formatGMTDate, formatGMTDateTime, formatGMTTime } from "@/lib/timezone";
+import { formatGMTDate, formatGMTTime } from "@/lib/timezone";
 import {
   Bell,
   CheckCircle,
@@ -11,7 +11,6 @@ import {
   MagnifyingGlass,
   Plus,
   ShieldCheck,
-  WarningCircle,
 } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -22,11 +21,9 @@ import type {
   GuardianConsentRecord,
   SmsDeliveryItem,
   AnnouncementInput,
-  EmergencyBroadcastInput,
   GuardianConsentInput,
 } from "@/lib/communications";
 import { CreateAnnouncementDialog } from "./create-announcement-dialog";
-import { EmergencyBroadcastDialog } from "./emergency-broadcast-dialog";
 
 interface CommunicationsModuleProps {
   announcements: AnnouncementRecord[];
@@ -40,12 +37,11 @@ interface CommunicationsModuleProps {
     deliveredCount: number;
   };
   onCreateAnnouncement: (input: AnnouncementInput) => Promise<{ success: boolean; error?: string }>;
-  onInitiateEmergencyBroadcast: (input: EmergencyBroadcastInput) => Promise<{ success: boolean; error?: string }>;
   onRecordRead: (announcementId: string, userId: string) => Promise<void>;
   onUpdateConsent: (input: GuardianConsentInput) => Promise<{ success: boolean; error?: string }>;
 }
 
-type CommTab = "notices" | "emergency" | "templates" | "consent" | "ledger";
+type CommTab = "notices" | "templates" | "consent" | "ledger";
 
 export function CommunicationsModule({
   announcements,
@@ -54,7 +50,6 @@ export function CommunicationsModule({
   smsLedger,
   ledgerSummary,
   onCreateAnnouncement,
-  onInitiateEmergencyBroadcast,
   onRecordRead,
   onUpdateConsent,
 }: CommunicationsModuleProps) {
@@ -66,7 +61,6 @@ export function CommunicationsModule({
 
   // Modals state
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showEmergencyModal, setShowEmergencyModal] = useState(false);
   const [selectedTemplateForCreate, setSelectedTemplateForCreate] = useState<CommunicationTemplateItem | null>(null);
 
   const [isPending, startTransition] = useTransition();
@@ -90,7 +84,6 @@ export function CommunicationsModule({
 
   // Overall statistics
   const totalAnnouncements = announcements.length;
-  const emergencyCount = announcements.filter((a) => a.priority === "emergency").length;
   const totalTargetRecipients = announcements.reduce((s, a) => s + a.targetRecipientCount, 0);
   const totalReads = announcements.reduce((s, a) => s + a.readCount, 0);
   const avgReadRate =
@@ -100,25 +93,16 @@ export function CommunicationsModule({
     consents.length > 0 ? Math.round((optInSmsCount / consents.length) * 100) : 100;
 
   function handleUseTemplate(template: CommunicationTemplateItem) {
-    if (template.defaultPriority === "emergency") {
-      setShowEmergencyModal(true);
-    } else {
-      setSelectedTemplateForCreate(template);
-      setShowCreateModal(true);
-    }
+    setSelectedTemplateForCreate(template);
+    setShowCreateModal(true);
   }
 
-  function handleToggleConsent(consent: GuardianConsentRecord, field: "announcements" | "attendance" | "emergency") {
+  function handleToggleConsent(consent: GuardianConsentRecord) {
     startTransition(async () => {
       const updated: GuardianConsentInput = {
         guardianId: consent.guardianId,
         phone: consent.phone,
-        optInSmsAnnouncements:
-          field === "announcements" ? !consent.optInSmsAnnouncements : consent.optInSmsAnnouncements,
-        optInSmsAttendance:
-          field === "attendance" ? !consent.optInSmsAttendance : consent.optInSmsAttendance,
-        optInSmsEmergency:
-          field === "emergency" ? !consent.optInSmsEmergency : consent.optInSmsEmergency,
+        optInSmsAnnouncements: !consent.optInSmsAnnouncements,
         optOutReason: consent.optOutReason ?? undefined,
       };
 
@@ -143,28 +127,13 @@ export function CommunicationsModule({
               <Badge tone="blue" className="font-mono text-[10px]">
                 PHASE 4
               </Badge>
-              {emergencyCount > 0 && (
-                <span className="inline-flex items-center gap-1 border border-red-200 bg-red-50 px-2 py-0.5 text-[10px] font-bold text-red-700">
-                  <span className="h-1.5 w-1.5 rounded-full bg-red-600 animate-pulse" />
-                  {emergencyCount} EMERGENCY BROADCASTS RECORDED
-                </span>
-              )}
             </div>
             <p className="mt-0.5 text-xs text-slate-500">
-              Institutional notices, dual-party emergency dispatches, read tracking, consent registry, and telecommunications ledger.
+              Publish school notices and review SMS delivery status.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
-            <Button
-              variant="secondary"
-              size="sm"
-              onClick={() => setShowEmergencyModal(true)}
-              className="h-8 rounded-none border-red-300 bg-red-50 text-xs font-bold text-red-700 hover:bg-red-100 hover:text-red-800"
-            >
-              <WarningCircle weight="bold" className="mr-1.5 h-3.5 w-3.5 text-red-600" />
-              Emergency Broadcast
-            </Button>
             <Button
               size="sm"
               onClick={() => {
@@ -248,19 +217,6 @@ export function CommunicationsModule({
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab("emergency")}
-            className={cn(
-              "flex items-center gap-1.5 border-b-2 px-4 py-2.5 transition-colors uppercase tracking-wider text-[11px]",
-              activeTab === "emergency"
-                ? "border-red-600 bg-white text-red-700 font-bold"
-                : "border-transparent text-slate-600 hover:text-slate-900",
-            )}
-          >
-            <WarningCircle weight="bold" className="h-3.5 w-3.5 text-red-600" />
-            Emergency Center ({emergencyCount})
-          </button>
-          <button
-            type="button"
             onClick={() => setActiveTab("templates")}
             className={cn(
               "flex items-center gap-1.5 border-b-2 px-4 py-2.5 transition-colors uppercase tracking-wider text-[11px]",
@@ -336,7 +292,6 @@ export function CommunicationsModule({
                   <option value="all">All Priorities</option>
                   <option value="normal">Normal</option>
                   <option value="urgent">Urgent</option>
-                  <option value="emergency">Emergency</option>
                 </select>
 
                 <select
@@ -370,21 +325,13 @@ export function CommunicationsModule({
                       key={ann.id}
                       className={cn(
                         "border p-4 transition-all bg-white",
-                        ann.priority === "emergency"
-                          ? "border-red-300 bg-red-50/30"
-                          : ann.priority === "urgent"
-                            ? "border-amber-200"
-                            : "border-slate-200 hover:border-slate-300",
+                        ann.priority === "urgent" ? "border-amber-200" : "border-slate-200 hover:border-slate-300",
                       )}
                     >
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                         <div className="space-y-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            {ann.priority === "emergency" ? (
-                              <span className="border border-red-300 bg-red-600 text-white px-2 py-0.5 font-mono text-[10px] uppercase font-bold tracking-wider">
-                                EMERGENCY
-                              </span>
-                            ) : ann.priority === "urgent" ? (
+                            {ann.priority === "urgent" ? (
                               <span className="border border-amber-300 bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-900 uppercase">
                                 URGENT
                               </span>
@@ -402,11 +349,6 @@ export function CommunicationsModule({
                               {ann.targetLabel}
                             </span>
 
-                            {ann.status === "scheduled" && (
-                              <span className="border border-purple-200 bg-purple-50 px-2 py-0.5 font-mono text-[10px] text-purple-700">
-                                SCHEDULED
-                              </span>
-                            )}
                           </div>
 
                           <h3 className="text-xs font-bold text-slate-900">{ann.title}</h3>
@@ -446,12 +388,6 @@ export function CommunicationsModule({
                           <span>
                             Author: <strong className="text-slate-700">{ann.authorName ?? "System"}</strong>
                           </span>
-                          {ann.requiresTwoParty && (
-                            <span className="inline-flex items-center gap-1 text-red-800 font-semibold">
-                              <ShieldCheck className="h-3.5 w-3.5" />
-                              Two-Party Signed: {ann.firstApproverName} + {ann.secondApproverName}
-                            </span>
-                          )}
                           <span>
                             Published: <span className="font-mono">{formatGMTDate(ann.createdAt)}</span>
                           </span>
@@ -477,85 +413,6 @@ export function CommunicationsModule({
                 })}
               </div>
             )}
-          </div>
-        )}
-
-        {/* TAB 2: EMERGENCY COMMAND CENTER */}
-        {activeTab === "emergency" && (
-          <div className="p-4 space-y-4">
-            <div className="border border-red-200 bg-red-50/50 p-4">
-              <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <div>
-                  <div className="flex items-center gap-2">
-                    <WarningCircle weight="bold" className="h-5 w-5 text-red-600" />
-                    <h2 className="text-xs font-bold uppercase tracking-wider text-red-950">
-                      Emergency Crisis Operations & Safety Override
-                    </h2>
-                  </div>
-                  <p className="mt-1 text-xs text-red-900 max-w-2xl">
-                    Rapid crisis broadcast facility. In strict compliance with the Four-Eyes principle, an emergency transmission requires joint sign-off from two distinct executive officers.
-                  </p>
-                </div>
-                <Button
-                  onClick={() => setShowEmergencyModal(true)}
-                  className="h-9 rounded-none bg-red-600 font-bold text-xs text-white hover:bg-red-700"
-                >
-                  <WarningCircle weight="bold" className="mr-1.5 h-4 w-4" />
-                  Initiate Two-Party Emergency Broadcast
-                </Button>
-              </div>
-            </div>
-
-            <div className="space-y-3">
-              <h3 className="text-xs font-bold uppercase tracking-wider text-slate-800">
-                Authorized Crisis Transmissions Log
-              </h3>
-
-              {announcements.filter((a) => a.priority === "emergency").length === 0 ? (
-                <div className="border border-slate-200 bg-white p-6 text-center text-xs text-slate-500">
-                  No emergency broadcasts have been issued in the current academic year.
-                </div>
-              ) : (
-                <div className="space-y-3">
-                  {announcements
-                    .filter((a) => a.priority === "emergency")
-                    .map((em) => (
-                      <div key={em.id} className="border-2 border-red-300 bg-white p-4">
-                        <div className="flex items-center justify-between">
-                          <span className="border border-red-300 bg-red-100 px-2 py-0.5 font-mono text-[10px] font-bold text-red-900 uppercase">
-                            EXECUTIVE EMERGENCY DISPATCH
-                          </span>
-                          <span className="font-mono text-xs text-slate-500">
-                            {formatGMTDateTime(em.createdAt)}
-                          </span>
-                        </div>
-
-                        <h4 className="mt-2 text-sm font-bold text-slate-950">{em.title}</h4>
-                        <p className="mt-1 text-xs text-slate-700">{em.content}</p>
-
-                        <div className="mt-3 grid grid-cols-1 sm:grid-cols-2 gap-2 border-t border-slate-100 pt-2.5 text-xs">
-                          <div className="bg-slate-50 p-2 border border-slate-200">
-                            <span className="block text-[10px] font-bold text-slate-500 uppercase">
-                              1. Initiating Officer
-                            </span>
-                            <span className="font-semibold text-slate-900">
-                              {em.firstApproverName ?? "Authorized Officer"}
-                            </span>
-                          </div>
-                          <div className="bg-slate-50 p-2 border border-slate-200">
-                            <span className="block text-[10px] font-bold text-slate-500 uppercase">
-                              2. Confirming Approver (Command)
-                            </span>
-                            <span className="font-semibold text-slate-900">
-                              {em.secondApproverName ?? "Dr. Arthur Vance (Headmaster)"}
-                            </span>
-                          </div>
-                        </div>
-                      </div>
-                    ))}
-                </div>
-              )}
-            </div>
           </div>
         )}
 
@@ -626,9 +483,7 @@ export function CommunicationsModule({
                     <th className="p-3">Guardian Name</th>
                     <th className="p-3">Student Enrolled</th>
                     <th className="p-3">Mobile Contact</th>
-                    <th className="p-3 text-center">Announcements SMS</th>
-                    <th className="p-3 text-center">Attendance SMS</th>
-                    <th className="p-3 text-center">Emergency SMS</th>
+                    <th className="p-3 text-center">Routine SMS</th>
                     <th className="p-3">Opt-Out Notes</th>
                   </tr>
                 </thead>
@@ -641,7 +496,7 @@ export function CommunicationsModule({
                       <td className="p-3 text-center">
                         <button
                           type="button"
-                          onClick={() => handleToggleConsent(c, "announcements")}
+                          onClick={() => handleToggleConsent(c)}
                           className={cn(
                             "px-2 py-0.5 text-[10px] font-bold border",
                             c.optInSmsAnnouncements
@@ -650,34 +505,6 @@ export function CommunicationsModule({
                           )}
                         >
                           {c.optInSmsAnnouncements ? "OPTED IN" : "OPTED OUT"}
-                        </button>
-                      </td>
-                      <td className="p-3 text-center">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleConsent(c, "attendance")}
-                          className={cn(
-                            "px-2 py-0.5 text-[10px] font-bold border",
-                            c.optInSmsAttendance
-                              ? "border-emerald-300 bg-emerald-50 text-emerald-800"
-                              : "border-slate-300 bg-slate-100 text-slate-600",
-                          )}
-                        >
-                          {c.optInSmsAttendance ? "OPTED IN" : "OPTED OUT"}
-                        </button>
-                      </td>
-                      <td className="p-3 text-center">
-                        <button
-                          type="button"
-                          onClick={() => handleToggleConsent(c, "emergency")}
-                          className={cn(
-                            "px-2 py-0.5 text-[10px] font-bold border",
-                            c.optInSmsEmergency
-                              ? "border-emerald-300 bg-emerald-50 text-emerald-800"
-                              : "border-red-300 bg-red-50 text-red-800",
-                          )}
-                        >
-                          {c.optInSmsEmergency ? "OPTED IN" : "BLOCKED"}
                         </button>
                       </td>
                       <td className="p-3 text-slate-500 text-[11px] max-w-xs truncate">
@@ -762,18 +589,6 @@ export function CommunicationsModule({
         />
       )}
 
-      {showEmergencyModal && (
-        <EmergencyBroadcastDialog
-          onClose={() => setShowEmergencyModal(false)}
-          onSubmit={async (input) => {
-            const res = await onInitiateEmergencyBroadcast(input);
-            if (res.success) {
-              setStatusMessage("CRITICAL: Emergency broadcast authorized and dispatched school-wide.");
-              setTimeout(() => setStatusMessage(null), 4000);
-            }
-          }}
-        />
-      )}
     </div>
   );
 }

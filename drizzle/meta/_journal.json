@@ -246,6 +246,34 @@
       "when": 1790500000000,
       "tag": "0035_remove_unused_phase1_records",
       "breakpoints": true
+    },
+    {
+      "idx": 35,
+      "version": "7",
+      "when": 1790505000000,
+      "tag": "0036_remove_emergency_broadcasts",
+      "breakpoints": true
+    },
+    {
+      "idx": 36,
+      "version": "7",
+      "when": 1790510000000,
+      "tag": "0037_single_sms_preference",
+      "breakpoints": true
+    },
+    {
+      "idx": 37,
+      "version": "7",
+      "when": 1790515000000,
+      "tag": "0038_remove_announcement_scheduling",
+      "breakpoints": true
+    },
+    {
+      "idx": 38,
+      "version": "7",
+      "when": 1790520000000,
+      "tag": "0039_sms_send_eligibility",
+      "breakpoints": true
     }
   ]
 }

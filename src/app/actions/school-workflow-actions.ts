@@ -6,23 +6,6 @@ import { requireStaff } from "@/lib/action-access";
 import { SchoolAdminError } from "@/lib/school-admin-policy";
 import { saveSchoolWorkflow } from "@/lib/school-workflow-service";
 import type { WorkflowCommand } from "@/lib/school-workflow-policy";
-import { approveEmergencyBroadcast, getPendingEmergencyBroadcasts } from "@/lib/emergency-broadcast-service";
-
-export async function pendingEmergencyBroadcastsAction() {
-  const actor = await requireStaff(["school_admin", "office_staff"]);
-  return getPendingEmergencyBroadcasts(actor);
-}
-
-export async function approveEmergencyBroadcastAction(id: string) {
-  const actor = await requireStaff(["school_admin", "office_staff"]);
-  try {
-    const result = await approveEmergencyBroadcast(actor, id);
-    revalidatePath("/");
-    return { success: true as const, ...result };
-  } catch (error) {
-    return { success: false as const, error: error instanceof Error ? error.message : "Approval failed." };
-  }
-}
 
 export async function saveSchoolWorkflowAction(input: WorkflowCommand) {
   const actor = await requireStaff(["school_admin", "office_staff"]);

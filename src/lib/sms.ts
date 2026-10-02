@@ -1,18 +1,5 @@
 import { isDemoMode } from "@/lib/runtime-config";
 
-export interface SmsDispatchResult {
-  id: string;
-  recipientPhone: string;
-  recipientName: string;
-  studentId: string;
-  studentName: string;
-  message: string;
-  status: "sent" | "delivered" | "failed" | "simulated";
-  providerRef: string;
-  error?: string;
-  sentAt: string;
-}
-
 export interface SmsProvider {
   send(to: string, message: string): Promise<{ success: boolean; providerRef: string; error?: string }>;
 }
@@ -24,40 +11,6 @@ export function normalizePhoneNumber(raw: string): string {
   }
   return cleaned;
 }
-
-export function formatAbsenceAlertMessage(params: {
-  studentName: string;
-  schoolName: string;
-  dateStr: string;
-}): string {
-  return `[${params.schoolName}] Attendance Alert: ${params.studentName} was marked absent on ${params.dateStr} without prior notice. Please contact the school office or submit an excuse note.`;
-}
-
-// In-memory ledger of dispatched SMS messages for preview/dev environments
-const smsDispatchHistory: SmsDispatchResult[] = [
-  {
-    id: "sms-001",
-    recipientPhone: "+354 555 0371",
-    recipientName: "Robert Martin",
-    studentId: "ST-2026-0126",
-    studentName: "Elias Martin",
-    message: "[Northfield Academy] Attendance Alert: Elias Martin was marked absent on 2026-09-21 without prior notice. Please contact the school office or submit an excuse note.",
-    status: "delivered",
-    providerRef: "SM_mock_8291410",
-    sentAt: "Yesterday, 09:30",
-  },
-  {
-    id: "sms-002",
-    recipientPhone: "+354 555 0284",
-    recipientName: "Karen Bennett",
-    studentId: "ST-2026-0138",
-    studentName: "Noah Bennett",
-    message: "[Northfield Academy] Attendance Alert: Noah Bennett was marked late (18 min) on 2026-09-18.",
-    status: "delivered",
-    providerRef: "SM_mock_7182931",
-    sentAt: "18 Sep, 09:45",
-  },
-];
 
 export class MockSmsProvider implements SmsProvider {
   async send(to: string, message: string): Promise<{ success: boolean; providerRef: string; error?: string }> {
@@ -152,43 +105,4 @@ export function getSmsProvider(): SmsProvider {
     return new TwilioSmsProvider();
   }
   throw new Error("SMS provider is not configured. No message was sent.");
-}
-
-export async function dispatchAbsenceAlert(params: {
-  recipientPhone: string;
-  recipientName: string;
-  studentId: string;
-  studentName: string;
-  dateStr: string;
-  schoolName?: string;
-}): Promise<SmsDispatchResult> {
-  const provider = getSmsProvider();
-  const normalizedPhone = normalizePhoneNumber(params.recipientPhone);
-  const message = formatAbsenceAlertMessage({
-    studentName: params.studentName,
-    schoolName: params.schoolName || "Northfield Academy",
-    dateStr: params.dateStr,
-  });
-
-  const result = await provider.send(normalizedPhone, message);
-
-  const dispatchItem: SmsDispatchResult = {
-    id: `sms-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
-    recipientPhone: normalizedPhone,
-    recipientName: params.recipientName,
-    studentId: params.studentId,
-    studentName: params.studentName,
-    message,
-    status: result.success ? (isDemoMode() ? "simulated" : "sent") : "failed",
-    providerRef: result.providerRef || `ERR_${Date.now()}`,
-    error: result.error,
-    sentAt: "Just now",
-  };
-
-  smsDispatchHistory.unshift(dispatchItem);
-  return dispatchItem;
-}
-
-export function getSmsDispatchHistory(): SmsDispatchResult[] {
-  return [...smsDispatchHistory];
 }

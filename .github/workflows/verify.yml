@@ -1,0 +1,48 @@
+name: Verify release
+on:
+  push:
+  pull_request:
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17-alpine
+        env:
+          POSTGRES_DB: klassa_test
+          POSTGRES_USER: klassa_test_owner
+          POSTGRES_PASSWORD: IntegrationOnlyOwnerPassword123456789
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U klassa_test_owner -d klassa_test"
+          --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL: postgres://klassa_test_owner:IntegrationOnlyOwnerPassword123456789@127.0.0.1:5432/klassa_test
+      RLS_TEST_ADMIN_URL: postgres://klassa_test_owner:IntegrationOnlyOwnerPassword123456789@127.0.0.1:5432/klassa_test
+      RLS_TEST_APP_URL: postgres://klassa_app:IntegrationOnlyAppPassword123456789@127.0.0.1:5432/klassa_test
+      KLASSO_DEMO_MODE: "false"
+      KLASSO_APP_DATABASE_PASSWORD: IntegrationOnlyAppPassword123456789
+      KLASSO_SMS_WORKER_PASSWORD: IntegrationOnlySmsPassword123456789
+      BETTER_AUTH_SECRET: IntegrationOnlyAuthSecret123456789012345
+      SENSITIVE_RECORD_ENCRYPTION_KEY: IntegrationOnlyRecordKey123456789012345
+      BETTER_AUTH_URL: https://localhost:3000
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - run: npm run typecheck
+      - run: npm run lint -- --max-warnings=0
+      - run: npm test
+      - run: npm run test:sms
+      - run: npm run db:check
+      - run: npm run db:deploy
+      - run: npm run test:integration
+      - run: node scripts/workflow-rls-probe.mjs
+      - run: npm run build
+      - run: npm run test:e2e

@@ -77,9 +77,11 @@ export function scoreToGrade(percentage: number, scale: GradingScaleEntry[] = ST
   gpaPoint: number;
   description?: string;
 } {
-  const bounded = Math.max(0, Math.min(100, percentage));
-  for (const item of scale) {
-    if (bounded >= item.minScore && bounded <= item.maxScore) {
+  // Match the two-decimal percentage persisted in the gradebook. Lower
+  // cutoffs define contiguous bands, including fractional marks between them.
+  const bounded = Number(Math.max(0, Math.min(100, percentage)).toFixed(2));
+  for (const item of [...scale].sort((a, b) => b.minScore - a.minScore)) {
+    if (bounded >= item.minScore) {
       return { label: item.label, gpaPoint: item.gpaPoint, description: item.description };
     }
   }

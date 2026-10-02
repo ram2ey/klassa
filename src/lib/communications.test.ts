@@ -6,57 +6,36 @@ import {
   renderCommunicationTemplate,
   calculateSmsSegments,
   calculateReadRate,
-  validateEmergencyApproval,
   announcementInputSchema,
-  emergencyBroadcastInputSchema,
 } from "./communications";
 
 describe("Phase 4: School Communications Domain Logic", () => {
   describe("canDispatchSms & Guardian Consent", () => {
     const fullConsent = {
       optInSmsAnnouncements: true,
-      optInSmsAttendance: true,
-      optInSmsEmergency: true,
     };
 
     const restrictedConsent = {
       optInSmsAnnouncements: false,
-      optInSmsAttendance: false,
-      optInSmsEmergency: false,
     };
 
     it("allows dispatch if consent record is undefined (default institutional opt-in)", () => {
-      const res = canDispatchSms(undefined, "announcements");
+      const res = canDispatchSms(undefined);
       expect(res.allowed).toBe(true);
       expect(res.reason).toContain("Default");
     });
 
     it("allows dispatch for opted-in announcement channels", () => {
-      const res = canDispatchSms(fullConsent, "announcements");
+      const res = canDispatchSms(fullConsent);
       expect(res.allowed).toBe(true);
     });
 
     it("blocks dispatch when guardian has opted out of announcements", () => {
-      const res = canDispatchSms(restrictedConsent, "announcements");
+      const res = canDispatchSms(restrictedConsent);
       expect(res.allowed).toBe(false);
       expect(res.reason).toContain("opted out");
     });
 
-    it("blocks attendance dispatch when guardian opted out of attendance alerts", () => {
-      const res = canDispatchSms(restrictedConsent, "attendance");
-      expect(res.allowed).toBe(false);
-    });
-
-    it("allows attendance dispatch when guardian is opted into attendance", () => {
-      const res = canDispatchSms({ ...restrictedConsent, optInSmsAttendance: true }, "attendance");
-      expect(res.allowed).toBe(true);
-    });
-
-    it("honors emergency override unconditionally for vital safety dispatches", () => {
-      const res = canDispatchSms(restrictedConsent, "emergency", true);
-      expect(res.allowed).toBe(true);
-      expect(res.reason).toContain("safety emergency override");
-    });
   });
 
   describe("generateDispatchIdempotencyKey & Duplicate Detection", () => {
@@ -161,28 +140,6 @@ describe("Phase 4: School Communications Domain Logic", () => {
     });
   });
 
-  describe("validateEmergencyApproval (Four-Eyes Principle)", () => {
-    it("passes when two distinct staff members approve", () => {
-      const res = validateEmergencyApproval("usr-admin-1", "usr-principal-1");
-      expect(res.valid).toBe(true);
-      expect(res.error).toBeUndefined();
-    });
-
-    it("fails when initiator attempts self-authorization", () => {
-      const res = validateEmergencyApproval("usr-admin-1", "usr-admin-1");
-      expect(res.valid).toBe(false);
-      expect(res.error).toContain("Four-Eyes Principle Violated");
-    });
-
-    it("fails when either approver is missing", () => {
-      const missingSecond = validateEmergencyApproval("usr-admin-1", "");
-      expect(missingSecond.valid).toBe(false);
-
-      const missingFirst = validateEmergencyApproval("", "usr-principal-1");
-      expect(missingFirst.valid).toBe(false);
-    });
-  });
-
   describe("Zod Validation Schemas", () => {
     it("validates announcement input correctly", () => {
       const valid = announcementInputSchema.safeParse({
@@ -202,25 +159,5 @@ describe("Phase 4: School Communications Domain Logic", () => {
       expect(invalid.success).toBe(false);
     });
 
-    it("enforces security confirmation for emergency broadcasts", () => {
-      const invalid = emergencyBroadcastInputSchema.safeParse({
-        title: "Campus Fire Drill",
-        content: "Evacuate building immediately towards west field.",
-        firstApproverId: "usr-1",
-        secondApproverId: "usr-2",
-        securityConfirmation: false, // not confirmed
-      });
-      expect(invalid.success).toBe(false);
-
-      const valid = emergencyBroadcastInputSchema.safeParse({
-        title: "Campus Fire Drill",
-        content: "Evacuate building immediately towards west field.",
-        firstApproverId: "usr-1",
-        secondApproverId: "usr-2",
-        securityConfirmation: true,
-      });
-      expect(valid.success).toBe(true);
-    });
   });
 });
-

@@ -28,7 +28,6 @@ export function TeacherBehaviourPanel({
   defaultDate,
   pending,
   onSave,
-  isAdmin = false,
 }: TeacherBehaviourPanelProps) {
   const formId = useId();
   const [conductType, setConductType] = useState<"praise" | "incident">("praise");

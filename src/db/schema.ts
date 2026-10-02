@@ -23,7 +23,7 @@ export const gradeStatus = pgEnum("grade_status", ["draft", "submitted", "publis
 export const reportCardStatus = pgEnum("report_card_status", ["draft", "approved", "published", "archived"]);
 export const announcementTarget = pgEnum("announcement_target", ["school", "grade", "class"]);
 export const announcementPriority = pgEnum("announcement_priority", ["normal", "important", "emergency"]);
-export const announcementStatus = pgEnum("announcement_status", ["draft", "scheduled", "pending_approval", "published", "archived"]);
+export const announcementStatus = pgEnum("announcement_status", ["draft", "published", "archived"]);
 export const deliveryChannel = pgEnum("delivery_channel", ["in_app", "sms", "both"]);
 export const sensitiveCaseArea = pgEnum("sensitive_case_area", ["safeguarding", "health_medical", "special_needs", "disciplinary"]);
 export const caseConfidentialityTier = pgEnum("case_confidentiality_tier", ["standard_sensitive", "confidential", "strictly_confidential"]);
@@ -384,7 +384,7 @@ export const smsDispatches = pgTable("sms_dispatches", {
   studentId: uuid("student_id").references(() => students.id, { onDelete: "set null" }),
   guardianId: uuid("guardian_id").references(() => guardians.id, { onDelete: "set null" }),
   invitationId: uuid("invitation_id").references(() => smsInvitations.id, { onDelete: "set null" }),
-  purpose: varchar("purpose", { length: 30 }).default("emergency").notNull(),
+  purpose: varchar("purpose", { length: 30 }).default("announcement").notNull(),
   idempotencyKey: text("idempotency_key"),
   message: text("message").notNull(),
   status: varchar("status", { length: 30 }).default("queued").notNull(),
@@ -392,29 +392,12 @@ export const smsDispatches = pgTable("sms_dispatches", {
   error: text("error"),
   attemptCount: integer("attempt_count").default(0).notNull(),
   leasedUntil: timestamp("leased_until", { withTimezone: true }),
+  leaseToken: uuid("lease_token"),
   deliveredAt: timestamp("delivered_at", { withTimezone: true }),
   sentAt: timestamp("sent_at", { withTimezone: true }).defaultNow().notNull(),
   ...timestamps,
 }, (table) => [index("sms_dispatches_org_time_idx").on(table.organizationId, table.sentAt), index("sms_dispatches_student_idx").on(table.studentId),
   uniqueIndex("sms_dispatches_idempotency_unique").on(table.idempotencyKey)]);
-
-export const emergencyBroadcasts = pgTable("emergency_broadcasts", {
-  id: uuid("id").defaultRandom().primaryKey(),
-  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
-  requestedBy: text("requested_by").notNull().references(() => users.id),
-  approvedBy: text("approved_by").references(() => users.id),
-  approvedAt: timestamp("approved_at", { withTimezone: true }),
-  status: varchar("status", { length: 20 }).default("pending").notNull(),
-  scope: varchar("scope", { length: 20 }).notNull(),
-  targetId: text("target_id").notNull(),
-  severity: varchar("severity", { length: 30 }).notNull(),
-  reason: text("reason").notNull(),
-  message: text("message").notNull(),
-  studentIds: jsonb("student_ids").$type<string[]>().notNull(),
-  unreachableStudentIds: jsonb("unreachable_student_ids").$type<string[]>().notNull(),
-  recipientCount: integer("recipient_count").notNull(),
-  ...timestamps,
-}, table => [index("emergency_broadcasts_org_status_idx").on(table.organizationId, table.status)]);
 
 export const smsWorkerStatus = pgTable("sms_worker_status", {
   id: integer("id").primaryKey(),
@@ -551,10 +534,6 @@ export const announcements = pgTable("announcements", {
   priority: announcementPriority("priority").default("normal").notNull(),
   channels: deliveryChannel("channels").default("in_app").notNull(),
   status: announcementStatus("status").default("draft").notNull(),
-  requiresTwoParty: boolean("requires_two_party").default(false).notNull(),
-  firstApproverId: text("first_approver_id").references(() => users.id, { onDelete: "set null" }),
-  secondApproverId: text("second_approver_id").references(() => users.id, { onDelete: "set null" }),
-  scheduledFor: timestamp("scheduled_for", { withTimezone: true }),
   publishedAt: timestamp("published_at", { withTimezone: true }),
   authorId: text("author_id").references(() => users.id, { onDelete: "set null" }),
   ...timestamps,
@@ -579,8 +558,6 @@ export const guardianConsents = pgTable("guardian_consents", {
   guardianId: uuid("guardian_id").notNull().references(() => guardians.id, { onDelete: "cascade" }),
   phone: varchar("phone", { length: 40 }).notNull(),
   optInSmsAnnouncements: boolean("opt_in_sms_announcements").default(true).notNull(),
-  optInSmsAttendance: boolean("opt_in_sms_attendance").default(true).notNull(),
-  optInSmsEmergency: boolean("opt_in_sms_emergency").default(true).notNull(),
   smsConfirmedAt: timestamp("sms_confirmed_at", { withTimezone: true }),
   optOutReason: text("opt_out_reason"),
   optOutAt: timestamp("opt_out_at", { withTimezone: true }),
@@ -877,7 +854,6 @@ export const schema = {
   guardianAbsenceNotes,
   notifications,
   smsDispatches,
-  emergencyBroadcasts,
   smsWorkerStatus,
   gradingSchemes,
   assessmentCategories,

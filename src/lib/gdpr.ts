@@ -194,7 +194,6 @@ export function generateStudentDataPortabilityPackage(
       channelPreferences: {
         in_app_announcements: true,
         sms_attendance_alerts: true,
-        emergency_broadcasts: true,
       },
       announcementsReceivedCount: 18,
     },

@@ -6,7 +6,6 @@ import {
   Clock,
   GraduationCap,
   MapPin,
-  Sparkles,
   BookOpen,
 } from "lucide-react";
 import type { DayOfWeek, TimetablePeriodItem } from "@/lib/timetable-service";
@@ -75,7 +74,7 @@ export function StudentDailyTimetable({
     <div className="space-y-4">
       {/* Day Selector Navigation */}
       <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-slate-200 bg-slate-100 p-1.5">
-        {DAYS.map(({ key, label, short }) => {
+        {DAYS.map(({ key, short }) => {
           const isSelected = selectedDay === key;
           const isCurrentDay = today === key;
           const count = timetable.filter((p) => p.dayOfWeek === key).length;

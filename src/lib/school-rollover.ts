@@ -1,7 +1,8 @@
-import { and, eq, inArray } from "drizzle-orm";
+import { createHash } from "node:crypto";
+import { and, desc, eq, inArray } from "drizzle-orm";
 import { z } from "zod";
 import { db } from "@/db";
-import { academicYears, classes, enrollments, gradeLevels, organizations, students, terms } from "@/db/schema";
+import { academicYears, auditEvents, classes, enrollments, gradeLevels, organizations, students, terms } from "@/db/schema";
 import { logAuditEvent } from "@/lib/audit";
 import type { requireStaff } from "@/lib/action-access";
 
@@ -55,6 +56,8 @@ export async function getSchoolRolloverPreview(actor: Actor, targetYearId: strin
 export async function approveSchoolRollover(actor: Actor, raw: RolloverInput) {
   admin(actor);
   const input = rolloverInput.parse(raw);
+  const fingerprint = createHash("sha256").update(JSON.stringify({ sourceYearId: input.sourceYearId,
+    targetYearId: input.targetYearId, placements: [...input.placements].sort((a, b) => a.studentId.localeCompare(b.studentId)) })).digest("hex");
   const org = actor.organizationId;
   return db.transaction(async tx => {
     const [school] = await tx.select({ id: organizations.id }).from(organizations).where(eq(organizations.id, org)).for("update");
@@ -70,7 +73,12 @@ export async function approveSchoolRollover(actor: Actor, raw: RolloverInput) {
       sourceEnrollments.some(item => !requested.has(item.studentId))) throw new RolloverError("Review every active student exactly once before approving rollover.");
     const existing = await tx.select().from(enrollments).where(and(eq(enrollments.organizationId, org), eq(enrollments.academicYearId, target.id)));
     if (current.length === 1 && current[0].id === target.id) {
-      if (existing.length === input.placements.filter(item => item.outcome === "move").length &&
+      const [receipt] = await tx.select({ metadata: auditEvents.metadata }).from(auditEvents).where(and(
+        eq(auditEvents.organizationId, org), eq(auditEvents.action, "academic_year.rollover_approved"),
+        eq(auditEvents.entityId, target.id))).orderBy(desc(auditEvents.createdAt)).limit(1);
+      const receiptFingerprint = receipt?.metadata && typeof receipt.metadata === "object" && "fingerprint" in receipt.metadata
+        ? receipt.metadata.fingerprint : null;
+      if (receiptFingerprint === fingerprint && existing.length === input.placements.filter(item => item.outcome === "move").length &&
         input.placements.every(item => item.outcome !== "move" || existing.some(row => row.studentId === item.studentId && row.classId === item.classId))) {
         return { moved: existing.length, alreadyApplied: true };
       }
@@ -98,7 +106,7 @@ export async function approveSchoolRollover(actor: Actor, raw: RolloverInput) {
     await tx.update(academicYears).set({ isCurrent: true, updatedAt: new Date() }).where(and(eq(academicYears.id, target.id), eq(academicYears.organizationId, org)));
     await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action: "academic_year.rollover_approved",
       entityType: "academic_year", entityId: target.id,
-      metadata: { sourceYearId: source.id, moved: moving.length, graduated: leaving.filter(item => item.outcome === "graduate").length,
+      metadata: { sourceYearId: source.id, fingerprint, moved: moving.length, graduated: leaving.filter(item => item.outcome === "graduate").length,
         withdrawn: leaving.filter(item => item.outcome === "withdraw").length } }, tx);
     return { moved: moving.length, alreadyApplied: false };
   });

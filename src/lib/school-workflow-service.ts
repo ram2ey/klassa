@@ -1,9 +1,9 @@
-import { and, eq, inArray, or, sql } from "drizzle-orm";
+import { and, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { academicYears, announcements, assessmentCategories, assessmentGrades, assessments,
   attendanceCorrections, attendanceRecords, attendanceSessions, classes, enrollments, gradeCorrections,
-  gradeLevels, guardians, guardianConsents, organizations, receptionLogs, reportCards, reportCardSubjectGrades, sensitiveAccessLogs, emergencyBroadcasts,
-  sensitiveCaseNotes, sensitiveCases, needToKnowAlerts, courtRestrictions, smsDispatches, studentBehaviours, studentGuardians, students, subjects, terms, teacherClassAssignments } from "@/db/schema";
+  gradeLevels, guardians, organizations, receptionLogs, reportCards, reportCardSubjectGrades, sensitiveAccessLogs,
+  sensitiveCaseNotes, sensitiveCases, needToKnowAlerts, courtRestrictions, studentBehaviours, studentGuardians, students, subjects, terms, teacherClassAssignments } from "@/db/schema";
 import { AuditActions, logAuditEvent } from "@/lib/audit";
 import type { requireStaff } from "@/lib/action-access";
 import { SchoolAdminError } from "@/lib/school-admin-policy";
@@ -11,7 +11,6 @@ import { canTeacherTakeAttendance, workflowCommandSchema, type WorkflowCommand }
 import { calculateWeightedTermGrade, scoreToGrade } from "@/lib/assessments";
 import { decryptNarrative, encryptNarrative } from "@/lib/narrative-crypto";
 import { canUserAccessCaseArea } from "@/lib/sensitive-records";
-import { normalizePhoneNumber } from "@/lib/sms";
 
 type Actor = Awaited<ReturnType<typeof requireStaff>>;
 function found<T>(row: T | undefined, label: string): T {
@@ -23,7 +22,7 @@ function decimal(value: number) { return value.toFixed(2); }
 export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
   if (actor.role !== "school_admin" && actor.role !== "teacher" && actor.role !== "office_staff") throw new SchoolAdminError("School staff access required.");
   const value = workflowCommandSchema.parse(raw);
-  if (actor.role === "office_staff" && value.kind !== "attendance" && value.kind !== "reception_log" && value.kind !== "emergency_sms_broadcast") {
+  if (actor.role === "office_staff" && value.kind !== "attendance" && value.kind !== "reception_log") {
     throw new SchoolAdminError("Office staff can only correct recorded attendance, log reception desk movements, or send emergency broadcasts.");
   }
   const org = actor.organizationId;
@@ -98,7 +97,6 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
     }
     let entityId = "";
     let noteText: string[] | undefined;
-    let broadcastRecipientCount = 0;
     switch (value.kind) {
       case "attendance":
       case "attendance_submit": {
@@ -123,41 +121,6 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
           const marked = await tx.select({ studentId: attendanceRecords.studentId }).from(attendanceRecords).where(and(eq(attendanceRecords.organizationId, org), eq(attendanceRecords.sessionId, session.id)));
           if (roster.some(item => !marked.some(row => row.studentId === item.studentId))) throw new SchoolAdminError("Mark every active student before submitting attendance.");
           await tx.update(attendanceSessions).set({ status: "submitted", submittedAt: new Date(), updatedAt: new Date() }).where(and(eq(attendanceSessions.id, session.id), eq(attendanceSessions.organizationId, org)));
-          if (session.period === "morning_roll_call") {
-            const absent = await tx.select({ studentId: attendanceRecords.studentId, firstName: students.firstName,
-              lastName: students.lastName, restrictedAt: students.processingRestrictedAt })
-              .from(attendanceRecords).innerJoin(students, eq(students.id, attendanceRecords.studentId))
-              .where(and(eq(attendanceRecords.organizationId, org), eq(attendanceRecords.sessionId, session.id),
-                eq(attendanceRecords.status, "absent")));
-            const [school] = await tx.select({ name: organizations.name }).from(organizations).where(eq(organizations.id, org));
-            if (absent.length) {
-              const contacts = await tx.select({ studentId: studentGuardians.studentId, guardianId: guardians.id,
-                firstName: guardians.firstName, lastName: guardians.lastName, phone: guardians.phone,
-                verifiedAt: guardians.phoneVerifiedAt, optIn: guardianConsents.optInSmsAttendance,
-                confirmedAt: guardianConsents.smsConfirmedAt }).from(studentGuardians)
-                .innerJoin(guardians, eq(guardians.id, studentGuardians.guardianId))
-                .leftJoin(guardianConsents, and(eq(guardianConsents.guardianId, guardians.id), eq(guardianConsents.organizationId, org)))
-                .where(and(eq(studentGuardians.organizationId, org), inArray(studentGuardians.studentId, absent.map(row => row.studentId)),
-                  eq(studentGuardians.hasLegalResponsibility, true)));
-              const orders = await tx.select().from(courtRestrictions).where(and(eq(courtRestrictions.organizationId, org),
-                inArray(courtRestrictions.studentId, absent.map(row => row.studentId)), eq(courtRestrictions.isEnforced, true),
-                or(eq(courtRestrictions.prohibitDirectContact, true), eq(courtRestrictions.prohibitDisclosure, true))));
-              for (const contact of contacts) {
-                const pupil = absent.find(row => row.studentId === contact.studentId);
-                if (!pupil || pupil.restrictedAt || !contact.optIn || !contact.confirmedAt || !contact.verifiedAt || !contact.phone) continue;
-                const phone = normalizePhoneNumber(contact.phone);
-                if (!/^\+233\d{9}$/.test(phone)) continue;
-                if (orders.some(order => order.studentId === contact.studentId && (!order.restrictedGuardianId || order.restrictedGuardianId === contact.guardianId) &&
-                  order.effectiveDate <= session.sessionDate && (!order.expirationDate || order.expirationDate >= session.sessionDate))) continue;
-                await tx.insert(smsDispatches).values({ organizationId: org, studentId: pupil.studentId,
-                  guardianId: contact.guardianId, recipientPhone: phone,
-                  recipientName: `${contact.firstName} ${contact.lastName}`, purpose: "attendance",
-                  idempotencyKey: `attendance:${session.id}:${pupil.studentId}:${contact.guardianId}`,
-                  message: `[${school?.name ?? "School"}] ${pupil.firstName} ${pupil.lastName} was marked absent on ${session.sessionDate}. Please contact the school office if this is unexpected.`,
-                  status: "queued" }).onConflictDoNothing({ target: smsDispatches.idempotencyKey });
-              }
-            }
-          }
           entityId = session.id;
           break;
         }
@@ -514,66 +477,6 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
         entityId = logRow.id;
         break;
       }
-      case "emergency_sms_broadcast": {
-        let targetStudentIds: string[] = [];
-        if (value.scope === "whole_school") {
-          const studentRows = await tx.select({ id: students.id }).from(students)
-            .where(and(eq(students.organizationId, org), eq(students.status, "active")));
-          targetStudentIds = studentRows.map(s => s.id);
-        } else if (value.scope === "grade") {
-          const classRows = await tx.select({ id: classes.id }).from(classes)
-            .where(and(eq(classes.organizationId, org), eq(classes.gradeLevelId, value.targetId)));
-          const classIds = classRows.map(c => c.id);
-          if (classIds.length > 0) {
-            const enrollRows = await tx.select({ studentId: enrollments.studentId }).from(enrollments)
-              .where(and(eq(enrollments.organizationId, org), inArray(enrollments.classId, classIds), eq(enrollments.status, "active")));
-            targetStudentIds = Array.from(new Set(enrollRows.map(e => e.studentId)));
-          }
-        } else if (value.scope === "class") {
-          const enrollRows = await tx.select({ studentId: enrollments.studentId }).from(enrollments)
-            .where(and(eq(enrollments.organizationId, org), eq(enrollments.classId, value.targetId), eq(enrollments.status, "active")));
-          targetStudentIds = Array.from(new Set(enrollRows.map(e => e.studentId)));
-        }
-
-        if (targetStudentIds.length === 0) {
-          throw new SchoolAdminError("No active students found in the selected broadcast scope.");
-        }
-
-        const recipientRows = await tx.select({
-          studentId: studentGuardians.studentId,
-          guardianId: guardians.id,
-          firstName: guardians.firstName,
-          lastName: guardians.lastName,
-          phone: guardians.phone,
-          phoneVerifiedAt: guardians.phoneVerifiedAt,
-        })
-        .from(studentGuardians)
-        .innerJoin(guardians, and(eq(studentGuardians.guardianId, guardians.id), eq(guardians.organizationId, org)))
-        .where(and(eq(studentGuardians.organizationId, org), inArray(studentGuardians.studentId, targetStudentIds), eq(studentGuardians.hasLegalResponsibility, true)));
-
-        const activeDisclosureOrders = await tx.select().from(courtRestrictions).where(and(
-          eq(courtRestrictions.organizationId, org), inArray(courtRestrictions.studentId, targetStudentIds),
-          eq(courtRestrictions.isEnforced, true), or(eq(courtRestrictions.prohibitDirectContact, true),
-            eq(courtRestrictions.prohibitDisclosure, true))));
-        const today = new Date().toISOString().slice(0, 10);
-        const validRecipients = recipientRows.filter(r => r.phoneVerifiedAt && r.phone && /^\+233\d{9}$/.test(normalizePhoneNumber(r.phone)) &&
-          !activeDisclosureOrders.some(order => order.studentId === r.studentId &&
-            (!order.restrictedGuardianId || order.restrictedGuardianId === r.guardianId) &&
-            order.effectiveDate <= today && (!order.expirationDate || order.expirationDate >= today)));
-        if (validRecipients.length === 0) {
-          throw new SchoolAdminError("No verified legal guardian numbers were found for this broadcast.");
-        }
-
-        const [broadcast] = await tx.insert(emergencyBroadcasts).values({
-          organizationId: org, requestedBy: actor.userId, scope: value.scope, targetId: value.targetId,
-          severity: value.severity, message: value.message, reason: value.reason,
-          studentIds: targetStudentIds, unreachableStudentIds: targetStudentIds.filter(id => !validRecipients.some(r => r.studentId === id)),
-          recipientCount: new Set(validRecipients.map(r => r.guardianId)).size,
-        }).returning({ id: emergencyBroadcasts.id });
-        broadcastRecipientCount = new Set(validRecipients.map(r => r.guardianId)).size;
-        entityId = broadcast.id;
-        break;
-      }
       case "behaviour_log": {
         found((await tx.select({ id: students.id }).from(students).where(and(eq(students.id, value.studentId), eq(students.organizationId, org))))[0], "Student");
         if (value.classId) {
@@ -599,9 +502,6 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
       const action = value.logType === "late_arrival" ? AuditActions.LATE_ARRIVAL_LOGGED : AuditActions.EARLY_DEPARTURE_LOGGED;
       await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action,
         entityType: "reception_log", entityId, metadata: { logType: value.logType, studentId: value.studentId, timeString: value.timeString, minutesLate: value.minutesLate, reason: value.reason, actorPersonName: value.actorPersonName, isExcused: value.isExcused } }, tx);
-    } else if (value.kind === "emergency_sms_broadcast") {
-      await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action: "emergency_broadcast.requested",
-        entityType: "sms_broadcast", entityId, metadata: { scope: value.scope, targetId: value.targetId, severity: value.severity, recipientCount: broadcastRecipientCount, reason: value.reason, messageLength: value.message.length } }, tx);
     } else if (value.kind === "behaviour_log") {
       const action = value.type === "praise" ? AuditActions.BEHAVIOUR_PRAISE_LOGGED : AuditActions.BEHAVIOUR_INCIDENT_LOGGED;
       await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action,
@@ -610,6 +510,6 @@ export async function saveSchoolWorkflow(actor: Actor, raw: WorkflowCommand) {
       await logAuditEvent({ organizationId: org, actorUserId: actor.userId, action: `${value.kind}.saved`,
         entityType: value.kind, entityId, metadata: "reason" in value ? { reason: value.reason } : {} }, tx);
     }
-    return { entityId, notes: noteText, recipientCount: broadcastRecipientCount };
+    return { entityId, notes: noteText, };
   });
 }

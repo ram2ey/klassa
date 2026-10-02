@@ -8,7 +8,8 @@ import type { SchoolAdminData } from "@/lib/school-admin-data";
 import type { SchoolWorkflowData } from "@/lib/school-workflow-data";
 import type { WorkflowCommand } from "@/lib/school-workflow-policy";
 import { formatGMTDateTime } from "@/lib/timezone";
-import { EmergencySmsBroadcast } from "@/components/emergency-sms-broadcast";
+import { previewParentSmsAction, queueParentSmsAction } from "@/app/actions/parent-sms-actions";
+import { ParentSmsAnnouncements } from "@/components/parent-sms-announcements";
 import { TeacherBehaviourPanel } from "@/components/teacher-behaviour-panel";
 import { Lock } from "lucide-react";
 
@@ -146,20 +147,12 @@ export function SchoolAdminWorkflows({ section, date, base, data }: { section: s
           <ul className="mt-3 text-sm">{data.reportSubjects.filter(row => row.reportCardId === card.id).map(row => <li key={row.id}>{subject(row.subjectId)}: {row.scorePercentage}% ({row.letterGrade})</li>)}</ul><Link className="mt-3 inline-flex min-h-11 items-center text-sm font-semibold text-blue-700" href={`/reports/${card.id}`}>Open printable report card</Link></article>)}{data.reports.length === 0 && <p className="text-sm text-slate-500">No report cards yet.</p>}</div></Box>
     </>}
     {section === "communications" && <>
-      <EmergencySmsBroadcast
-        students={base.students}
+      <ParentSmsAnnouncements
         grades={base.grades}
-        classes={base.classes}
+        classes={classes}
         dispatches={data.dispatches}
-        onDispatch={async (cmd) => {
-          const res = await saveSchoolWorkflowAction(cmd);
-          if (res.success) {
-            router.refresh();
-            return { success: true, recipientCount: res.recipientCount };
-          }
-          return { success: false, error: res.error };
-        }}
-        schoolName={base.school.name}
+        onPreview={previewParentSmsAction}
+        onQueue={async input => { const result = await queueParentSmsAction(input); if (result.success) router.refresh(); return result; }}
       />
       <Box title={editingAnnouncement ? "Edit announcement draft" : "Create in-app announcement"}><form key={editingAnnouncement?.id ?? "new-announcement"} className="space-y-3" onSubmit={event => submit(event, form => editingAnnouncement ? ({ kind: "announcement_update", announcementId: editingAnnouncement.id, title: string(form.get("title")), content: string(form.get("content")), targetType, targetId: targetType === "school" ? "all" : string(form.get("targetId")), priority: string(form.get("priority")) as "normal" | "important" }) : ({ kind: "announcement", title: string(form.get("title")), content: string(form.get("content")), targetType, targetId: targetType === "school" ? "all" : string(form.get("targetId")), priority: string(form.get("priority")) as "normal" | "important", status: string(form.get("status")) as "draft" | "published" }))}>
         <Input name="title" label="Title" defaultValue={editingAnnouncement?.title} /><label className="block text-sm font-medium">Message<textarea className={`${field} mt-1 min-h-28`} name="content" required defaultValue={editingAnnouncement?.content ?? ""} /></label>

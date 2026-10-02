@@ -7,7 +7,6 @@ const mocks = vi.hoisted(() => ({
   saveOffice: vi.fn(),
   correctAttendance: vi.fn(),
   recordReception: vi.fn(),
-  dispatchSms: vi.fn(),
   refresh: vi.fn(),
 }));
 
@@ -23,7 +22,6 @@ vi.mock("@/app/actions/office-actions", () => ({
   saveOfficeRecordAction: mocks.saveOffice,
   correctOfficeAttendanceAction: mocks.correctAttendance,
   recordReceptionDeskAction: mocks.recordReception,
-  dispatchEmergencySmsAction: mocks.dispatchSms,
   markGuardianAbsenceNoteReviewedAction: vi.fn(),
   reviewAndExcuseGuardianAbsenceAction: vi.fn(),
 }));
@@ -55,6 +53,8 @@ const mockData: OfficeData = {
       studentId: "student-2",
       prohibitPickup: true,
       prohibitDisclosure: true,
+      prohibitDirectContact: true,
+      restrictedGuardianId: null,
       effectiveDate: "2026-01-01",
       expirationDate: null,
       isEnforced: true,
@@ -101,6 +101,13 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("OfficeWorkspace reception desk component", () => {
+  it("shows a restriction hold instead of actionable contact links for an absence", () => {
+    render(<OfficeWorkspace data={{ ...mockData, unexplainedAbsences: [{ studentId: "student-1", classId: "class-1",
+      sessionDate: "2026-09-26", guardianName: null, phone: null, email: null, contactBlocked: true }] }}
+      notices={[]} section="attendance" date="2026-09-26" />);
+    expect(screen.getByText("Contact restricted: ask the school administrator")).toBeTruthy();
+    expect(document.querySelector('a[href^="tel:"], a[href^="mailto:"]')).toBeNull();
+  });
   it("renders overview with reception desk logs count", () => {
     render(<OfficeWorkspace data={mockData} notices={[]} section="overview" date="2026-09-26" />);
     expect(screen.getByRole("heading", { level: 1, name: "Overview" })).toBeTruthy();
@@ -179,44 +186,8 @@ describe("OfficeWorkspace reception desk component", () => {
     expect(screen.getByText("Traffic on Route 4")).toBeTruthy();
   });
 
-  it("renders the emergency broadcast tab and overview card", () => {
-    render(
-      <OfficeWorkspace
-        data={{
-          ...mockData,
-          dispatches: [
-            {
-              id: "disp-1",
-              organizationId: "org-1",
-              studentId: "student-1",
-              guardianId: null,
-              invitationId: null,
-              purpose: "emergency",
-              idempotencyKey: null,
-              attemptCount: 0,
-              leasedUntil: null,
-              deliveredAt: null,
-              recipientName: "Parent One",
-              recipientPhone: "+354 555 1234",
-              message: "Test emergency alert",
-              status: "sent",
-              providerRef: "SM-1",
-              error: null,
-              sentAt: new Date(),
-              createdAt: new Date(),
-              updatedAt: new Date(),
-            },
-          ],
-        }}
-        notices={[]}
-        section="overview"
-        date="2026-09-26"
-      />
-    );
-    expect(screen.getByText("SMS broadcasts")).toBeTruthy();
-
-    cleanup();
+  it("renders the parent SMS announcement composer", () => {
     render(<OfficeWorkspace data={mockData} notices={[]} section="broadcast" date="2026-09-26" />);
-    expect(screen.getByRole("heading", { level: 2, name: "Emergency Parent SMS Broadcast" })).toBeTruthy();
+    expect(screen.getByRole("heading", { level: 2, name: "Parent SMS announcement" })).toBeTruthy();
   });
 });
