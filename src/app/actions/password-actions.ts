@@ -7,6 +7,7 @@ import { db } from "@/db";
 import { users } from "@/db/schema";
 import { getAuth } from "@/lib/auth";
 import { logAuditEvent } from "@/lib/audit";
+import { beginRlsContext } from "@/db/rls-context";
 
 const passwordChangeSchema = z.object({
   currentPassword: z.string().min(1),
@@ -33,6 +34,14 @@ export async function changeTemporaryPasswordAction(raw: z.input<typeof password
   const [user] = await db.select().from(users).where(eq(users.id, session.user.id)).limit(1);
   if (!user) return { success: false as const, error: "Account not found." };
   if (!user.mustChangePassword) return { success: true as const };
+
+  // This action intentionally bypasses the usual requireAccount guard because
+  // users with temporary passwords cannot access the rest of the application.
+  // Establish their verified tenant scope before writing the audit event.
+  const rlsScope = beginRlsContext();
+  rlsScope.userId = user.id;
+  rlsScope.platform = user.isPlatformAdmin;
+  if (user.organizationId) rlsScope.organizationIds = [user.organizationId];
 
   try {
     await auth.api.changePassword({
