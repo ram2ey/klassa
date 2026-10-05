@@ -26,15 +26,15 @@ export function AcceptInvitation() {
     return () => { cancelled = true; };
   }, []);
   return <main className="mx-auto max-w-lg space-y-5 p-6 text-slate-900">
-    <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">Klassa · School invitation</p>
+    <p className="text-xs font-semibold uppercase tracking-wider text-primary">Klassa · School invitation</p>
     <h1 className="text-2xl font-bold">Join your school</h1>
     {error && <p role="alert" className="rounded border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
     {!invitation && !error && <p role="status">Checking your invitation…</p>}
-    {activated ? <p role="status">Your account is ready. <Link href="/login" className="text-blue-700 underline">Sign in to continue.</Link></p> : invitation && <>
+    {activated ? <p role="status">Your account is ready. <Link href="/login" className="text-primary underline">Sign in to continue.</Link></p> : invitation && <>
       <div className="rounded border border-slate-200 bg-white p-4"><h2 className="font-bold">{invitation.schoolName}</h2>
         <p className="mt-1 text-sm text-slate-600">Tenant ID: {invitation.tenantId}</p>
         <p className="mt-1 text-sm text-slate-600">{invitation.role.replaceAll("_", " ")} · Invitation for {invitation.phoneHint}</p></div>
-      {invitation.mode === "sign-in" ? <p className="text-sm">You already have a Klassa account. <Link href="/login" className="text-blue-700 underline">Sign in</Link>, then reopen this SMS link to add the school. Your existing password will stay the same.</p> :
+      {invitation.mode === "sign-in" ? <p className="text-sm">You already have a Klassa account. <Link href="/login" className="text-primary underline">Sign in</Link>, then reopen this SMS link to add the school. Your existing password will stay the same.</p> :
         <form className="space-y-4" onSubmit={async event => {
           event.preventDefault(); setPending(true); setError("");
           const data = new FormData(event.currentTarget);

@@ -92,17 +92,17 @@ export function AddNeedToKnowDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
-      <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-xs border border-slate-300 bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-200 p-4">
+      <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-control border border-line bg-surface shadow-xl">
+        <div className="flex items-center justify-between border-b border-line p-4">
           <div className="flex items-center gap-2">
-            <div className="rounded-xs bg-amber-100 p-1.5 text-amber-800">
+            <div className="rounded-control bg-amber-100 p-1.5 text-amber-800">
               <ShieldCheck size={18} weight="bold" />
             </div>
-            <h2 className="text-base font-bold text-slate-900">Publish Teacher Need-to-Know Directive</h2>
+            <h2 className="text-base font-bold text-ink">Publish Teacher Need-to-Know Directive</h2>
           </div>
           <button
             onClick={onClose}
-            className="rounded-xs p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            className="rounded-control p-1 text-muted hover:bg-surface-subtle hover:text-secondary"
             aria-label="Close"
           >
             <X size={18} />
@@ -110,19 +110,19 @@ export function AddNeedToKnowDialog({
         </div>
 
         <form onSubmit={handleSubmit} className="flex-1 space-y-4 overflow-y-auto p-4 text-xs">
-          <div className="rounded-xs border border-blue-200 bg-blue-50/70 p-3 text-slate-700 leading-relaxed">
-            <span className="font-semibold text-blue-900">Institutional Need-to-Know Standard:</span> Classroom staff require actionable care instructions (e.g. EpiPen location, exam accommodations) without exposing medical diagnosis or confidential safeguarding details.
+          <div className="rounded-control border border-primary/20 bg-primary-subtle/70 p-3 text-secondary leading-relaxed">
+            <span className="font-semibold text-ink">Institutional Need-to-Know Standard:</span> Classroom staff require actionable care instructions (e.g. EpiPen location, exam accommodations) without exposing medical diagnosis or confidential safeguarding details.
           </div>
 
           {error && (
-            <div className="flex items-center gap-2 rounded-xs border border-rose-200 bg-rose-50 p-2.5 text-rose-700">
+            <div className="flex items-center gap-2 rounded-control border border-rose-200 bg-rose-50 p-2.5 text-rose-700">
               <WarningCircle size={16} />
               <span>{error}</span>
             </div>
           )}
 
           {sanitizationNotice && (
-            <div className="flex items-center gap-2 rounded-xs border border-amber-200 bg-amber-50 p-2.5 text-amber-800">
+            <div className="flex items-center gap-2 rounded-control border border-amber-200 bg-amber-50 p-2.5 text-amber-800">
               <WarningCircle size={16} />
               <span>{sanitizationNotice}</span>
             </div>
@@ -130,13 +130,13 @@ export function AddNeedToKnowDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block font-semibold text-slate-700">
+              <label className="mb-1 block font-semibold text-secondary">
                 Student <span className="text-rose-600">*</span>
               </label>
               <select
                 value={studentId}
                 onChange={(e) => setStudentId(e.target.value)}
-                className="w-full rounded-xs border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-control border border-line bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-primary focus:outline-none"
               >
                 {AVAILABLE_STUDENTS.map((st) => (
                   <option key={st.id} value={st.id}>
@@ -147,13 +147,13 @@ export function AddNeedToKnowDialog({
             </div>
 
             <div>
-              <label className="mb-1 block font-semibold text-slate-700">
+              <label className="mb-1 block font-semibold text-secondary">
                 Category <span className="text-rose-600">*</span>
               </label>
               <select
                 value={category}
                 onChange={(e) => setCategory(e.target.value as "medical" | "dietary" | "learning_support" | "safety")}
-                className="w-full rounded-xs border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-control border border-line bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-primary focus:outline-none"
               >
                 <option value="medical">Medical / Health</option>
                 <option value="dietary">Dietary / Anaphylaxis</option>
@@ -165,13 +165,13 @@ export function AddNeedToKnowDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block font-semibold text-slate-700">
+              <label className="mb-1 block font-semibold text-secondary">
                 Classroom Urgency / Severity <span className="text-rose-600">*</span>
               </label>
               <select
                 value={severity}
                 onChange={(e) => setSeverity(e.target.value as NeedToKnowSeverity)}
-                className="w-full rounded-xs border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-control border border-line bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-primary focus:outline-none"
               >
                 <option value="routine">Routine (Accommodations & Daily Support)</option>
                 <option value="urgent">Urgent (Restricted Contact / Immediate Awareness)</option>
@@ -180,20 +180,20 @@ export function AddNeedToKnowDialog({
             </div>
 
             <div>
-              <label className="mb-1 block font-semibold text-slate-700">
+              <label className="mb-1 block font-semibold text-secondary">
                 Expiry Date
               </label>
               <input
                 type="date"
                 value={expiresAt}
                 onChange={(e) => setExpiresAt(e.target.value)}
-                className="w-full rounded-xs border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-control border border-line bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-primary focus:outline-none"
               />
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block font-semibold text-slate-700">
+            <label className="mb-1 block font-semibold text-secondary">
               Directive Summary <span className="text-rose-600">*</span>
             </label>
             <input
@@ -201,13 +201,13 @@ export function AddNeedToKnowDialog({
               placeholder="e.g., Severe Peanut Anaphylaxis: Carries twin EpiPen pack"
               value={directiveSummary}
               onChange={(e) => setDirectiveSummary(e.target.value)}
-              className="w-full rounded-xs border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+              className="w-full rounded-control border border-line bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-primary focus:outline-none"
               required
             />
           </div>
 
           <div>
-            <label className="mb-1 block font-semibold text-slate-700">
+            <label className="mb-1 block font-semibold text-secondary">
               Action Required by Classroom Teacher <span className="text-rose-600">*</span>
             </label>
             <textarea
@@ -215,12 +215,12 @@ export function AddNeedToKnowDialog({
               placeholder="e.g., Ensure EpiPen kit is transported on all outdoor activities. If facial swelling or wheezing develops, administer pen immediately and page Health Nurse..."
               value={actionRequired}
               onChange={(e) => setActionRequired(e.target.value)}
-              className="w-full rounded-xs border border-slate-300 bg-white px-2.5 py-2 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+              className="w-full rounded-control border border-line bg-surface px-2.5 py-2 text-xs text-ink focus:border-primary focus:outline-none"
               required
             />
           </div>
 
-          <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-3">
+          <div className="flex items-center justify-end gap-2 border-t border-line pt-3">
             <Button variant="secondary" type="button" onClick={onClose} disabled={isPending}>
               Cancel
             </Button>

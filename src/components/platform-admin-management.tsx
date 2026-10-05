@@ -102,7 +102,7 @@ export function PlatformAdminManagement({ admins, currentUserId }: Props) {
       <label className="text-xs font-semibold">Full name<input name="name" required minLength={2} maxLength={180} className={field} /></label>
       <label className="text-xs font-semibold">Username<input name="username" required minLength={3} maxLength={64} pattern="[a-z0-9][a-z0-9._-]*" autoCapitalize="none" spellCheck={false} className={field} /></label>
       <label className="text-xs font-semibold sm:col-span-2">Temporary password<input name="temporaryPassword" type="password" required minLength={12} maxLength={128} autoComplete="new-password" className={field} /></label>
-      <div className="sm:col-span-2"><button type="submit" disabled={pending} className="bg-blue-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">Create administrator</button></div>
+      <div className="sm:col-span-2"><button type="submit" disabled={pending} className="bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">Create administrator</button></div>
     </form>
     {suspendId && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4" role="presentation">
       <div role="dialog" aria-modal="true" aria-labelledby="platform-admin-suspend-title" className="w-full max-w-md bg-white p-6 shadow-xl">

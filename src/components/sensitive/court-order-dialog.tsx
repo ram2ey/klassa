@@ -101,17 +101,17 @@ export function CourtOrderDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
-      <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-xs border border-slate-300 bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-200 p-4">
+      <div className="flex max-h-[90vh] w-full max-w-lg flex-col rounded-control border border-line bg-surface shadow-xl">
+        <div className="flex items-center justify-between border-b border-line p-4">
           <div className="flex items-center gap-2">
-            <div className="rounded-xs bg-rose-100 p-1.5 text-rose-800">
+            <div className="rounded-control bg-rose-100 p-1.5 text-rose-800">
               <Gavel size={18} weight="bold" />
             </div>
-            <h2 className="text-base font-bold text-slate-900">Enforce Statutory Court Restriction</h2>
+            <h2 className="text-base font-bold text-ink">Enforce Statutory Court Restriction</h2>
           </div>
           <button
             onClick={onClose}
-            className="rounded-xs p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            className="rounded-control p-1 text-muted hover:bg-surface-subtle hover:text-secondary"
             aria-label="Close"
           >
             <X size={18} />
@@ -120,7 +120,7 @@ export function CourtOrderDialog({
 
         <form onSubmit={handleSubmit} className="flex-1 space-y-4 overflow-y-auto p-4 text-xs">
           {error && (
-            <div className="flex items-center gap-2 rounded-xs border border-rose-200 bg-rose-50 p-2.5 text-rose-700">
+            <div className="flex items-center gap-2 rounded-control border border-rose-200 bg-rose-50 p-2.5 text-rose-700">
               <WarningCircle size={16} />
               <span>{error}</span>
             </div>
@@ -128,13 +128,13 @@ export function CourtOrderDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block font-semibold text-slate-700">
+              <label className="mb-1 block font-semibold text-secondary">
                 Protected Student <span className="text-rose-600">*</span>
               </label>
               <select
                 value={studentId}
                 onChange={(e) => setStudentId(e.target.value)}
-                className="w-full rounded-xs border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-control border border-line bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-primary focus:outline-none"
               >
                 {AVAILABLE_STUDENTS.map((st) => (
                   <option key={st.id} value={st.id}>
@@ -145,13 +145,13 @@ export function CourtOrderDialog({
             </div>
 
             <div>
-              <label className="mb-1 block font-semibold text-slate-700">
+              <label className="mb-1 block font-semibold text-secondary">
                 Order Type <span className="text-rose-600">*</span>
               </label>
               <select
                 value={orderType}
                 onChange={(e) => setOrderType(e.target.value as CourtOrderType)}
-                className="w-full rounded-xs border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-control border border-line bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-primary focus:outline-none"
               >
                 <option value="restraining_order">Civil Protective / Restraining Order</option>
                 <option value="custody_restriction">Custody & Guardianship Restriction</option>
@@ -163,7 +163,7 @@ export function CourtOrderDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block font-semibold text-slate-700">
+              <label className="mb-1 block font-semibold text-secondary">
                 Restricted Individual <span className="text-rose-600">*</span>
               </label>
               <input
@@ -171,13 +171,13 @@ export function CourtOrderDialog({
                 placeholder="Full Legal Name"
                 value={restrictedPersonName}
                 onChange={(e) => setRestrictedPersonName(e.target.value)}
-                className="w-full rounded-xs border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-control border border-line bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-primary focus:outline-none"
                 required
               />
             </div>
 
             <div>
-              <label className="mb-1 block font-semibold text-slate-700">
+              <label className="mb-1 block font-semibold text-secondary">
                 Docket / Case Number <span className="text-rose-600">*</span>
               </label>
               <input
@@ -185,27 +185,27 @@ export function CourtOrderDialog({
                 placeholder="e.g., FAM-2026-8821-RO"
                 value={docketNumber}
                 onChange={(e) => setDocketNumber(e.target.value)}
-                className="w-full rounded-xs border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-control border border-line bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-primary focus:outline-none"
                 required
               />
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block font-semibold text-slate-700">
+            <label className="mb-1 block font-semibold text-secondary">
               Issuing Court Jurisdiction <span className="text-rose-600">*</span>
             </label>
             <input
               type="text"
               value={issuingCourt}
               onChange={(e) => setIssuingCourt(e.target.value)}
-              className="w-full rounded-xs border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+              className="w-full rounded-control border border-line bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-primary focus:outline-none"
               required
             />
           </div>
 
           <div>
-            <label className="mb-1 block font-semibold text-slate-700">
+            <label className="mb-1 block font-semibold text-secondary">
               Mandated Legal Summary <span className="text-rose-600">*</span>
             </label>
             <textarea
@@ -213,19 +213,19 @@ export function CourtOrderDialog({
               placeholder="Summary of court stipulations regarding premises entry, record withholding, or custody rights..."
               value={summary}
               onChange={(e) => setSummary(e.target.value)}
-              className="w-full rounded-xs border border-slate-300 bg-white px-2.5 py-2 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+              className="w-full rounded-control border border-line bg-surface px-2.5 py-2 text-xs text-ink focus:border-primary focus:outline-none"
               required
             />
           </div>
 
-          <div className="space-y-2 rounded-xs border border-slate-200 bg-slate-50 p-3">
-            <span className="block font-semibold text-slate-700">Enforced Safeguarding Prohibitions:</span>
+          <div className="space-y-2 rounded-control border border-line bg-surface-subtle p-3">
+            <span className="block font-semibold text-secondary">Enforced Safeguarding Prohibitions:</span>
             <label className="flex items-center gap-2">
               <input
                 type="checkbox"
                 checked={prohibitPickup}
                 onChange={(e) => setProhibitPickup(e.target.checked)}
-                className="rounded-xs text-blue-600 focus:ring-0"
+                className="rounded-control text-primary focus:ring-0"
               />
               <span>Prohibit campus release and student pickup</span>
             </label>
@@ -234,7 +234,7 @@ export function CourtOrderDialog({
                 type="checkbox"
                 checked={prohibitDisclosure}
                 onChange={(e) => setProhibitDisclosure(e.target.checked)}
-                className="rounded-xs text-blue-600 focus:ring-0"
+                className="rounded-control text-primary focus:ring-0"
               />
               <span>Prohibit disclosure of attendance, report cards, or address records</span>
             </label>
@@ -243,7 +243,7 @@ export function CourtOrderDialog({
                 type="checkbox"
                 checked={prohibitDirectContact}
                 onChange={(e) => setProhibitDirectContact(e.target.checked)}
-                className="rounded-xs text-blue-600 focus:ring-0"
+                className="rounded-control text-primary focus:ring-0"
               />
               <span>Prohibit on-premises or electronic communication with student</span>
             </label>
@@ -251,28 +251,28 @@ export function CourtOrderDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block font-semibold text-slate-700">Effective Date</label>
+              <label className="mb-1 block font-semibold text-secondary">Effective Date</label>
               <input
                 type="date"
                 value={effectiveDate}
                 onChange={(e) => setEffectiveDate(e.target.value)}
-                className="w-full rounded-xs border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-control border border-line bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-primary focus:outline-none"
                 required
               />
             </div>
 
             <div>
-              <label className="mb-1 block font-semibold text-slate-700">Expiration Date (Optional)</label>
+              <label className="mb-1 block font-semibold text-secondary">Expiration Date (Optional)</label>
               <input
                 type="date"
                 value={expirationDate}
                 onChange={(e) => setExpirationDate(e.target.value)}
-                className="w-full rounded-xs border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-control border border-line bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-primary focus:outline-none"
               />
             </div>
           </div>
 
-          <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-3">
+          <div className="flex items-center justify-end gap-2 border-t border-line pt-3">
             <Button variant="secondary" type="button" onClick={onClose} disabled={isPending}>
               Cancel
             </Button>

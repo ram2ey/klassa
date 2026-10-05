@@ -9,8 +9,8 @@ export default async function EmergencyRollPage() {
   const data = await getOfficeData(date);
   const year = data.years.find(row => row.isCurrent);
   const classes = data.classes.filter(row => row.academicYearId === year?.id);
-  return <main className="mx-auto max-w-5xl space-y-8 p-6 text-slate-900 print:max-w-none print:p-0">
-    <div className="flex items-center justify-between gap-4 print:hidden"><Link href="/?section=attendance" className="text-sm text-blue-800 underline">Back to office</Link><PrintReportButton /></div>
+  return <main className="mx-auto max-w-5xl space-y-8 p-6 text-ink print:max-w-none print:p-0">
+    <div className="flex items-center justify-between gap-4 print:hidden"><Link href="/?section=attendance" className="text-sm text-primary-hover underline">Back to office</Link><PrintReportButton /></div>
     <header><p className="text-sm font-semibold">{data.school.name}</p><h1 className="text-2xl font-bold">Emergency roll sheets</h1><p className="text-sm">Prepared {date}. Verify every student against the live register during an evacuation.</p></header>
     {classes.map(klass => { const pupils = data.enrollments.filter(row => row.classId === klass.id && row.status === "active")
       .map(row => data.students.find(student => student.id === row.studentId)).filter((row): row is NonNullable<typeof row> => !!row);

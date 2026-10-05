@@ -14,6 +14,6 @@ export function PlatformAnnouncement() {
       } catch { setMessage("The announcement could not be published."); } });
     }}><label className="text-sm font-medium">Title<input name="title" required minLength={3} maxLength={200} className="mt-1 block min-h-11 w-full border border-slate-300 px-3" /></label>
       <label className="text-sm font-medium">Message<textarea name="content" required minLength={10} maxLength={5000} className="mt-1 block min-h-28 w-full border border-slate-300 p-3" /></label>
-      <button disabled={pending} className="justify-self-start bg-blue-700 px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">Publish to all schools</button>
+      <button disabled={pending} className="justify-self-start bg-primary px-4 py-3 text-sm font-semibold text-white disabled:opacity-50">Publish to all schools</button>
       {message && <p role="status" className="text-sm">{message}</p>}</form></section>;
 }

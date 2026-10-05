@@ -96,7 +96,7 @@ export function PlatformAccountControls({ userId, organizationId, name, hasActiv
           {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
           <div className="flex justify-end gap-2">
             <button type="button" disabled={pending} onClick={() => { setResetOpen(false); setTemporaryPassword(""); setError(""); }} className="border border-slate-300 px-4 py-2 text-sm font-semibold disabled:opacity-50">Cancel</button>
-            <button type="submit" disabled={pending} className="bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{pending ? "Resetting…" : "Reset password"}</button>
+            <button type="submit" disabled={pending} className="bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">{pending ? "Resetting…" : "Reset password"}</button>
           </div>
         </form>
       </div>

@@ -60,12 +60,12 @@ export function PlatformSchoolDetail({ data }: { data: Data }) {
 
   return <div className="min-h-screen bg-slate-50 text-slate-900">
     <header className="flex flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4 lg:px-8">
-      <div><Link href="/platform" className="text-xs font-semibold text-blue-700 hover:underline">← Platform console</Link><p className="mt-1 text-sm font-bold">School details</p></div>
+      <div><Link href="/platform" className="text-xs font-semibold text-primary hover:underline">← Platform console</Link><p className="mt-1 text-sm font-bold">School details</p></div>
       <AccountSignOut />
     </header>
     <main className="mx-auto max-w-6xl space-y-6 p-5 lg:p-8">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div><p className="text-xs font-semibold uppercase tracking-widest text-blue-700">{school.slug}</p><h1 className="mt-1 text-3xl font-bold">{school.name}</h1><p className="mt-2 text-sm text-slate-500">Created {formatGMTDate(school.createdAt)} · {SCHOOL_TIME_ZONE_LABEL}</p></div>
+        <div><p className="text-xs font-semibold uppercase tracking-widest text-primary">{school.slug}</p><h1 className="mt-1 text-3xl font-bold">{school.name}</h1><p className="mt-2 text-sm text-slate-500">Created {formatGMTDate(school.createdAt)} · {SCHOOL_TIME_ZONE_LABEL}</p></div>
         <span className={`px-3 py-1.5 text-xs font-bold ${school.suspendedAt ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>{school.suspendedAt ? "Suspended" : "Active"}</span>
       </div>
       {message && <p role="status" className="border border-emerald-200 bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p>}
@@ -76,12 +76,12 @@ export function PlatformSchoolDetail({ data }: { data: Data }) {
         <Metric label="Setup complete" value={`${complete}/${steps.length}`} />
         <Metric label="Students" value={data.studentCount} />
       </div>
-      <section className="border border-slate-200 bg-white p-5"><h2 className="font-bold">School data portability</h2><p className="mt-1 text-sm text-slate-600">Download the school&apos;s records as JSON for a controlled tenant transfer. The file contains personal and sensitive records; store it securely.</p><a href={`/platform/schools/${school.id}/export`} className="mt-3 inline-flex min-h-11 items-center bg-blue-700 px-4 text-sm font-semibold text-white">Download school export</a></section>
+      <section className="border border-slate-200 bg-white p-5"><h2 className="font-bold">School data portability</h2><p className="mt-1 text-sm text-slate-600">Download the school&apos;s records as JSON for a controlled tenant transfer. The file contains personal and sensitive records; store it securely.</p><a href={`/platform/schools/${school.id}/export`} className="mt-3 inline-flex min-h-11 items-center bg-primary px-4 text-sm font-semibold text-white">Download school export</a></section>
       <div className="grid gap-6 lg:grid-cols-2">
         <section className="border border-slate-200 bg-white"><Heading title="School profile" description="The tenant ID remains fixed so existing login names keep working." />
           <form onSubmit={save} className="space-y-4 p-5"><label className="block text-sm font-semibold">School name<input required minLength={2} maxLength={180} value={name} onChange={event => setName(event.target.value)} className="mt-1 block h-10 w-full border border-slate-300 px-3 font-normal" /></label>
             <p className="text-xs text-slate-500">Timezone is fixed at {SCHOOL_TIME_ZONE_LABEL}.</p>
-            <button disabled={pending} className="bg-blue-600 px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Save changes</button></form></section>
+            <button disabled={pending} className="bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-50">Save changes</button></form></section>
         <section className="border border-slate-200 bg-white"><Heading title="Access control" description="School suspension is reversible and recorded in the audit log." />
           <div className="space-y-4 p-5"><p className="text-sm text-slate-600">{school.suspendedAt ? `Suspended ${formatGMTDateTime(school.suspendedAt)}. School accounts cannot sign in.` : "Active school accounts can sign in. Suspension signs them out and blocks access until reactivation."}</p>
             {school.suspendedAt

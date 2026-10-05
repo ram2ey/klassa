@@ -13,7 +13,7 @@ export function ChangeTemporaryPassword() {
   const router = useRouter();
 
   return <main className="mx-auto max-w-md p-8 text-slate-900">
-    <p className="text-xs font-semibold uppercase tracking-wider text-blue-700">First sign-in</p>
+    <p className="text-xs font-semibold uppercase tracking-wider text-primary">First sign-in</p>
     <h1 className="mt-2 text-2xl font-bold">Choose your own password</h1>
     <p className="mt-2 text-sm text-slate-600">The password supplied by your administrator is temporary. Change it before continuing to your account.</p>
     <form className="mt-6 space-y-4" onSubmit={event => {

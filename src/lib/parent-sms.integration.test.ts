@@ -4,6 +4,7 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import { databaseClient } from "@/db";
 import { runWithRlsContext } from "@/db/rls-context";
 import { previewParentSmsRecipients, queueParentSmsAnnouncement } from "./parent-sms-service";
+import { recordGuardianSmsPreferences, updateGuardianSmsPreferences } from "./guardian-school-consent-service";
 
 const school = randomUUID();
 const actorId = `sms-test-${randomUUID()}`;
@@ -59,6 +60,7 @@ describe("live parent SMS targeting and retries", () => {
         await tx`DELETE FROM sms_dispatches WHERE organization_id = ${school}`;
         await tx`DELETE FROM audit_events WHERE organization_id = ${school}`;
         await tx`DELETE FROM enrollments WHERE organization_id = ${school}`;
+        await tx`DELETE FROM guardian_consents WHERE organization_id = ${school}`;
         await tx`DELETE FROM student_guardians WHERE organization_id = ${school}`;
         await tx`DELETE FROM guardians WHERE organization_id = ${school}`;
         await tx`DELETE FROM students WHERE organization_id = ${school}`;
@@ -73,6 +75,28 @@ describe("live parent SMS targeting and retries", () => {
     await databaseClient.end();
   });
   const message = "School closes at noon today.";
+
+  it("lets staff record and guardians change their own SMS choice, with audited opt-outs enforced", async () => {
+    await owner`UPDATE guardians SET user_id = ${actorId} WHERE id = ${contacts[0]}`;
+    const preference = { guardianId: contacts[0], announcements: false, evidence: "Guardian requested by phone during test" };
+    await expect(scoped(() => recordGuardianSmsPreferences({ ...actor, role: "teacher" }, preference))).rejects.toThrow("Office or school");
+    await expect(scoped(() => recordGuardianSmsPreferences(actor, { ...preference, guardianId: randomUUID() }))).rejects.toThrow("unavailable");
+    await scoped(() => recordGuardianSmsPreferences(actor, preference));
+    await expect(scoped(() => previewParentSmsRecipients(actor, { scope: "grade", targetId: grade, message })))
+      .resolves.toMatchObject({ recipientCount: 0 });
+    const account = { userId: actorId, name: "Guardian", guardians: [{ id: contacts[0], organizationId: school }] };
+    await expect(scoped(() => updateGuardianSmsPreferences(account, { guardianId: contacts[1], schoolId: school, announcements: true })))
+      .rejects.toThrow("not linked");
+    await scoped(() => updateGuardianSmsPreferences(account, { guardianId: contacts[0], schoolId: school, announcements: true }));
+    await expect(scoped(() => previewParentSmsRecipients(actor, { scope: "grade", targetId: grade, message })))
+      .resolves.toMatchObject({ recipientCount: 1 });
+    const events = await owner`SELECT action, metadata FROM audit_events WHERE organization_id = ${school}
+      AND entity_type = 'guardian_consent' ORDER BY created_at`;
+    expect(events.map(event => event.action)).toEqual(["guardian.sms_preferences_recorded", "guardian.sms_preferences_confirmed"]);
+    expect(events[0].metadata.evidence).toBe(preference.evidence);
+    // Keep the other campaign assertions independent of this fixture.
+    await owner`DELETE FROM audit_events WHERE organization_id = ${school} AND entity_type = 'guardian_consent'`;
+  });
 
   it("targets only current-grade, active, unrestricted pupils after rollover", async () => {
     await expect(scoped(() => previewParentSmsRecipients(actor, { scope: "grade", targetId: grade, message })))

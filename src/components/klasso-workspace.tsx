@@ -1,6 +1,9 @@
 "use client";
 import { getWorkspaceData, createStudentAction, updateStudentStatusAction, createGuardianAction, createClassAction, createSubjectAction, inviteStaffAction, processCsvImportAction } from "@/app/actions/roster-actions";
 import { useState, useMemo, useTransition } from "react";
+import { WorkspaceShell } from "@/components/workspace-shell";
+import { groupWorkspaceNavigation } from "@/components/workspace-navigation";
+import { LayoutDashboard as DashboardIcon, Users as PeopleIcon, GraduationCap as ClassIcon, CalendarCheck as AttendanceIcon, BookOpen as GradebookIcon, FileText as ReportIcon, Megaphone as NoticeIcon, Archive as ImportIcon, Settings as SettingsIcon, ShieldCheck as AuditIcon } from "lucide-react";
 import { type NavModule, type Persona, type StudentRecord, type GuardianRecord, type ClassRecord, type SubjectRecord, type ImportJobRecord, type StaffRecord, type InvitationRecord, type AuditRecordItem } from "@/components/demo/types";
 import { initialAuditLogs, initialRollCallRecords, initialCorrections, initialAssessments, initialAssessmentCategories, initialSchemes, initialGradebookStudents, initialGradeCorrections, initialReportCards } from "@/components/demo/fixtures";
 import { type InAppNotification, getInAppNotifications, addInAppNotification, markAllNotificationsAsRead } from "@/lib/notifications";
@@ -16,7 +19,7 @@ import { calculateAttendanceMetrics, type AttendanceStatus } from "@/lib/attenda
 import { type CsvValidationResult } from "@/lib/csv";
 import { createAnnouncementAction, recordAnnouncementReadAction, updateGuardianConsentAction } from "@/app/actions/communication-actions";
 import { cn } from "@/lib/utils";
-import { Buildings, House, CalendarCheck, Table, FileText, Megaphone, Student, UsersThree, GraduationCap, Archive, Gear, ShieldCheck, CaretRight, CaretLeft, List, MagnifyingGlass, Bell } from "@phosphor-icons/react";
+import { MagnifyingGlass, Bell } from "@phosphor-icons/react";
 import { GuardianPortalView } from "@/components/demo/guardian";
 import { OverviewModule } from "@/components/demo/overview";
 import { AttendanceManagerModule, CorrectAttendanceDialog, SubmitExcuseDialog } from "@/components/demo/attendance";
@@ -31,9 +34,7 @@ import { AddAssessmentDialog } from "@/components/assessments/add-assessment-dia
 import { AddStudentDialog, ImportCsvModal, AddGuardianDialog, AddClassDialog, AddSubjectDialog, InviteStaffDialog, StudentDetailDrawer } from "@/components/demo/dialogs";
 
 export function KlassoWorkspace({ roster }: { roster: Awaited<ReturnType<typeof getWorkspaceData>> }) {
-  const [collapsed, setCollapsed] = useState(false);
   const [invitationError, setInvitationError] = useState("");
-  const [mobileOpen, setMobileOpen] = useState(false);
   const [active, setActive] = useState<NavModule>("Attendance");
   const [persona, setPersona] = useState<Persona>("admin");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
@@ -134,7 +135,7 @@ export function KlassoWorkspace({ roster }: { roster: Awaited<ReturnType<typeof 
 
   const filteredStudents = useMemo(() => students.filter((student) => {
     const searchTarget = `${student.firstName} ${student.lastName} ${student.id} ${student.className}`.toLowerCase();
-    const matchesQuery = searchTarget.includes(query.toLowerCase());
+    const matchesQuery = searchTarget.includes(query.trim().toLowerCase());
     const matchesGrade = gradeFilter === "All grades" || student.grade === gradeFilter;
     const matchesStatus = statusFilter === "All statuses" || student.status === statusFilter;
     return matchesQuery && matchesGrade && matchesStatus;
@@ -696,167 +697,52 @@ export function KlassoWorkspace({ roster }: { roster: Awaited<ReturnType<typeof 
     return res;
   }
 
+  const previewGroups = groupWorkspaceNavigation([
+    { id: "overview", label: "Overview", icon: DashboardIcon, roles: ["admin", "teacher", "guardian"] },
+    { id: "attendance", label: "Attendance", icon: AttendanceIcon, roles: ["admin", "teacher", "guardian"] },
+    { id: "gradebook", label: "Gradebook", icon: GradebookIcon, roles: ["admin", "teacher"] },
+    { id: "reports", label: "Report cards", icon: ReportIcon, roles: ["admin", "teacher"] },
+    { id: "communications", label: "Communications", icon: NoticeIcon, roles: ["admin", "teacher", "guardian"] },
+    { id: "students", label: "Students", icon: PeopleIcon, roles: ["admin", "teacher"] },
+    { id: "guardians", label: "Guardians", icon: PeopleIcon, roles: ["admin"] },
+    { id: "classes", label: "Classes", icon: ClassIcon, roles: ["admin", "teacher"] },
+    { id: "imports", label: "Imports", icon: ImportIcon, roles: ["admin"] },
+    { id: "settings", label: "Settings", icon: SettingsIcon, roles: ["admin"] },
+    { id: "audit", label: "Audit log", icon: AuditIcon, roles: ["admin"] },
+  ].filter(item => item.roles.includes(persona))).map(group => ({ ...group, items: group.items.map(item => ({ ...item, id: item.label, href: undefined })) }));
+
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-950 font-sans">
-      <div role="status" className="sticky top-0 z-50 bg-amber-100 px-4 py-2 text-center text-xs text-amber-950">Local demo ? Synthetic records only ? Changes are temporary and shared within this preview ? SMS and approvals are simulations</div>
-      {mobileOpen && (
-        <button
-          aria-label="Close navigation"
-          className="fixed inset-0 z-30 bg-slate-950/40 lg:hidden"
-          onClick={() => setMobileOpen(false)}
-        />
-      )}
-
-      {/* Sidebar Navigation */}
-      <aside
-        className={cn(
-          "fixed inset-y-0 left-0 z-40 flex border-r border-slate-800 bg-slate-950 text-slate-300 transition-[width,transform] duration-150 select-none",
-          collapsed ? "w-16" : "w-60",
-          mobileOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
-        )}
-      >
-        <div className="flex min-w-0 flex-1 flex-col">
-          <div className={cn("flex h-16 items-center border-b border-slate-800", collapsed ? "justify-center px-2" : "px-5")}>
-            <div className="min-w-0">
-              <div className="text-[19px] font-bold tracking-[0.14em] text-white flex items-center gap-2">
-                <span>{collapsed ? "K" : "KLASSA"}</span>
-                {!collapsed && <span className="text-[10px] bg-blue-900/80 text-blue-300 px-1.5 py-0.5 border border-blue-700 tracking-wider">PHASE 6: PRODUCTION HARDENING</span>}
-              </div>
-              {!collapsed && <div className="mt-0.5 text-[9px] font-semibold uppercase tracking-[0.18em] text-slate-500">School administration</div>}
-            </div>
-          </div>
-
-          {!collapsed && (
-            <div className="border-b border-slate-800 p-3">
-              <div className="flex w-full items-center gap-3 border border-slate-700 bg-slate-900 px-3 py-2 text-left">
-                <span className="flex h-8 w-8 items-center justify-center border border-blue-800 bg-blue-950 text-blue-300">
-                  <Buildings size={17} />
-                </span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-xs font-semibold text-white">{currentOrganization.name}</span>
-                  <span className="block text-[10px] text-slate-500">2026–27 Academic Year</span>
-                </span>
-              </div>
-            </div>
-          )}
-
-          <nav aria-label="Primary navigation" className="flex-1 space-y-1 p-2">
-            {!collapsed && <p className="px-2 pb-1 pt-2 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">Workspace</p>}
-            {[
-              { label: "Overview" as const, icon: House, roles: ["admin", "teacher", "guardian"] },
-              { label: "Attendance" as const, icon: CalendarCheck, roles: ["admin", "teacher", "guardian"] },
-              { label: "Gradebook" as const, icon: Table, roles: ["admin", "teacher"] },
-              { label: "Report cards" as const, icon: FileText, roles: ["admin", "teacher"] },
-              { label: "Communications" as const, icon: Megaphone, roles: ["admin", "teacher", "guardian"] },
-              { label: "Students" as const, icon: Student, roles: ["admin", "teacher"] },
-              { label: "Guardians" as const, icon: UsersThree, roles: ["admin"] },
-              { label: "Classes" as const, icon: GraduationCap, roles: ["admin", "teacher"] },
-              { label: "Imports" as const, icon: Archive, roles: ["admin"] },
-            ].filter((item) => item.roles.includes(persona)).map((item) => {
-              const Icon = item.icon;
-              const selected = active === item.label;
-              return (
-                <button
-                  key={item.label}
-                  title={collapsed ? item.label : undefined}
-                  onClick={() => { setActive(item.label); setMobileOpen(false); }}
-                  className={cn(
-                    "flex h-10 w-full items-center gap-3 border-l-2 px-3 text-[13px] font-medium transition-colors",
-                    selected ? "border-blue-500 bg-blue-950/70 text-white font-semibold" : "border-transparent text-slate-400 hover:bg-slate-900 hover:text-white",
-                    collapsed && "justify-center px-0",
-                  )}
-                >
-                  <Icon size={19} weight={selected ? "fill" : "regular"} />
-                  {!collapsed && <span>{item.label}</span>}
-                </button>
-              );
-            })}
-          </nav>
-
-          <div className="border-t border-slate-800 p-2 space-y-1">
-            {!collapsed && <p className="px-2 pb-1 pt-1 text-[10px] font-bold uppercase tracking-[0.16em] text-slate-500">System</p>}
-            {(persona === "admin") && (
-              <>
-                <button
-                  title={collapsed ? "Settings" : undefined}
-                  onClick={() => { setActive("Settings"); setMobileOpen(false); }}
-                  className={cn(
-                    "flex h-10 w-full items-center gap-3 border-l-2 px-3 text-[13px] font-medium transition-colors",
-                    active === "Settings" ? "border-blue-500 bg-blue-950/70 text-white font-semibold" : "border-transparent text-slate-400 hover:bg-slate-900 hover:text-white",
-                    collapsed && "justify-center px-0",
-                  )}
-                >
-                  <Gear size={19} weight={active === "Settings" ? "fill" : "regular"} />
-                  {!collapsed && <span>Settings</span>}
-                </button>
-                <button
-                  title={collapsed ? "Audit log" : undefined}
-                  onClick={() => { setActive("Audit log"); setMobileOpen(false); }}
-                  className={cn(
-                    "flex h-10 w-full items-center gap-3 border-l-2 px-3 text-[13px] font-medium transition-colors",
-                    active === "Audit log" ? "border-blue-500 bg-blue-950/70 text-white font-semibold" : "border-transparent text-slate-400 hover:bg-slate-900 hover:text-white",
-                    collapsed && "justify-center px-0",
-                  )}
-                >
-                  <ShieldCheck size={19} weight={active === "Audit log" ? "fill" : "regular"} />
-                  {!collapsed && <span>Audit log</span>}
-                </button>
-              </>
-            )}
-          </div>
-        </div>
-
-        <button
-          aria-label={collapsed ? "Expand sidebar" : "Collapse sidebar"}
-          onClick={() => setCollapsed(!collapsed)}
-          className="absolute -right-3 top-20 hidden h-6 w-6 items-center justify-center border border-slate-300 bg-white text-slate-600 shadow-sm hover:text-slate-950 lg:flex"
-        >
-          {collapsed ? <CaretRight size={13} /> : <CaretLeft size={13} />}
-        </button>
-      </aside>
-
-      {/* Main Content Area */}
-      <div className={cn("transition-[padding] duration-150", collapsed ? "lg:pl-16" : "lg:pl-60")}>
-        {/* Top Header */}
-        <header className="sticky top-0 z-20 flex h-16 items-center gap-3 border-b border-slate-200 bg-white px-4 lg:px-6">
-          <button
-            className="flex h-10 w-10 items-center justify-center border border-slate-300 lg:hidden"
-            aria-label="Open navigation"
-            onClick={() => setMobileOpen(true)}
-          >
-            <List size={20} />
-          </button>
-
+    <><WorkspaceShell schoolName={currentOrganization.name} academicYear="2026–27 Academic Year" actorName={persona === "admin" ? "Olivia Parker" : persona === "teacher" ? "Elena Rostova" : "David Warren"} roleLabel={persona === "admin" ? "School administrator · Demo" : persona === "teacher" ? "Teacher · Demo" : "Parent / Guardian · Demo"} navigationLabel="Primary navigation" groups={previewGroups} activeId={active} contentId="demo-content" onNavigate={id => setActive(id as NavModule)} accountActions={<p className="p-2 text-xs text-secondary">Synthetic demo account</p>} banner={<div role="status" className="bg-warning-subtle px-4 py-2 text-center text-xs text-warning">Local demo · Synthetic records only · Changes are temporary and shared within this preview · SMS and approvals are simulations</div>} toolbar={<>
           {/* Search */}
           <div className="relative hidden max-w-xs flex-1 md:block">
-            <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+            <MagnifyingGlass className="absolute left-3 top-1/2 -translate-y-1/2 text-muted" size={16} />
             <input
               aria-label="Search Klassa"
               value={query}
               onChange={(e) => setQuery(e.target.value)}
-              className="h-9 w-full border border-slate-300 bg-slate-50 pl-9 pr-3 text-[13px] placeholder:text-slate-400 focus:border-blue-600 focus:bg-white focus:outline-none"
+              className="h-9 w-full border border-line bg-surface-subtle pl-9 pr-3 text-[13px] placeholder:text-muted focus:border-primary focus:bg-surface focus:outline-none"
               placeholder="Search students, records…"
             />
           </div>
 
           {/* Role/Persona Switcher Bar */}
-          <div className="flex flex-wrap items-center gap-1 border border-slate-200 bg-slate-100 p-1 text-xs">
-            <span className="px-1.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">Persona:</span>
+          <div className="flex flex-wrap items-center gap-1 border border-line bg-surface-subtle p-1 text-xs">
+            <span className="px-1.5 text-[10px] font-bold uppercase tracking-wider text-muted">Persona:</span>
             <button
               onClick={() => handlePersonaSwitch("admin")}
-              className={cn("px-2 py-0.5 font-semibold transition-colors", persona === "admin" ? "bg-white text-blue-700 shadow-xs border border-slate-200" : "text-slate-600 hover:text-slate-950")}
+              className={cn("px-2 py-0.5 font-semibold transition-colors", persona === "admin" ? "bg-surface text-primary shadow-xs border border-line" : "text-secondary hover:text-ink")}
             >
               Admin
             </button>
             <button
               onClick={() => handlePersonaSwitch("teacher")}
-              className={cn("px-2 py-0.5 font-semibold transition-colors", persona === "teacher" ? "bg-white text-blue-700 shadow-xs border border-slate-200" : "text-slate-600 hover:text-slate-950")}
+              className={cn("px-2 py-0.5 font-semibold transition-colors", persona === "teacher" ? "bg-surface text-primary shadow-xs border border-line" : "text-secondary hover:text-ink")}
             >
               Teacher
             </button>
             <button
               onClick={() => handlePersonaSwitch("guardian")}
-              className={cn("px-2 py-0.5 font-semibold transition-colors", persona === "guardian" ? "bg-white text-blue-700 shadow-xs border border-slate-200" : "text-slate-600 hover:text-slate-950")}
+              className={cn("px-2 py-0.5 font-semibold transition-colors", persona === "guardian" ? "bg-surface text-primary shadow-xs border border-line" : "text-secondary hover:text-ink")}
             >
               Guardian
             </button>
@@ -868,11 +754,11 @@ export function KlassoWorkspace({ roster }: { roster: Awaited<ReturnType<typeof 
               <button
                 aria-label="Notifications"
                 onClick={() => setNotificationsOpen(!notificationsOpen)}
-                className="relative flex h-9 w-9 items-center justify-center border border-slate-300 bg-white text-slate-700 hover:bg-slate-50"
+                className="relative flex h-9 w-9 items-center justify-center border border-line bg-surface text-secondary hover:bg-surface-subtle"
               >
                 <Bell size={18} />
                 {unreadCount > 0 && (
-                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center bg-blue-700 text-[10px] font-bold text-white">
+                  <span className="absolute -top-1 -right-1 flex h-4 w-4 items-center justify-center bg-primary text-[10px] font-bold text-white">
                     {unreadCount}
                   </span>
                 )}
@@ -880,30 +766,30 @@ export function KlassoWorkspace({ roster }: { roster: Awaited<ReturnType<typeof 
 
               {/* Notification Popover */}
               {notificationsOpen && (
-                <div className="absolute right-0 mt-2 w-80 sm:w-96 border border-slate-300 bg-white shadow-2xl z-50 animate-in fade-in duration-150">
-                  <div className="flex items-center justify-between border-b border-slate-200 px-3 py-2.5 bg-slate-50">
-                    <span className="text-xs font-bold uppercase tracking-wider text-slate-800">In-App Notification Center</span>
+                <div className="absolute right-0 mt-2 w-80 sm:w-96 border border-line bg-surface shadow-2xl z-50 animate-in fade-in duration-150">
+                  <div className="flex items-center justify-between border-b border-line px-3 py-2.5 bg-surface-subtle">
+                    <span className="text-xs font-bold uppercase tracking-wider text-ink">In-App Notification Center</span>
                     <button
                       onClick={() => {
                         markAllNotificationsAsRead();
                         setNotifications((curr) => curr.map((n) => ({ ...n, isRead: true })));
                       }}
-                      className="text-[11px] font-semibold text-blue-700 hover:underline"
+                      className="text-[11px] font-semibold text-primary hover:underline"
                     >
                       Mark all as read
                     </button>
                   </div>
                   <div className="max-h-72 overflow-y-auto divide-y divide-slate-100">
                     {notifications.length === 0 ? (
-                      <p className="p-4 text-center text-xs text-slate-500">No notifications.</p>
+                      <p className="p-4 text-center text-xs text-muted">No notifications.</p>
                     ) : (
                       notifications.map((n) => (
-                        <div key={n.id} className={cn("p-3 text-xs space-y-0.5", !n.isRead && "bg-blue-50/40")}>
+                        <div key={n.id} className={cn("p-3 text-xs space-y-0.5", !n.isRead && "bg-primary-subtle/40")}>
                           <div className="flex items-center justify-between">
-                            <span className="font-semibold text-slate-900">{n.title}</span>
-                            <span className="text-[10px] text-slate-400">{n.createdAt}</span>
+                            <span className="font-semibold text-ink">{n.title}</span>
+                            <span className="text-[10px] text-muted">{n.createdAt}</span>
                           </div>
-                          <p className="text-slate-600 text-[11px]">{n.message}</p>
+                          <p className="text-secondary text-[11px]">{n.message}</p>
                         </div>
                       ))
                     )}
@@ -913,7 +799,7 @@ export function KlassoWorkspace({ roster }: { roster: Awaited<ReturnType<typeof 
             </div>
 
             {/* Profile Avatar */}
-            <div className="flex h-9 items-center gap-2 border-l border-slate-200 pl-3">
+            <div className="flex h-9 items-center gap-2 border-l border-line pl-3">
               <span className="flex h-8 w-8 items-center justify-center bg-slate-900 text-xs font-bold text-white">
                 {persona === "admin" ? "OP" : persona === "teacher" ? "ER" : "DW"}
               </span>
@@ -921,33 +807,43 @@ export function KlassoWorkspace({ roster }: { roster: Awaited<ReturnType<typeof 
                 <span className="block text-xs font-semibold">
                   {persona === "admin" ? "Olivia Parker" : persona === "teacher" ? "Elena Rostova" : "David Warren"}
                 </span>
-                <span className="block text-[10px] text-slate-500">
+                <span className="block text-[10px] text-muted">
                   {persona === "admin" ? "School Administrator" : persona === "teacher" ? "Homeroom Teacher (7A/7B)" : "Parent / Guardian"}
                 </span>
               </div>
             </div>
           </div>
-        </header>
+</>}>
 
-        {/* Dynamic Workspace View */}
-        <main className="p-4 lg:p-6">
           {persona === "guardian" ? (
             <GuardianPortalView
               onSubmitExcuse={() => setModal("submitExcuse")}
-              reportCards={reportCards}
+              ameliaReportCards={reportCards.filter(rc => rc.studentId === "ST-2026-0142" && rc.status === "published")}
               onViewReportCard={(rc) => setSelectedReportCard(rc)}
               announcements={announcements}
-              consents={guardianConsents}
-              onUpdateConsent={handleUpdateGuardianConsent}
+              guardianConsent={(() => {
+                const consent = guardianConsents.find(item => item.guardianId === "grd-001");
+                return consent ? { phone: consent.phone, optInSmsAnnouncements: consent.optInSmsAnnouncements } : undefined;
+              })()}
+              onToggleSmsConsent={async optIn => {
+                const consent = guardianConsents.find(item => item.guardianId === "grd-001");
+                if (!consent) return false;
+                const result = await handleUpdateGuardianConsent({ guardianId: consent.guardianId, phone: consent.phone, optInSmsAnnouncements: optIn });
+                return result.success;
+              }}
             />
           ) : (
             <>
               {active === "Overview" && (
                 <OverviewModule
-                  studentsCount={students.length}
+                  studentsCount={students.filter(student => student.status === "Active").length}
                   guardiansCount={guardians.length}
                   classesCount={classes.length}
-                  attendanceRate={attendanceMetrics.attendanceRate}
+                  staffCount={staff.length}
+                  metrics={attendanceMetrics}
+                  submitted={attendanceSessionStatus === "submitted"}
+                  schoolName={currentOrganization.name}
+                  persona={persona}
                   recentAudit={auditLogs.slice(0, 5)}
                   onNavigate={(mod) => setActive(mod)}
                   onAddStudent={() => setModal("addStudent")}
@@ -1029,6 +925,7 @@ export function KlassoWorkspace({ roster }: { roster: Awaited<ReturnType<typeof 
               {active === "Students" && (
                 <StudentDirectoryModule
                   students={filteredStudents}
+                  availableGrades={[...new Set(students.map(student => student.grade))]}
                   total={students.length}
                   query={query}
                   setQuery={setQuery}
@@ -1100,8 +997,7 @@ export function KlassoWorkspace({ roster }: { roster: Awaited<ReturnType<typeof 
               )}
             </>
           )}
-        </main>
-      </div>
+</WorkspaceShell>
 
       {/* Modals & Dialogs */}
       {selectedReportCard && (
@@ -1185,7 +1081,7 @@ export function KlassoWorkspace({ roster }: { roster: Awaited<ReturnType<typeof 
           onToggleStatus={() => handleToggleStatus(selectedStudent.id)}
         />
       )}
-    </div>
+    </>
   );
 }
 export type { NavModule, Persona } from "./demo/types";

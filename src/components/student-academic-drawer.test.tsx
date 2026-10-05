@@ -1,9 +1,14 @@
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import {
   StudentAcademicDrawer,
   type StudentAcademicDrawerProps,
 } from "./student-academic-drawer";
+
+beforeEach(() => {
+  HTMLDialogElement.prototype.showModal = function () { this.setAttribute("open", ""); };
+  HTMLDialogElement.prototype.close = function () { this.removeAttribute("open"); };
+});
 
 const mockStudent = {
   id: "student-1",
@@ -269,10 +274,11 @@ describe("StudentAcademicDrawer component", () => {
       />
     );
 
+    const dialog = screen.getByRole("dialog");
     fireEvent.click(screen.getByRole("button", { name: "Close" }));
     expect(onClose).toHaveBeenCalledTimes(1);
 
-    fireEvent.keyDown(window, { key: "Escape" });
+    fireEvent(dialog, new Event("cancel", { cancelable: true }));
     expect(onClose).toHaveBeenCalledTimes(2);
   });
 });

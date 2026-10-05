@@ -6,11 +6,12 @@ export function register() {
 }
 
 export const onRequestError: Instrumentation.onRequestError = async () => {
-  if (process.env.NEXT_RUNTIME !== "nodejs") return;
-  try {
-    const { recordPlatformRequestError } = await import("@/lib/platform-telemetry");
-    await recordPlatformRequestError();
-  } catch {
-    // Telemetry storage must never replace or obscure the original request error.
+  if (process.env.NEXT_RUNTIME === "nodejs") {
+    try {
+      const { recordPlatformRequestError } = await import("@/lib/platform-telemetry");
+      await recordPlatformRequestError();
+    } catch {
+      // Telemetry storage must never replace or obscure the original request error.
+    }
   }
 };

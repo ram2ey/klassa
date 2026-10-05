@@ -1,49 +1,37 @@
 #!/usr/bin/env bash
-# Klasso Automated Disaster Recovery & Monthly Restore Drill Script
-# Validates 24-hour RPO, 8-hour RTO, and database integrity
+# Restore into an explicitly selected disposable database and record evidence.
 set -euo pipefail
-
+: "${STAGING_DATABASE_URL:?Set the isolated restore target explicitly}"
+: "${CONFIRM_DRILL_TARGET:?Set CONFIRM_DRILL_TARGET=yes after verifying the disposable target}"
+[ "${CONFIRM_DRILL_TARGET}" = yes ] || exit 1
+: "${EXPECTED_STUDENTS:?Provide the source snapshot student count}"
+: "${EXPECTED_GUARDIANS:?Provide the source snapshot guardian count}"
+: "${EXPECTED_ENROLLMENTS:?Provide the source snapshot enrollment count}"
+: "${BACKUP_CREATED_AT:?Provide the trusted backup snapshot UTC time (ISO 8601)}"
+for count in "${EXPECTED_STUDENTS}" "${EXPECTED_GUARDIANS}" "${EXPECTED_ENROLLMENTS}"; do
+  [[ "$count" =~ ^[0-9]+$ ]] || { echo '[ERROR] Expected counts must be nonnegative integers'; exit 1; }
+done
 BACKUP_DIR="${BACKUP_DIR:-/var/backups/klasso}"
-STAGING_DB="${STAGING_DATABASE_URL:-postgresql://klasso:test@localhost:5432/klasso_drill_staging}"
-LOG_FILE="${DRILL_LOG:-/var/log/klasso-restore-drill.log}"
-
-echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ")] [DRILL-START] Commencing monthly restore drill..." | tee -a "${LOG_FILE}"
-
-# 1. Locate latest backup
-LATEST_BACKUP=$(ls -t "${BACKUP_DIR}"/klasso_*.sql.gz 2>/dev/null | head -n 1 || true)
-if [ -z "${LATEST_BACKUP}" ]; then
-  echo "[ERROR] No backup archives found in ${BACKUP_DIR}." | tee -a "${LOG_FILE}"
-  exit 1
+LOG_FILE="${DRILL_LOG:-./klasso-restore-drill.log}"
+LATEST_BACKUP="${1:-}"
+if [ -z "$LATEST_BACKUP" ]; then
+  shopt -s nullglob
+  archives=("${BACKUP_DIR}"/klasso_*.sql.gz)
+  [ "${#archives[@]}" -gt 0 ] || { echo '[ERROR] No backups found'; exit 1; }
+  LATEST_BACKUP="${archives[${#archives[@]}-1]}"
 fi
-
-echo "[INFO] Target backup archive: ${LATEST_BACKUP}" | tee -a "${LOG_FILE}"
-
-# 2. Verify SHA-256 Checksum
-CHECKSUM_FILE="${LATEST_BACKUP}.sha256"
-if [ -f "${CHECKSUM_FILE}" ]; then
-  echo "[INFO] Verifying SHA-256 integrity digest..." | tee -a "${LOG_FILE}"
-  sha256sum -c "${CHECKSUM_FILE}" | tee -a "${LOG_FILE}"
-  echo "[SUCCESS] Cryptographic checksum verified." | tee -a "${LOG_FILE}"
-else
-  echo "[ERROR] Checksum file missing: ${CHECKSUM_FILE}" | tee -a "${LOG_FILE}"
-  exit 1
-fi
-
-# 3. Time the restoration (RTO benchmark)
 START_TIME=$(date +%s)
-echo "[INFO] Restoring archive into isolated staging database..." | tee -a "${LOG_FILE}"
-gunzip -c "${LATEST_BACKUP}" | psql "${STAGING_DB}" --single-transaction -v ON_ERROR_STOP=1 > /dev/null
-END_TIME=$(date +%s)
-ELAPSED_MINUTES=$(( (END_TIME - START_TIME) / 60 ))
-echo "[INFO] Database restored. Elapsed time (RTO): ${ELAPSED_MINUTES} minutes." | tee -a "${LOG_FILE}"
-
-# 4. Reconcile row counts
-STUDENT_COUNT=$(psql "${STAGING_DB}" -t -c "SELECT count(*) FROM students;")
-GUARDIAN_COUNT=$(psql "${STAGING_DB}" -t -c "SELECT count(*) FROM guardians;")
-ENROLLMENT_COUNT=$(psql "${STAGING_DB}" -t -c "SELECT count(*) FROM enrollments;")
-echo "[INFO] Data reconciliation: ${STUDENT_COUNT} students, ${GUARDIAN_COUNT} guardians, ${ENROLLMENT_COUNT} enrollments." | tee -a "${LOG_FILE}"
-
-# 5. Clean up staging database
-psql "${STAGING_DB}" -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;" > /dev/null
-echo "[$(date -u +"%Y-%m-%dT%H:%M:%SZ")] [DRILL-COMPLETE] Restore drill completed successfully within RTO/RPO SLAs." | tee -a "${LOG_FILE}"
-
+SNAPSHOT_TIME=$(date -u -d "$BACKUP_CREATED_AT" +%s)
+BACKUP_AGE=$((START_TIME - SNAPSHOT_TIME))
+[ "$BACKUP_AGE" -ge 0 ] && [ "$BACKUP_AGE" -le 86400 ] || { echo '[ERROR] Snapshot outside the 24-hour RPO'; exit 1; }
+SCRIPT_DIR=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+echo "[$(date -u +%FT%TZ)] DRILL START: $LATEST_BACKUP" | tee -a "$LOG_FILE"
+DATABASE_URL="$STAGING_DATABASE_URL" CONFIRM_RESTORE=yes bash "$SCRIPT_DIR/restore.sh" "$LATEST_BACKUP" | tee -a "$LOG_FILE"
+ACTUAL=$(psql "$STAGING_DATABASE_URL" --no-psqlrc -v ON_ERROR_STOP=1 -At -c \
+  'SELECT (SELECT count(*) FROM students), (SELECT count(*) FROM guardians), (SELECT count(*) FROM enrollments)')
+EXPECTED="${EXPECTED_STUDENTS}|${EXPECTED_GUARDIANS}|${EXPECTED_ENROLLMENTS}"
+[ "$ACTUAL" = "$EXPECTED" ] || { echo "[ERROR] Count mismatch: expected $EXPECTED, restored $ACTUAL" | tee -a "$LOG_FILE"; exit 1; }
+ELAPSED=$(($(date +%s) - START_TIME))
+[ "$ELAPSED" -le 28800 ] || { echo '[ERROR] Restore exceeded 8 hours' | tee -a "$LOG_FILE"; exit 1; }
+echo "[$(date -u +%FT%TZ)] Database checks passed: counts=$ACTUAL snapshot_age_seconds=$BACKUP_AGE restore_seconds=$ELAPSED" | tee -a "$LOG_FILE"
+echo 'Target retained for login, decryption and tenant isolation checks. Full recovery acceptance remains pending until these pass.' | tee -a "$LOG_FILE"

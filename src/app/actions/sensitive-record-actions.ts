@@ -30,7 +30,7 @@ import {
   INITIAL_NEED_TO_KNOW_ALERTS,
   INITIAL_COURT_RESTRICTIONS,
   INITIAL_SENSITIVE_ACCESS_LOGS,
-} from "@/lib/sensitive-records";
+} from "@/lib/sensitive-records-server";
 
 const DEFAULT_ORG_ID = "00000000-0000-0000-0000-000000000001";
 

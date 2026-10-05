@@ -12,7 +12,7 @@ vi.mock("@/app/actions/school-access-actions", () => ({ provisionStaffForCurrent
 const data: SchoolAdminData = {
   school: { id: "school-1", name: "Northfield School", slug: "northfield", timezone: "Etc/GMT" },
   actor: { organizationId: "school-1", userId: "admin-1", name: "School Admin", role: "school_admin" },
-  students: [], guardians: [], links: [], staff: [], classes: [], assignments: [], grades: [], years: [], terms: [], subjects: [], enrollments: [], audit: [], absenceNotes: [],
+  students: [], guardians: [], smsPreferences: [], links: [], staff: [], classes: [], assignments: [], grades: [], years: [], terms: [], subjects: [], enrollments: [], audit: [], absenceNotes: [],
   attendanceSummary: [], publishedReports: [], reportSubjects: [], behaviours: [], timetable: [], activeAlerts: [], activeRestrictions: [],
 };
 const assignmentData = {
@@ -33,7 +33,7 @@ beforeEach(() => {
 afterEach(cleanup);
 
 describe("school administration workspace", () => {
-  it("shows live safety and submitted attendance metrics on the overview", () => {
+  it("shows submitted attendance without displaying restricted overview metrics", () => {
     const overviewData = { ...data,
       activeAlerts: [{ studentId: "student-1" }, { studentId: "student-1" }, { studentId: "student-2" }],
       activeRestrictions: [{ studentId: "student-2" }],
@@ -43,12 +43,11 @@ describe("school administration workspace", () => {
       ],
     } as SchoolAdminData;
     render(<SchoolAdminWorkspace data={overviewData} section="overview" />);
-    expect(screen.getByRole("heading", { name: "Active alerts" }).closest("article")?.textContent).toContain("3");
-    expect(screen.getByRole("heading", { name: "Active alerts" }).closest("article")?.textContent).toContain("2 students");
-    expect(screen.getByRole("heading", { name: "Current restrictions" }).closest("article")?.textContent).toContain("1 student");
+    expect(screen.queryByRole("heading", { name: "Active alerts" })).toBeNull();
+    expect(screen.queryByRole("heading", { name: "Current restrictions" })).toBeNull();
     expect(screen.getByRole("heading", { name: "Attendance rate" }).closest("article")?.textContent).toContain("80%");
     expect(screen.getByRole("heading", { name: "Attendance rate" }).closest("article")?.textContent).toContain("15 submitted or locked marks");
-    expect(screen.getByRole("heading", { name: "Unexcused absences" }).closest("article")?.textContent).toContain("3");
+    expect(screen.getByText("Absent").nextElementSibling?.textContent).toBe("3");
   });
   it("does not show a misleading attendance rate before any marks are submitted", () => {
     render(<SchoolAdminWorkspace data={data} section="overview" />);

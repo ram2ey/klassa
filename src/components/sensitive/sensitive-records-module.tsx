@@ -98,9 +98,9 @@ export function SensitiveRecordsModule({
   if (currentUserRole === "teacher" || currentUserRole === "guardian") {
     return (
       <div className="space-y-6">
-        <div className="border border-rose-200 bg-rose-50/70 p-6 rounded-xs space-y-4">
+        <div className="border border-rose-200 bg-rose-50/70 p-6 rounded-control space-y-4">
           <div className="flex items-center gap-3">
-            <div className="rounded-xs bg-rose-100 p-2 text-rose-800">
+            <div className="rounded-control bg-rose-100 p-2 text-rose-800">
               <LockKey size={28} weight="bold" />
             </div>
             <div>
@@ -178,18 +178,18 @@ export function SensitiveRecordsModule({
   return (
     <div className="space-y-6">
       {/* Top Banner Notice */}
-      <div className="flex items-start justify-between rounded-xs border border-slate-300 bg-white p-4 shadow-xs">
+      <div className="flex items-start justify-between rounded-control border border-line bg-surface p-4 shadow-xs">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <ShieldCheck size={20} className="text-blue-700" weight="bold" />
-            <h1 className="text-lg font-bold text-slate-900">
+            <ShieldCheck size={20} className="text-primary" weight="bold" />
+            <h1 className="text-lg font-bold text-ink">
               Sensitive Student Records & Statutory Safeguarding
             </h1>
-            <span className="rounded-xs border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-800">
+            <span className="rounded-control border border-primary/20 bg-primary-subtle px-2 py-0.5 text-[10px] font-bold text-primary-hover">
               AES-256-GCM ENCRYPTED
             </span>
           </div>
-          <p className="text-xs text-slate-600">
+          <p className="text-xs text-secondary">
             Institutional case files for Child Protection, Special Needs (SENCO), Health & Medical protocols, and Enforced Court Restrictions. Every narrative decryption is logged permanently in the read audit ledger.
           </p>
         </div>
@@ -232,57 +232,57 @@ export function SensitiveRecordsModule({
 
       {/* Metrics Row */}
       <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
-        <div className="rounded-xs border border-slate-200 bg-white p-3.5 space-y-1">
-          <div className="flex items-center justify-between text-xs text-slate-500">
+        <div className="rounded-control border border-line bg-surface p-3.5 space-y-1">
+          <div className="flex items-center justify-between text-xs text-muted">
             <span>Authorized Cases</span>
-            <LockKey size={16} className="text-slate-400" />
+            <LockKey size={16} className="text-muted" />
           </div>
-          <p className="text-xl font-bold text-slate-900">{visibleCases.length}</p>
-          <span className="text-[10px] text-slate-400">Clearance role: {currentUserRole.replace("_", " ")}</span>
+          <p className="text-xl font-bold text-ink">{visibleCases.length}</p>
+          <span className="text-[10px] text-muted">Clearance role: {currentUserRole.replace("_", " ")}</span>
         </div>
 
-        <div className="rounded-xs border border-slate-200 bg-white p-3.5 space-y-1">
-          <div className="flex items-center justify-between text-xs text-slate-500">
+        <div className="rounded-control border border-line bg-surface p-3.5 space-y-1">
+          <div className="flex items-center justify-between text-xs text-muted">
             <span>Teacher Need-to-Know</span>
             <ShieldWarning size={16} className="text-amber-600" />
           </div>
           <p className="text-xl font-bold text-amber-900">
             {localAlerts.filter((a) => a.isActive).length}
           </p>
-          <span className="text-[10px] text-slate-400">Active classroom directives</span>
+          <span className="text-[10px] text-muted">Active classroom directives</span>
         </div>
 
-        <div className="rounded-xs border border-slate-200 bg-white p-3.5 space-y-1">
-          <div className="flex items-center justify-between text-xs text-slate-500">
+        <div className="rounded-control border border-line bg-surface p-3.5 space-y-1">
+          <div className="flex items-center justify-between text-xs text-muted">
             <span>Enforced Court Orders</span>
             <Gavel size={16} className="text-rose-600" />
           </div>
           <p className="text-xl font-bold text-rose-900">
             {courtOrders.filter((o) => o.isEnforced).length}
           </p>
-          <span className="text-[10px] text-slate-400">Protective pickup bans</span>
+          <span className="text-[10px] text-muted">Protective pickup bans</span>
         </div>
 
-        <div className="rounded-xs border border-slate-200 bg-white p-3.5 space-y-1">
-          <div className="flex items-center justify-between text-xs text-slate-500">
+        <div className="rounded-control border border-line bg-surface p-3.5 space-y-1">
+          <div className="flex items-center justify-between text-xs text-muted">
             <span>Decryption Audits</span>
-            <ClockCounterClockwise size={16} className="text-blue-600" />
+            <ClockCounterClockwise size={16} className="text-primary" />
           </div>
-          <p className="text-xl font-bold text-blue-900">{localLogs.length}</p>
-          <span className="text-[10px] text-slate-400">Immutable read events</span>
+          <p className="text-xl font-bold text-ink">{localLogs.length}</p>
+          <span className="text-[10px] text-muted">Immutable read events</span>
         </div>
       </div>
 
       {/* Navigation Sub-Tabs */}
-      <div className="flex items-center justify-between border-b border-slate-200 bg-white px-2">
+      <div className="flex items-center justify-between border-b border-line bg-surface px-2">
         <div className="flex items-center gap-1">
           <button
             onClick={() => setActiveTab("cases")}
             className={cn(
               "px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors",
               activeTab === "cases"
-                ? "border-blue-600 text-blue-700"
-                : "border-transparent text-slate-600 hover:text-slate-900"
+                ? "border-primary text-primary"
+                : "border-transparent text-secondary hover:text-ink"
             )}
           >
             Confidential Cases ({visibleCases.length})
@@ -292,8 +292,8 @@ export function SensitiveRecordsModule({
             className={cn(
               "px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors",
               activeTab === "need_to_know"
-                ? "border-blue-600 text-blue-700"
-                : "border-transparent text-slate-600 hover:text-slate-900"
+                ? "border-primary text-primary"
+                : "border-transparent text-secondary hover:text-ink"
             )}
           >
             Teacher Need-to-Know Registry ({localAlerts.filter((a) => a.isActive).length})
@@ -303,8 +303,8 @@ export function SensitiveRecordsModule({
             className={cn(
               "px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors",
               activeTab === "court_orders"
-                ? "border-blue-600 text-blue-700"
-                : "border-transparent text-slate-600 hover:text-slate-900"
+                ? "border-primary text-primary"
+                : "border-transparent text-secondary hover:text-ink"
             )}
           >
             Court Restrictions & Protection Orders ({courtOrders.length})
@@ -314,8 +314,8 @@ export function SensitiveRecordsModule({
             className={cn(
               "px-4 py-2.5 text-xs font-semibold border-b-2 transition-colors",
               activeTab === "audit_log"
-                ? "border-blue-600 text-blue-700"
-                : "border-transparent text-slate-600 hover:text-slate-900"
+                ? "border-primary text-primary"
+                : "border-transparent text-secondary hover:text-ink"
             )}
           >
             Read-Access Audit Trail ({localLogs.length})
@@ -325,19 +325,19 @@ export function SensitiveRecordsModule({
         {activeTab === "cases" && (
           <div className="flex items-center gap-2 py-1.5">
             <div className="relative">
-              <MagnifyingGlass size={14} className="absolute left-2.5 top-2 text-slate-400" />
+              <MagnifyingGlass size={14} className="absolute left-2.5 top-2 text-muted" />
               <input
                 type="text"
                 placeholder="Search case or student..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-48 rounded-xs border border-slate-300 bg-white pl-8 pr-2.5 py-1 text-xs text-slate-800 placeholder-slate-400 focus:border-blue-600 focus:outline-none"
+                className="w-48 rounded-control border border-line bg-surface pl-8 pr-2.5 py-1 text-xs text-ink placeholder-slate-400 focus:border-primary focus:outline-none"
               />
             </div>
             <select
               value={caseAreaFilter}
               onChange={(e) => setCaseAreaFilter(e.target.value as "all" | SensitiveCaseArea)}
-              className="rounded-xs border border-slate-300 bg-white px-2 py-1 text-xs text-slate-800 focus:border-blue-600 focus:outline-none"
+              className="rounded-control border border-line bg-surface px-2 py-1 text-xs text-ink focus:border-primary focus:outline-none"
             >
               <option value="all">All Domains</option>
               <option value="safeguarding">Safeguarding (CP)</option>
@@ -351,10 +351,10 @@ export function SensitiveRecordsModule({
 
       {/* Tab 1: Confidential Cases */}
       {activeTab === "cases" && (
-        <div className="overflow-hidden rounded-xs border border-slate-200 bg-white shadow-xs">
+        <div className="overflow-hidden rounded-control border border-line bg-surface shadow-xs">
           <div className="overflow-x-auto">
-            <table className="w-full text-left text-xs text-slate-800">
-              <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-600 uppercase">
+            <table className="w-full text-left text-xs text-ink">
+              <thead className="border-b border-line bg-surface-subtle text-[11px] font-semibold text-secondary uppercase">
                 <tr>
                   <th className="px-4 py-3">Case ID</th>
                   <th className="px-4 py-3">Student</th>
@@ -369,35 +369,35 @@ export function SensitiveRecordsModule({
               <tbody className="divide-y divide-slate-100 font-normal">
                 {visibleCases.length === 0 ? (
                   <tr>
-                    <td colSpan={8} className="p-6 text-center text-slate-400">
+                    <td colSpan={8} className="p-6 text-center text-muted">
                       No confidential records found for current role clearance and filter.
                     </td>
                   </tr>
                 ) : (
                   visibleCases.map((c) => (
-                    <tr key={c.id} className="hover:bg-slate-50/70 transition-colors">
-                      <td className="px-4 py-3 font-mono font-bold text-slate-900">
+                    <tr key={c.id} className="hover:bg-surface-subtle/70 transition-colors">
+                      <td className="px-4 py-3 font-mono font-bold text-ink">
                         {c.caseNumber}
                       </td>
-                      <td className="px-4 py-3 font-medium text-slate-900">
+                      <td className="px-4 py-3 font-medium text-ink">
                         <div>{c.studentName}</div>
-                        <span className="text-[10px] text-slate-400">{c.studentGrade}</span>
+                        <span className="text-[10px] text-muted">{c.studentGrade}</span>
                       </td>
                       <td className="px-4 py-3">
-                        <span className="capitalize text-slate-700">
+                        <span className="capitalize text-secondary">
                           {c.area.replace(/_/g, " ")}
                         </span>
                       </td>
                       <td className="px-4 py-3 max-w-xs">
-                        <div className="font-semibold text-slate-900 truncate">{c.title}</div>
-                        <div className="text-[11px] text-slate-500 truncate">
+                        <div className="font-semibold text-ink truncate">{c.title}</div>
+                        <div className="text-[11px] text-muted truncate">
                           {c.latestNoteSummary || "Encrypted narrative on file"}
                         </div>
                       </td>
                       <td className="px-4 py-3">{getTierBadge(c.confidentialityTier)}</td>
-                      <td className="px-4 py-3 text-slate-600">{c.leadSpecialistName}</td>
+                      <td className="px-4 py-3 text-secondary">{c.leadSpecialistName}</td>
                       <td className="px-4 py-3">
-                        <span className="capitalize rounded-xs bg-slate-100 px-2 py-0.5 text-[10px] font-medium text-slate-700">
+                        <span className="capitalize rounded-control bg-surface-subtle px-2 py-0.5 text-[10px] font-medium text-secondary">
                           {c.status.replace(/_/g, " ")}
                         </span>
                       </td>
@@ -415,7 +415,7 @@ export function SensitiveRecordsModule({
                           variant="ghost"
                           size="sm"
                           onClick={() => handleGenerateDisclosure(c.studentId, c.studentName)}
-                          className="text-[11px] h-7 text-slate-600 hover:text-slate-900"
+                          className="text-[11px] h-7 text-secondary hover:text-ink"
                         >
                           Redacted Package
                         </Button>
@@ -432,16 +432,16 @@ export function SensitiveRecordsModule({
       {/* Tab 2: Need-to-Know Registry */}
       {activeTab === "need_to_know" && (
         <div className="space-y-4">
-          <div className="rounded-xs border border-amber-200 bg-amber-50/60 p-3 text-xs text-amber-950 flex items-start gap-2">
+          <div className="rounded-control border border-amber-200 bg-amber-50/60 p-3 text-xs text-amber-950 flex items-start gap-2">
             <ShieldWarning size={20} className="text-amber-800 shrink-0 mt-0.5" />
             <div>
               <span className="font-bold">Active Classroom Staff Directives:</span> Teachers receive strictly operational directives (dietary allergies, physical health accommodations, exam support) without clinical diagnostics or confidential investigative narratives.
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-xs border border-slate-200 bg-white shadow-xs">
-            <table className="w-full text-left text-xs text-slate-800">
-              <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-600 uppercase">
+          <div className="overflow-hidden rounded-control border border-line bg-surface shadow-xs">
+            <table className="w-full text-left text-xs text-ink">
+              <thead className="border-b border-line bg-surface-subtle text-[11px] font-semibold text-secondary uppercase">
                 <tr>
                   <th className="px-4 py-3">Student</th>
                   <th className="px-4 py-3">Category</th>
@@ -455,7 +455,7 @@ export function SensitiveRecordsModule({
               <tbody className="divide-y divide-slate-100">
                 {localAlerts.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="p-6 text-center text-slate-400">
+                    <td colSpan={7} className="p-6 text-center text-muted">
                       No active teacher directives registered.
                     </td>
                   </tr>
@@ -464,20 +464,20 @@ export function SensitiveRecordsModule({
                     <tr
                       key={a.id}
                       className={cn(
-                        "hover:bg-slate-50/70 transition-colors",
-                        !a.isActive && "opacity-50 bg-slate-50"
+                        "hover:bg-surface-subtle/70 transition-colors",
+                        !a.isActive && "opacity-50 bg-surface-subtle"
                       )}
                     >
-                      <td className="px-4 py-3 font-medium text-slate-900">
+                      <td className="px-4 py-3 font-medium text-ink">
                         {a.studentName} ({a.studentGrade})
                       </td>
-                      <td className="px-4 py-3 capitalize text-slate-600">{a.category.replace(/_/g, " ")}</td>
-                      <td className="px-4 py-3 font-semibold text-slate-900">{a.directiveSummary}</td>
-                      <td className="px-4 py-3 max-w-sm text-slate-700 leading-relaxed">
+                      <td className="px-4 py-3 capitalize text-secondary">{a.category.replace(/_/g, " ")}</td>
+                      <td className="px-4 py-3 font-semibold text-ink">{a.directiveSummary}</td>
+                      <td className="px-4 py-3 max-w-sm text-secondary leading-relaxed">
                         {a.actionRequired}
                       </td>
                       <td className="px-4 py-3">{getSeverityBadge(a.severity)}</td>
-                      <td className="px-4 py-3 text-slate-500 text-[11px]">{a.authorSpecialistName}</td>
+                      <td className="px-4 py-3 text-muted text-[11px]">{a.authorSpecialistName}</td>
                       <td className="px-4 py-3 text-right">
                         {a.isActive ? (
                           <Button
@@ -489,7 +489,7 @@ export function SensitiveRecordsModule({
                             Mark Resolved
                           </Button>
                         ) : (
-                          <span className="text-[11px] text-slate-400 italic">Resolved</span>
+                          <span className="text-[11px] text-muted italic">Resolved</span>
                         )}
                       </td>
                     </tr>
@@ -504,16 +504,16 @@ export function SensitiveRecordsModule({
       {/* Tab 3: Court Restrictions */}
       {activeTab === "court_orders" && (
         <div className="space-y-4">
-          <div className="rounded-xs border border-rose-200 bg-rose-50/60 p-3 text-xs text-rose-950 flex items-start gap-2">
+          <div className="rounded-control border border-rose-200 bg-rose-50/60 p-3 text-xs text-rose-950 flex items-start gap-2">
             <Gavel size={20} className="text-rose-800 shrink-0 mt-0.5" />
             <div>
               <span className="font-bold">Statutory Legal Protective Registry:</span> Court orders enforced against non-custodial individuals or restricted guardians. Front office and gate security are alerted to prohibit campus access and withhold record disclosures.
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-xs border border-slate-200 bg-white shadow-xs">
-            <table className="w-full text-left text-xs text-slate-800">
-              <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-600 uppercase">
+          <div className="overflow-hidden rounded-control border border-line bg-surface shadow-xs">
+            <table className="w-full text-left text-xs text-ink">
+              <thead className="border-b border-line bg-surface-subtle text-[11px] font-semibold text-secondary uppercase">
                 <tr>
                   <th className="px-4 py-3">Protected Student</th>
                   <th className="px-4 py-3">Restricted Individual</th>
@@ -526,17 +526,17 @@ export function SensitiveRecordsModule({
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {courtOrders.map((ord) => (
-                  <tr key={ord.id} className="hover:bg-slate-50/70">
-                    <td className="px-4 py-3 font-semibold text-slate-900">{ord.studentName}</td>
+                  <tr key={ord.id} className="hover:bg-surface-subtle/70">
+                    <td className="px-4 py-3 font-semibold text-ink">{ord.studentName}</td>
                     <td className="px-4 py-3 font-medium text-rose-800">{ord.restrictedPersonName}</td>
-                    <td className="px-4 py-3 capitalize text-slate-700">
+                    <td className="px-4 py-3 capitalize text-secondary">
                       {ord.orderType.replace(/_/g, " ")}
                     </td>
-                    <td className="px-4 py-3 text-slate-600">
+                    <td className="px-4 py-3 text-secondary">
                       <span className="font-mono">{ord.docketNumber}</span>
-                      <div className="text-[10px] text-slate-400">{ord.issuingCourt}</div>
+                      <div className="text-[10px] text-muted">{ord.issuingCourt}</div>
                     </td>
-                    <td className="px-4 py-3 max-w-sm text-slate-700 leading-relaxed">
+                    <td className="px-4 py-3 max-w-sm text-secondary leading-relaxed">
                       {ord.summary}
                     </td>
                     <td className="px-4 py-3 space-y-1 text-[10px]">
@@ -564,16 +564,16 @@ export function SensitiveRecordsModule({
       {/* Tab 4: Read-Access Audit Trail */}
       {activeTab === "audit_log" && (
         <div className="space-y-4">
-          <div className="rounded-xs border border-blue-200 bg-blue-50/60 p-3 text-xs text-blue-950 flex items-start gap-2">
-            <ClockCounterClockwise size={20} className="text-blue-800 shrink-0 mt-0.5" />
+          <div className="rounded-control border border-primary/20 bg-primary-subtle/60 p-3 text-xs text-ink flex items-start gap-2">
+            <ClockCounterClockwise size={20} className="text-primary-hover shrink-0 mt-0.5" />
             <div>
               <span className="font-bold">Permanent Read-Access Audit Ledger:</span> Every single decryption of sensitive narrative notes is recorded with user identity, timestamp, IP address, and mandatory justification reason to prevent unauthorized record browsing.
             </div>
           </div>
 
-          <div className="overflow-hidden rounded-xs border border-slate-200 bg-white shadow-xs">
-            <table className="w-full text-left text-xs text-slate-800">
-              <thead className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold text-slate-600 uppercase">
+          <div className="overflow-hidden rounded-control border border-line bg-surface shadow-xs">
+            <table className="w-full text-left text-xs text-ink">
+              <thead className="border-b border-line bg-surface-subtle text-[11px] font-semibold text-secondary uppercase">
                 <tr>
                   <th className="px-4 py-3">Timestamp</th>
                   <th className="px-4 py-3">Actor / User</th>
@@ -586,22 +586,22 @@ export function SensitiveRecordsModule({
               </thead>
               <tbody className="divide-y divide-slate-100 font-mono text-[11px]">
                 {localLogs.map((log) => (
-                  <tr key={log.id} className="hover:bg-slate-50/70">
-                    <td className="px-4 py-3 text-slate-500 font-sans">
+                  <tr key={log.id} className="hover:bg-surface-subtle/70">
+                    <td className="px-4 py-3 text-muted font-sans">
                       {formatGMTDateTime(log.accessedAt)}
                     </td>
-                    <td className="px-4 py-3 font-semibold text-slate-900 font-sans">
+                    <td className="px-4 py-3 font-semibold text-ink font-sans">
                       {log.userName}
                     </td>
-                    <td className="px-4 py-3 capitalize text-slate-600 font-sans">
+                    <td className="px-4 py-3 capitalize text-secondary font-sans">
                       {log.userRole.replace(/_/g, " ")}
                     </td>
-                    <td className="px-4 py-3 font-bold text-blue-700">{log.caseNumber}</td>
-                    <td className="px-4 py-3 text-slate-700">{log.action}</td>
-                    <td className="px-4 py-3 font-sans text-slate-900 max-w-sm italic">
+                    <td className="px-4 py-3 font-bold text-primary">{log.caseNumber}</td>
+                    <td className="px-4 py-3 text-secondary">{log.action}</td>
+                    <td className="px-4 py-3 font-sans text-ink max-w-sm italic">
                       &ldquo;{log.accessReason}&rdquo;
                     </td>
-                    <td className="px-4 py-3 text-slate-500">{log.ipAddress}</td>
+                    <td className="px-4 py-3 text-muted">{log.ipAddress}</td>
                   </tr>
                 ))}
               </tbody>

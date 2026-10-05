@@ -2,7 +2,7 @@ import { and, asc, count, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { academicYears, attendanceRecords, attendanceSessions, auditEvents, classes, classTimetablePeriods, courtRestrictions, enrollments, gradeLevels, guardians, needToKnowAlerts, organizationMemberships,
   organizations, reportCards, reportCardSubjectGrades, studentBehaviours, studentGuardians, students, subjects, teacherClassAssignments, terms, users,
-  guardianAbsenceNotes } from "@/db/schema";
+  guardianConsents, guardianAbsenceNotes } from "@/db/schema";
 import { requireStaff } from "@/lib/action-access";
 import { formatPeriodLabel, type TimetablePeriodItem } from "@/lib/timetable-service";
 
@@ -35,6 +35,8 @@ export async function getSchoolAdminData() {
       .leftJoin(users, eq(users.id, auditEvents.actorUserId)).where(and(eq(auditEvents.organizationId, org)))
       .orderBy(desc(auditEvents.createdAt)).limit(100),
     db.select({ studentId: attendanceRecords.studentId, total: count(),
+      firstDate: sql<string>`min(${attendanceSessions.sessionDate})`,
+      lastDate: sql<string>`max(${attendanceSessions.sessionDate})`,
       attended: sql<number>`count(*) filter (where ${attendanceRecords.status} in ('present', 'late'))`,
       absent: sql<number>`count(*) filter (where ${attendanceRecords.status} = 'absent')` })
       .from(attendanceRecords).innerJoin(attendanceSessions, eq(attendanceRecords.sessionId, attendanceSessions.id))
@@ -88,7 +90,10 @@ export async function getSchoolAdminData() {
       teacherName: teacher?.name,
     };
   });
-  return { school, actor, students: studentRows, guardians: guardianRows, links, staff, classes: classRows, assignments,
+  const smsPreferences = await db.select({ guardianId: guardianConsents.guardianId,
+    announcements: guardianConsents.optInSmsAnnouncements }).from(guardianConsents)
+    .where(eq(guardianConsents.organizationId, org));
+  return { school, actor, students: studentRows, guardians: guardianRows, smsPreferences, links, staff, classes: classRows, assignments,
     grades, years, terms: termRows, subjects: subjectRows, enrollments: enrollmentRows, audit, absenceNotes,
     attendanceSummary, publishedReports, reportSubjects, behaviours, timetable, activeAlerts: activeAlerts.filter(alert => !alert.expiresAt || alert.expiresAt > new Date()),
     activeRestrictions: activeRestrictions.filter(restriction => restriction.effectiveDate <= new Date().toISOString().slice(0, 10) &&

@@ -34,7 +34,7 @@ function ReviewControl({ member }: { member: Member }) {
     });
   }
   return <>
-    <button type="button" onClick={() => { setOpen(true); setError(""); }} className="border border-blue-300 px-2 py-1 text-xs font-semibold text-blue-700">Record review</button>
+    <button type="button" onClick={() => { setOpen(true); setError(""); }} className="border border-primary/30 px-2 py-1 text-xs font-semibold text-primary">Record review</button>
     {open && <div className="fixed inset-0 z-50 grid place-items-center bg-slate-950/50 p-4" role="presentation">
       <div role="dialog" aria-modal="true" aria-labelledby={`review-title-${member.id}`} className="w-full max-w-md bg-white p-6 shadow-xl">
         <h3 id={`review-title-${member.id}`} className="text-lg font-bold">Review {member.name}&apos;s access</h3>
@@ -47,7 +47,7 @@ function ReviewControl({ member }: { member: Member }) {
               className="mt-1 block min-h-24 w-full border border-slate-300 p-3 font-normal" /></label>
           {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
           <div className="flex justify-end gap-2"><button type="button" disabled={pending} onClick={() => { setOpen(false); setNote(""); }} className="border border-slate-300 px-4 py-2 text-sm font-semibold">Cancel</button>
-            <button type="submit" disabled={pending} className="bg-blue-700 px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">Save review</button></div>
+            <button type="submit" disabled={pending} className="bg-primary px-4 py-2 text-sm font-semibold text-white disabled:opacity-40">Save review</button></div>
         </form>
       </div>
     </div>}

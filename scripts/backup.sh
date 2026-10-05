@@ -18,14 +18,17 @@ if [ -z "${DATABASE_URL:-}" ]; then
   exit 1
 fi
 
-# Run pg_dump with compression
+# Publish only completed archives. Failed dumps must not appear restorable.
+TEMP_FILE=$(mktemp "${BACKUP_DIR}/.klasso-backup.XXXXXX")
+trap 'rm -f -- "$TEMP_FILE"' EXIT
+# Preserve GRANT/REVOKE statements; no-owner permits a new migration owner.
 pg_dump "${DATABASE_URL}" \
   --format=plain \
   --no-owner \
-  --no-privileges \
   --clean \
   --if-exists \
-  | gzip -9 > "${BACKUP_FILE}"
+  | gzip -9 > "${TEMP_FILE}"
+mv -- "${TEMP_FILE}" "${BACKUP_FILE}"
 
 # Generate SHA-256 integrity hash
 sha256sum "${BACKUP_FILE}" > "${CHECKSUM_FILE}"

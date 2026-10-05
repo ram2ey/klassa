@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { hashPassword } from "better-auth/crypto";
+import { readFile } from "node:fs/promises";
+import { bootstrapAdmin } from "./bootstrap-admin.mjs";
 import { drizzle } from "drizzle-orm/postgres-js";
 import { migrate } from "drizzle-orm/postgres-js/migrator";
 import postgres from "postgres";
@@ -161,65 +162,17 @@ try {
   }
   console.log("[deploy] Restricted web database role and tenant policies verified.");
 
-  // 4. Platform administrator bootstrap
-  console.log("[deploy] Checking platform administrator status...");
-  const existingAdmins = await client`
-    SELECT id FROM users WHERE is_platform_admin = true LIMIT 1
-  `;
-
-  const username = (process.env.KLASSO_BOOTSTRAP_USERNAME ?? "").trim().toLowerCase();
-  const name = (process.env.KLASSO_BOOTSTRAP_NAME ?? "").trim();
-  const password = process.env.KLASSO_BOOTSTRAP_PASSWORD ?? "";
-
-  if (existingAdmins.length > 0) {
-    console.log("[deploy] A platform administrator already exists; bootstrap skipped.");
-  } else if (!username && !name && !password) {
-    console.log("[deploy] No platform administrator exists yet.");
-    console.log("[deploy] Notice: KLASSO_BOOTSTRAP_USERNAME / PASSWORD not set in environment. Skipping admin creation.");
-    console.log("[deploy] You can configure them in Coolify Environment Variables and redeploy anytime to bootstrap an administrator.");
-  } else {
-    if (!/^[a-z0-9][a-z0-9._-]{2,63}$/.test(username)) {
-      console.warn(`[deploy] Warning: KLASSO_BOOTSTRAP_USERNAME must contain 3-64 lowercase letters, numbers, dots, underscores or hyphens. Admin creation skipped.`);
-    } else if (name.length < 2 || name.length > 180) {
-      console.warn("[deploy] Warning: KLASSO_BOOTSTRAP_NAME must be between 2 and 180 characters. Admin creation skipped.");
-    } else if (password.length < 12 || password.length > 128) {
-      console.warn("[deploy] Warning: KLASSO_BOOTSTRAP_PASSWORD must be between 12 and 128 characters. Admin creation skipped.");
-    } else {
-      const userId = randomUUID();
-      const accountId = randomUUID();
-      const hashedPassword = await hashPassword(password);
-      const email = `${userId}@accounts.klassa.invalid`;
-
-      await client.begin(async (sql) => {
-        await sql`
-          INSERT INTO users (
-            id, name, email, email_verified, username, display_username,
-            is_platform_admin, must_change_password
-          )
-          VALUES (
-            ${userId}, ${name}, ${email}, false, ${"platform:" + username}, ${username},
-            true, false
-          )
-        `;
-        await sql`
-          INSERT INTO accounts (
-            id, account_id, provider_id, user_id, password
-          )
-          VALUES (
-            ${accountId}, ${userId}, 'credential', ${userId}, ${hashedPassword}
-          )
-        `;
-      });
-
-      console.log(`[deploy] Platform administrator (${name}, platform / ${username}) created successfully!`);
-    }
-  }
+  await client.begin(async sql => {
+    await sql.unsafe(await readFile(new URL("./database-security.sql", import.meta.url), "utf8"));
+  });
+  const bootstrap = await bootstrapAdmin(client);
+  console.log(bootstrap.created ? "[deploy] Platform administrator created." : "[deploy] Platform administrator already exists.");
 
   console.log("[deploy] Database preparation completed successfully.");
 } catch (error) {
   const message = error instanceof Error ? error.message : "Unknown error during deployment.";
   console.error(`[deploy] Fatal error during database preparation: ${message}`);
-  process.exit(1);
+  process.exitCode = 1;
 } finally {
   delete process.env.KLASSO_BOOTSTRAP_PASSWORD;
   await client.end();

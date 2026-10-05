@@ -48,7 +48,7 @@ export function TermLockControl({ term, onUpdated }: { term: SchoolAdminData["te
       {term.isLocked ? (
         <Button
           variant="secondary"
-          className="min-h-11 border-amber-300 text-amber-900 hover:bg-amber-50"
+          className="min-h-11 border-warning/40 text-warning hover:bg-warning-subtle"
           onClick={() => { setNotes(""); setError(""); setModal("unlock"); }}
         >
           <Unlock size={14} className="mr-1" />
@@ -57,7 +57,7 @@ export function TermLockControl({ term, onUpdated }: { term: SchoolAdminData["te
       ) : (
         <Button
           variant="secondary"
-          className="min-h-11 border-slate-300 text-slate-800 hover:bg-slate-100"
+          className="min-h-11 border-line-subtle text-ink hover:bg-surface-subtle"
           onClick={() => { setNotes(""); setError(""); setModal("lock"); }}
         >
           <Lock size={14} className="mr-1" />
@@ -66,18 +66,18 @@ export function TermLockControl({ term, onUpdated }: { term: SchoolAdminData["te
       )}
 
       {modal === "lock" && (
-        <dialog open className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md bg-white p-6 shadow-xl space-y-4">
-            <h3 className="text-lg font-bold text-slate-900">Close & lock {term.name}</h3>
-            <p className="text-sm text-slate-600">
+        <dialog open className="ui-overlay fixed inset-0 m-auto max-h-[90dvh] w-[min(500px,calc(100%_-_32px))] overflow-y-auto rounded-card bg-surface p-0 shadow-overlay">
+          <div className="space-y-4 p-6">
+            <h3 className="text-lg font-bold text-ink">Close & lock {term.name}</h3>
+            <p className="text-sm text-secondary">
               Submit every recorded roll call and publish all assessments, grades and latest report cards for active students first. Closing then seals attendance and locks the gradebook.
             </p>
-            {error && <p role="alert" className="text-xs text-rose-700 bg-rose-50 p-2 border border-rose-200">{error}</p>}
+            {error && <p role="alert" className="rounded-control border border-danger/20 bg-danger-subtle p-3 text-xs text-danger">{error}</p>}
             <form onSubmit={handleLock} className="space-y-3">
-              <label className="block text-sm font-medium text-slate-700">
+              <label className="block text-sm font-medium text-ink">
                 Lock notes (optional)
                 <textarea
-                  className="mt-1 w-full border border-slate-300 p-2 text-sm"
+                  className="ui-field mt-1.5 w-full text-sm"
                   rows={3}
                   value={notes}
                   onChange={e => setNotes(e.target.value)}
@@ -86,7 +86,7 @@ export function TermLockControl({ term, onUpdated }: { term: SchoolAdminData["te
               </label>
               <div className="flex justify-end gap-2 pt-2">
                 <Button type="button" variant="secondary" onClick={() => setModal(null)} disabled={pending}>Cancel</Button>
-                <Button type="submit" disabled={pending} className="bg-amber-700 hover:bg-amber-800 text-white">
+                <Button type="submit" disabled={pending} className="min-h-11 bg-primary text-white hover:bg-primary-hover">
                   {pending ? "Locking…" : "Confirm close & lock"}
                 </Button>
               </div>
@@ -96,18 +96,18 @@ export function TermLockControl({ term, onUpdated }: { term: SchoolAdminData["te
       )}
 
       {modal === "unlock" && (
-        <dialog open className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="w-full max-w-md bg-white p-6 shadow-xl space-y-4">
-            <h3 className="text-lg font-bold text-slate-900">Unlock {term.name}</h3>
-            <p className="text-sm text-slate-600">
+        <dialog open className="ui-overlay fixed inset-0 m-auto max-h-[90dvh] w-[min(500px,calc(100%_-_32px))] overflow-y-auto rounded-card bg-surface p-0 shadow-overlay">
+          <div className="space-y-4 p-6">
+            <h3 className="text-lg font-bold text-ink">Unlock {term.name}</h3>
+            <p className="text-sm text-secondary">
               Reopening this term restores locked attendance sessions to their submitted or in-progress state. Gradebook changes will be allowed again. An audit trail reason is required.
             </p>
-            {error && <p role="alert" className="text-xs text-rose-700 bg-rose-50 p-2 border border-rose-200">{error}</p>}
+            {error && <p role="alert" className="rounded-control border border-danger/20 bg-danger-subtle p-3 text-xs text-danger">{error}</p>}
             <form onSubmit={handleUnlock} className="space-y-3">
-              <label className="block text-sm font-medium text-slate-700">
+              <label className="block text-sm font-medium text-ink">
                 Reason for unlocking *
                 <textarea
-                  className="mt-1 w-full border border-slate-300 p-2 text-sm"
+                  className="ui-field mt-1.5 w-full text-sm"
                   rows={3}
                   required
                   value={notes}
@@ -117,7 +117,7 @@ export function TermLockControl({ term, onUpdated }: { term: SchoolAdminData["te
               </label>
               <div className="flex justify-end gap-2 pt-2">
                 <Button type="button" variant="secondary" onClick={() => setModal(null)} disabled={pending}>Cancel</Button>
-                <Button type="submit" disabled={pending} className="bg-blue-700 hover:bg-blue-800 text-white">
+                <Button type="submit" disabled={pending} className="min-h-11 bg-primary text-white hover:bg-primary-hover">
                   {pending ? "Unlocking…" : "Confirm unlock"}
                 </Button>
               </div>
@@ -133,7 +133,7 @@ export function SubjectAssignmentRemove({ assignmentId, label, onRemoved }: { as
   const [pending, startTransition] = useTransition();
   const [error, setError] = useState("");
   const router = useRouter();
-  return <span className="inline-flex flex-col items-start gap-1"><Button variant="secondary" aria-label={`Remove ${label}`} className="min-h-11 border-red-200 text-red-800 hover:bg-red-50" disabled={pending}
+  return <span className="inline-flex flex-col items-start gap-1"><Button variant="secondary" aria-label={`Remove ${label}`} className="min-h-11 border-danger/20 text-danger hover:bg-danger-subtle" disabled={pending}
     onClick={() => {
       if (!window.confirm(`Remove the subject teacher assignment for ${label}?`)) return;
       setError("");
@@ -143,14 +143,14 @@ export function SubjectAssignmentRemove({ assignmentId, label, onRemoved }: { as
         onRemoved();
         router.refresh();
       });
-    }}>Remove</Button>{error && <span role="alert" className="text-xs text-red-700">{error}</span>}</span>;
+    }}>Remove</Button>{error && <span role="alert" className="text-xs text-danger">{error}</span>}</span>;
 }
 
 export function StaffAccessAction({ membershipId, staffName }: { membershipId: string; staffName: string }) {
   const [pending, startTransition] = useTransition();
   const [message, setMessage] = useState("");
   const router = useRouter();
-  return <span className="inline-flex flex-col items-start gap-1"><Button variant="secondary" className="min-h-11 border-red-200 text-red-800 hover:bg-red-50" disabled={pending}
+  return <span className="inline-flex flex-col items-start gap-1"><Button variant="secondary" className="min-h-11 border-danger/20 text-danger hover:bg-danger-subtle" disabled={pending}
     onClick={() => {
       if (!window.confirm(`Remove ${staffName}'s access to this school? Their school session will end. Their account and access to any other school will remain.`)) return;
       setMessage("");
@@ -160,5 +160,5 @@ export function StaffAccessAction({ membershipId, staffName }: { membershipId: s
         setMessage("School access removed.");
         router.refresh();
       });
-    }}>{pending ? "Removing…" : "Remove access"}</Button>{message && <span role="status" className="max-w-48 text-xs text-slate-600">{message}</span>}</span>;
+    }}>{pending ? "Removing…" : "Remove access"}</Button>{message && <span role="status" className="max-w-48 text-xs text-secondary">{message}</span>}</span>;
 }

@@ -58,55 +58,55 @@ export function AddAssessmentDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/50 p-4">
-      <div className="w-full max-w-md border border-slate-300 bg-white shadow-xl animate-in fade-in zoom-in-95 duration-150">
-        <div className="border-b border-slate-200 bg-slate-50 px-4 py-3">
-          <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="w-full max-w-md rounded-card border border-line-subtle bg-surface shadow-xl animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
+        <div className="border-b border-line-subtle bg-surface-subtle px-4 py-3">
+          <h2 className="text-xs font-bold uppercase tracking-wider text-ink">
             Create Course Assessment
           </h2>
-          <p className="mt-0.5 text-xs text-slate-500">
+          <p className="mt-0.5 text-xs text-secondary">
             Add a new quiz, assignment, examination, or capstone project to the gradebook.
           </p>
         </div>
 
         <form onSubmit={handleSubmit} className="p-4 space-y-3.5 text-xs">
           {error && (
-            <div className="border border-red-200 bg-red-50 p-2.5 text-xs text-red-800">
+            <div className="rounded-control border border-danger/20 bg-danger-subtle p-2.5 text-xs text-danger">
               {error}
             </div>
           )}
 
           <label className="block">
-            <span className="mb-1 block font-semibold text-slate-800">Assessment Title</span>
+            <span className="mb-1 block font-semibold text-secondary">Assessment Title</span>
             <input
               type="text"
               required
               placeholder="e.g. Unit 2 Quadratic Equations Exam"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="h-9 w-full border border-slate-300 bg-white px-3 focus:border-blue-600 focus:outline-none"
+              className="h-9 w-full rounded-control border border-line bg-surface px-3 text-xs text-ink focus:border-primary focus:outline-none"
             />
           </label>
 
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
-              <span className="mb-1 block font-semibold text-slate-800">Code / Identifier</span>
+              <span className="mb-1 block font-semibold text-secondary">Code / Identifier</span>
               <input
                 type="text"
                 required
                 placeholder="e.g. MATH-EX2"
                 value={code}
                 onChange={(e) => setCode(e.target.value)}
-                className="h-9 w-full border border-slate-300 bg-white px-3 font-mono uppercase focus:border-blue-600 focus:outline-none"
+                className="h-9 w-full rounded-control border border-line bg-surface px-3 font-mono uppercase text-xs text-ink focus:border-primary focus:outline-none"
               />
             </label>
 
             <label className="block">
-              <span className="mb-1 block font-semibold text-slate-800">Assessment Category</span>
+              <span className="mb-1 block font-semibold text-secondary">Assessment Category</span>
               <select
                 value={categoryId}
                 onChange={(e) => setCategoryId(e.target.value)}
-                className="h-9 w-full border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                className="h-9 w-full rounded-control border border-line bg-surface px-2 text-xs text-ink focus:border-primary focus:outline-none"
               >
                 {categories.map((c) => (
                   <option key={c.id} value={c.id}>
@@ -119,7 +119,7 @@ export function AddAssessmentDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
-              <span className="mb-1 block font-semibold text-slate-800">Max Possible Points</span>
+              <span className="mb-1 block font-semibold text-secondary">Max Possible Points</span>
               <input
                 type="number"
                 min={1}
@@ -127,35 +127,35 @@ export function AddAssessmentDialog({
                 required
                 value={maxScore}
                 onChange={(e) => setMaxScore(parseInt(e.target.value) || 100)}
-                className="h-9 w-full border border-slate-300 bg-white px-3 font-mono focus:border-blue-600 focus:outline-none"
+                className="h-9 w-full rounded-control border border-line bg-surface px-3 font-mono text-xs text-ink focus:border-primary focus:outline-none"
               />
             </label>
 
             <label className="block">
-              <span className="mb-1 block font-semibold text-slate-800">Due / Exam Date</span>
+              <span className="mb-1 block font-semibold text-secondary">Due / Exam Date</span>
               <input
                 type="date"
                 required
                 value={dateDue}
                 onChange={(e) => setDateDue(e.target.value)}
-                className="h-9 w-full border border-slate-300 bg-white px-3 focus:border-blue-600 focus:outline-none"
+                className="h-9 w-full rounded-control border border-line bg-surface px-3 text-xs text-ink focus:border-primary focus:outline-none"
               />
             </label>
           </div>
 
           <label className="block">
-            <span className="mb-1 block font-semibold text-slate-800">Initial Publication State</span>
+            <span className="mb-1 block font-semibold text-secondary">Initial Publication State</span>
             <select
               value={status}
               onChange={(e) => setStatus(e.target.value as "draft" | "published")}
-              className="h-9 w-full border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+              className="h-9 w-full rounded-control border border-line bg-surface px-2 text-xs text-ink focus:border-primary focus:outline-none"
             >
               <option value="draft">Draft (Private to Teachers & Staff)</option>
               <option value="published">Published (Visible in Guardian Portal & Transcripts)</option>
             </select>
           </label>
 
-          <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-3">
+          <div className="flex items-center justify-end gap-2 border-t border-line-subtle pt-3">
             <Button type="button" variant="secondary" onClick={onClose} disabled={loading}>
               Cancel
             </Button>

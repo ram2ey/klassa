@@ -89,7 +89,7 @@ export async function getTeacherData(section: string, sessionDate: string) {
   const relevantReportIds = section === "reports" ? reportRows.map(row => row.id) : section === "classes" ? publishedReports.map(row => row.id) : [];
   const reportSubjects = relevantReportIds.length ? await db.select().from(reportCardSubjectGrades)
     .where(and(eq(reportCardSubjectGrades.organizationId, org), inArray(reportCardSubjectGrades.reportCardId, relevantReportIds))) : [];
-  const loadedSessions = classIds.length && section === "attendance" ? await db.select().from(attendanceSessions)
+  const loadedSessions = classIds.length && ["overview", "attendance"].includes(section) ? await db.select().from(attendanceSessions)
     .where(and(eq(attendanceSessions.organizationId, org), inArray(attendanceSessions.classId, classIds), eq(attendanceSessions.sessionDate, sessionDate))) : [];
   const sessionRows = loadedSessions.filter(row => row.period === "morning_roll_call" ? homeroomIds.has(row.classId) :
     homeroomIds.has(row.classId) || assignments.some(item => item.classId === row.classId && item.subjectId !== null));

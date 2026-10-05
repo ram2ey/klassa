@@ -15,7 +15,7 @@ WORKDIR /app
 COPY drizzle.config.ts tsconfig.json ./
 COPY drizzle ./drizzle
 COPY src/db ./src/db
-COPY scripts/deploy-database.mjs scripts/deploy-migrate.sh ./scripts/
+COPY scripts/deploy-database.mjs scripts/bootstrap-admin.mjs scripts/database-security.sql scripts/deploy-migrate.sh ./scripts/
 CMD ["node", "scripts/deploy-database.mjs"]
 
 FROM dependencies AS sms-worker

@@ -60,6 +60,7 @@ test.afterAll(async () => {
     await tx`DELETE FROM audit_events WHERE organization_id = ${school}`;
     await tx`DELETE FROM subjects WHERE organization_id = ${school}`;
     await tx`DELETE FROM enrollments WHERE organization_id = ${school}`;
+    await tx`DELETE FROM guardian_consents WHERE organization_id = ${school}`;
     await tx`DELETE FROM student_guardians WHERE organization_id = ${school}`;
     await tx`DELETE FROM guardians WHERE organization_id = ${school}`;
     await tx`DELETE FROM students WHERE organization_id = ${school}`;
@@ -111,6 +112,13 @@ test("office staff see the roster without administrator navigation", async ({ pa
   await expect(page.getByText("Linked Pupil", { exact: true })).toBeVisible();
   await expect(page.getByText("Unrelated Pupil", { exact: true })).toBeVisible();
   await expect(page.getByRole("link", { name: "Staff & access", exact: true })).toHaveCount(0);
+  await page.goto("/?section=guardians");
+  await page.getByLabel("Receive school announcement SMS").uncheck();
+  await page.getByLabel("Guardian confirmation", { exact: true }).fill("Guardian requested an opt-out by phone during test");
+  await page.getByRole("button", { name: "Save SMS preferences" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "SMS preferences saved." })).toBeVisible();
+  const [choice] = await owner`SELECT opt_in_sms_announcements FROM guardian_consents WHERE guardian_id = ${guardian}`;
+  expect(choice.opt_in_sms_announcements).toBe(false);
 });
 
 test("teacher sees only pupils in assigned classes", async ({ page }) => {
@@ -118,6 +126,7 @@ test("teacher sees only pupils in assigned classes", async ({ page }) => {
   await page.getByRole("link", { name: "My classes", exact: true }).click();
   await expect(page.getByText("Linked Pupil", { exact: true })).toBeVisible();
   await expect(page.getByText("Unrelated Pupil", { exact: true })).toHaveCount(0);
+
 });
 
 test("guardian signs in to only their legally linked pupil", async ({ page }) => {
@@ -125,4 +134,10 @@ test("guardian signs in to only their legally linked pupil", async ({ page }) =>
   await expect(page.getByRole("heading", { name: "Your students", exact: true })).toBeVisible();
   await expect(page.getByRole("heading", { name: "Linked Pupil", exact: true })).toBeVisible();
   await expect(page.getByText("Unrelated Pupil", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("heading", { name: "School announcement SMS preferences" })).toBeVisible();
+  await page.getByLabel("Receive school announcement SMS").check();
+  await page.getByRole("button", { name: "Save SMS preferences" }).click();
+  await expect(page.getByRole("status").filter({ hasText: "SMS preferences saved." })).toBeVisible();
+  const [choice] = await owner`SELECT opt_in_sms_announcements FROM guardian_consents WHERE guardian_id = ${guardian}`;
+  expect(choice.opt_in_sms_announcements).toBe(true);
 });

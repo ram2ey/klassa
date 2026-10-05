@@ -1,13 +1,25 @@
 import { and, asc, desc, eq, gte, inArray, isNull, lte } from "drizzle-orm";
 import { db } from "@/db";
 import { academicYears, announcements, attendanceRecords, attendanceSessions, classes, classTimetablePeriods, courtRestrictions, enrollments, gradeLevels,
-  guardianAbsenceNotes, organizations, reportCardSubjectGrades, reportCards, studentGuardians, students, subjects, terms, users } from "@/db/schema";
+  guardianConsents, guardians, guardianAbsenceNotes, organizations, reportCardSubjectGrades, reportCards, studentGuardians, students, subjects, terms, users } from "@/db/schema";
 import { requireGuardian } from "@/lib/action-access";
 import { formatPeriodLabel, type TimetablePeriodItem } from "@/lib/timetable-service";
 
 export async function getGuardianPortalData() {
   const account = await requireGuardian();
   const guardianIds = account.guardians.map(guardian => guardian.id);
+  const preferenceRows = await db.select({ guardianId: guardians.id, schoolId: guardians.organizationId,
+    schoolName: organizations.name, announcements: guardianConsents.optInSmsAnnouncements })
+    .from(guardians).innerJoin(organizations, eq(organizations.id, guardians.organizationId))
+    .innerJoin(studentGuardians, and(eq(studentGuardians.guardianId, guardians.id),
+      eq(studentGuardians.organizationId, guardians.organizationId), eq(studentGuardians.hasLegalResponsibility, true)))
+    .leftJoin(guardianConsents, and(eq(guardianConsents.guardianId, guardians.id),
+      eq(guardianConsents.organizationId, guardians.organizationId)))
+    .where(and(eq(guardians.userId, account.userId), inArray(guardians.id, guardianIds)));
+  const smsPreferences = preferenceRows.filter((row, index, rows) =>
+    account.guardians.some(profile => profile.id === row.guardianId && profile.organizationId === row.schoolId) &&
+    rows.findIndex(other => other.guardianId === row.guardianId) === index)
+    .map(row => ({ ...row, announcements: row.announcements ?? true }));
   const linkedRows = await db.select({ guardianId: studentGuardians.guardianId, studentId: studentGuardians.studentId,
     organizationId: studentGuardians.organizationId, relationship: studentGuardians.relationship })
     .from(studentGuardians).innerJoin(students, and(eq(students.id, studentGuardians.studentId),
@@ -27,7 +39,7 @@ export async function getGuardianPortalData() {
     order.organizationId === link.organizationId && (!order.guardianId || order.guardianId === link.guardianId) &&
     order.effectiveDate <= today && (!order.expirationDate || order.expirationDate >= today)));
   const studentIds = [...new Set(legalLinks.map(link => link.studentId))];
-  if (!studentIds.length) return { guardianName: account.name, students: [], announcements: [] };
+  if (!studentIds.length) return { guardianName: account.name, smsPreferences, students: [], announcements: [] };
 
   const orgIds = [...new Set(legalLinks.map(link => link.organizationId))];
   const [studentRows, schoolRows, yearRows, classRows, gradeRows, termRows, enrollmentRows] = await Promise.all([
@@ -144,7 +156,7 @@ export async function getGuardianPortalData() {
   })).map(notice => ({ id: notice.id, title: notice.title, content: notice.content, priority: notice.priority,
     publishedAt: notice.publishedAt, schoolName: schoolRows.find(school => school.id === notice.organizationId)?.name ?? "School" }));
 
-  return { guardianName: account.name, students: studentsWithDetails, announcements: visibleNotices };
+  return { guardianName: account.name, smsPreferences, students: studentsWithDetails, announcements: visibleNotices };
 }
 
 export type GuardianPortalData = Awaited<ReturnType<typeof getGuardianPortalData>>;

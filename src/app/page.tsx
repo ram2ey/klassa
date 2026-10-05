@@ -64,5 +64,5 @@ export default async function Home({ searchParams }: { searchParams: Promise<{ s
   }
   return <><main className="mx-auto max-w-xl space-y-4 p-6"><h1 className="text-xl font-bold">Your school account is ready</h1>
       <p>Your membership is active. Live workflows for your role are still being connected.</p>
-      <Link href="/schools" className="text-blue-700 underline">Choose another school</Link><AccountSignOut /></main><SchoolNoticeBoard notices={await getStaffAnnouncements()} /></>;
+      <Link href="/schools" className="text-primary underline">Choose another school</Link><AccountSignOut /></main><SchoolNoticeBoard notices={await getStaffAnnouncements()} /></>;
 }

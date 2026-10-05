@@ -1,5 +1,7 @@
 "use client";
-import Link from "next/link";
+import { AdministratorOverview } from "@/components/school-overviews";
+import { GuardianDirectory } from "@/components/people-directories";
+import { GuardianSmsPreferences } from "@/components/guardian-sms-preferences";
 import { type SchoolAdminData } from "@/lib/school-admin-data";
 import { type SchoolWorkflowData } from "@/lib/school-workflow-data";
 import { type SchoolGdprData } from "@/lib/school-gdpr-data";
@@ -7,10 +9,11 @@ import { sections, type Editor, panelStyle, words } from "@/components/school-ad
 import { useState } from "react";
 import { SCHOOL_TIME_ZONE, formatGMTDateTime, SCHOOL_TIME_ZONE_LABEL } from "@/lib/timezone";
 import { Button } from "@/components/ui/button";
-import { Plus, X, Menu, ChevronRight, Search, GraduationCap, Users, ClipboardList, UsersRound, ShieldAlert, ClipboardCheck, CalendarDays, Check, FileClock, Lock, Unlock } from "lucide-react";
-import { AccountSignOut } from "@/components/account-sign-out";
+import { Plus, X, Search, Lock, Unlock } from "lucide-react";
+import { WorkspaceShell } from "@/components/workspace-shell";
+import { groupWorkspaceNavigation } from "@/components/workspace-navigation";
 import { SchoolAdminWorkflows } from "@/components/school-admin-workflows";
-import { Metric, PanelHeading, Empty, DataTable, Status } from "@/components/school-admin/ui";
+import { PanelHeading, DataTable, Status } from "@/components/school-admin/ui";
 import { SchoolAdminStudentDirectory } from "@/components/school-admin-student-directory";
 import { StudentCsvImport } from "@/components/student-csv-import";
 import { GuardianPortalAccess } from "@/components/guardian-portal-access";
@@ -23,19 +26,10 @@ import { StudentEnrollmentFlow } from "@/components/student-enrollment-flow";
 export function SchoolAdminWorkspace({ data, workflow, gdpr, section, date: selectedDate }: { data: SchoolAdminData; workflow?: SchoolWorkflowData; gdpr?: SchoolGdprData; section: string; date?: string }) {
   const current = sections.find(item => item.id === section) ?? sections[0];
   const [query, setQuery] = useState("");
-  const [mobileNav, setMobileNav] = useState(false);
   const [editor, setEditor] = useState<Editor | null>(null);
   const [showEnrollment, setShowEnrollment] = useState(false);
   const [notice, setNotice] = useState("");
   const currentYear = data.years.find(year => year.isCurrent);
-  const attendanceTotals = data.attendanceSummary.reduce((totals, row) => ({
-    marks: totals.marks + Number(row.total),
-    attended: totals.attended + Number(row.attended),
-    absent: totals.absent + Number(row.absent),
-  }), { marks: 0, attended: 0, absent: 0 });
-  const attendanceRate = attendanceTotals.marks ? `${Math.round(attendanceTotals.attended / attendanceTotals.marks * 100)}%` : "—";
-  const alertedStudents = new Set(data.activeAlerts.map(alert => alert.studentId)).size;
-  const restrictedStudents = new Set(data.activeRestrictions.map(restriction => restriction.studentId)).size;
   const date = (value: string | Date) => new Intl.DateTimeFormat("en-GH", { dateStyle: "medium", timeZone: SCHOOL_TIME_ZONE }).format(new Date(value));
   const matches = (...values: unknown[]) => values.join(" ").toLowerCase().includes(query.toLowerCase());
   const yearName = (id: string) => data.years.find(year => year.id === id)?.name ?? "Unknown year";
@@ -46,78 +40,32 @@ export function SchoolAdminWorkspace({ data, workflow, gdpr, section, date: sele
   const add = (kind: Editor["kind"], title: string) => <Button aria-label={title} className="min-h-11" onClick={() => edit(kind, title)}><Plus size={16} />{title}</Button>;
   const editButton = (kind: Editor["kind"], title: string, values: NonNullable<Editor["values"]>) => <Button variant="secondary" aria-label={title} className="min-h-11" onClick={() => edit(kind, title, values)}>Edit</Button>;
 
-  return <div className="min-h-screen bg-slate-50 text-slate-900 lg:grid lg:grid-cols-[240px_minmax(0,1fr)]">
-    <a href="#school-content" className="sr-only z-50 bg-white p-3 focus:not-sr-only focus:fixed">Skip to content</a>
-    <aside className="border-b border-slate-200 bg-slate-950 text-slate-300 lg:sticky lg:top-0 lg:flex lg:h-screen lg:flex-col lg:border-b-0">
-      <div className="flex min-h-20 items-center justify-between border-b border-white/10 px-5">
-        <Link href="/" className="flex items-center gap-3 text-white"><span className="grid h-9 w-9 place-items-center bg-blue-600 text-lg font-bold">K</span><span><span className="block text-lg font-bold">Klassa</span><span className="block text-[10px] font-semibold uppercase tracking-[.16em] text-slate-400">School workspace</span></span></Link>
-        <button className="grid h-11 w-11 place-items-center lg:hidden" aria-label={mobileNav ? "Close navigation" : "Open navigation"} aria-expanded={mobileNav} aria-controls="school-nav" onClick={() => setMobileNav(!mobileNav)}>{mobileNav ? <X size={20} /> : <Menu size={20} />}</button>
-      </div>
-      <nav id="school-nav" aria-label="School navigation" className={`${mobileNav ? "block" : "hidden"} flex-1 p-3 lg:block`}>
-        <p className="px-3 pb-2 pt-4 text-[10px] font-semibold uppercase tracking-[.15em] text-slate-500">Your school</p>
-        {sections.map(item => { const Icon = item.icon; return <Link key={item.id} href={`/?section=${item.id}`} aria-current={current.id === item.id ? "page" : undefined} onClick={() => { setQuery(""); setMobileNav(false); setNotice(""); }} className={`mb-1 flex min-h-11 items-center gap-3 px-3 text-sm font-medium ${current.id === item.id ? "bg-blue-600 text-white" : "hover:bg-white/5 hover:text-white"}`}><Icon size={18} /><span className="flex-1">{item.label}</span>{current.id === item.id && <ChevronRight size={14} />}</Link>; })}
-      </nav>
-      <div className="hidden border-t border-white/10 p-5 lg:block"><p className="text-sm font-semibold text-white">{data.actor.name}</p><p className="mt-1 text-xs text-slate-400">School administrator</p><Link href="/schools" className="mt-4 inline-flex min-h-11 items-center text-xs text-blue-300 hover:text-white">Switch school <ChevronRight size={14} /></Link></div>
-    </aside>
+  return <><WorkspaceShell schoolName={data.school.name} academicYear={currentYear?.name ?? "Academic year not set"} actorName={data.actor.name} roleLabel="School administrator" navigationLabel="School navigation" groups={groupWorkspaceNavigation(sections)} activeId={current.id} contentId="school-content" switchSchoolHref="/schools" onNavigate={() => { setQuery(""); setNotice(""); }}>
 
-    <div className="min-w-0">
-      <header className="flex min-h-20 flex-wrap items-center justify-between gap-3 border-b border-slate-200 bg-white px-5 py-4 sm:px-8">
-        <div><p className="text-[10px] font-semibold uppercase tracking-[.14em] text-blue-700">{currentYear?.name ?? "Academic year not set"}</p><p className="mt-1 font-bold">{data.school.name}</p></div>
-        <div className="flex items-center gap-3"><span className="hidden border border-slate-200 px-3 py-1.5 text-xs text-slate-600 sm:inline">Tenant: {data.school.slug}</span><Link href="/schools" className="text-xs text-blue-700 lg:hidden">Switch school</Link><AccountSignOut /></div>
-      </header>
-      <main id="school-content" className="mx-auto max-w-[1500px] space-y-6 p-4 sm:p-8">
-        <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-medium text-slate-500">School administration</p><h1 className="mt-1 text-2xl font-bold tracking-tight">{current.label}</h1></div>
-          {!["overview", "settings", "attendance", "gradebook", "reports", "behaviour", "communications", "sensitive"].includes(current.id) && <label className="relative block"><span className="sr-only">Search {current.label}</span><Search size={16} className="absolute left-3 top-3.5 text-slate-400" /><input value={query} onChange={event => setQuery(event.target.value)} placeholder={`Search ${current.label.toLowerCase()}`} className="min-h-11 w-72 max-w-full border border-slate-300 bg-white pl-9 pr-3 text-sm" /></label>}
-        </div>
+        {current.id !== "overview" && <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-medium text-secondary">School administration</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-ink">{current.label}</h1></div>
+          {!["students", "guardians", "overview", "settings", "attendance", "gradebook", "reports", "behaviour", "communications", "sensitive"].includes(current.id) && <label className="relative block"><span className="sr-only">Search {current.label}</span><Search size={16} className="absolute left-3 top-3.5 text-muted" /><input value={query} onChange={event => setQuery(event.target.value)} placeholder={`Search ${current.label.toLowerCase()}`} className="ui-field min-h-11 w-72 max-w-full pl-9 pr-3 text-sm" /></label>}
+        </div>}
         {notice && <div role="status" className="flex items-start justify-between gap-4 border border-emerald-200 bg-emerald-50 p-4 text-sm text-emerald-800"><span>{notice}</span><button aria-label="Dismiss notification" onClick={() => setNotice("")}><X size={18} /></button></div>}
         {workflow && ["attendance", "gradebook", "reports", "behaviour", "communications", "sensitive"].includes(current.id) && <SchoolAdminWorkflows section={current.id} date={selectedDate ?? new Date().toISOString().slice(0, 10)} base={data} data={workflow} />}
 
-        {current.id === "overview" && <>
-          <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-            <Metric label="Students" value={data.students.length} detail={`${data.students.filter(student => student.status === "active").length} active students`} icon={<GraduationCap size={22} />} />
-            <Metric label="Staff" value={data.staff.length} detail={`${data.staff.filter(member => member.role === "teacher").length} teachers`} icon={<Users size={22} />} />
-            <Metric label="Classes" value={data.classes.filter(item => item.academicYearId === currentYear?.id).length} detail={currentYear?.name ?? "Choose a current academic year"} icon={<ClipboardList size={22} />} />
-            <Metric label="Guardians" value={data.guardians.length} detail={`${new Set(data.links.map(link => link.studentId)).size} students with linked guardians`} icon={<UsersRound size={22} />} />
-            <Metric label="Active alerts" value={data.activeAlerts.length} detail={`${alertedStudents} student${alertedStudents === 1 ? "" : "s"} with staff directives`} icon={<ShieldAlert size={22} />} />
-            <Metric label="Current restrictions" value={data.activeRestrictions.length} detail={`${restrictedStudents} student${restrictedStudents === 1 ? "" : "s"} with court restrictions`} icon={<ShieldAlert size={22} />} />
-            <Metric label="Attendance rate" value={attendanceRate} detail={attendanceTotals.marks ? `Across ${attendanceTotals.marks} submitted or locked marks` : "No submitted attendance marks yet"} icon={<ClipboardCheck size={22} />} />
-            <Metric label="Unexcused absences" value={attendanceTotals.absent} detail="Across submitted or locked attendance marks" icon={<CalendarDays size={22} />} />
-          </div>
-          <section className={panelStyle}><PanelHeading title="Guardian absence notes" description="Recent submissions and unresolved notes across the school." />
-            <div className="p-5 text-sm"><p className="font-semibold">{data.absenceNotes?.filter(note => note.status === "submitted").length ?? 0} awaiting office review</p>
-              <ul className="mt-3 divide-y divide-slate-100">{data.absenceNotes?.slice(0, 10).map(note => <li key={note.id} className="flex flex-wrap justify-between gap-2 py-2"><span>{studentName(note.studentId)} · {note.absenceDate} · {words(note.reasonCategory)}</span><span className="font-medium">{words(note.status)}</span></li>)}</ul>
-              {!data.absenceNotes?.length && <p className="mt-2 text-slate-500">No guardian absence notes have been submitted.</p>}</div></section>
-          <div className="grid gap-6 xl:grid-cols-[1fr_1.4fr]">
-            <section className={panelStyle}><PanelHeading title="School setup" description="Build the foundations for your school year." />
-              <div className="divide-y divide-slate-100">{[
-                { label: "Set the current academic year", done: !!currentYear, section: "academic" },
-                { label: "Add grades and classes", done: data.classes.some(item => item.academicYearId === currentYear?.id), section: "classes" },
-                { label: "Create staff accounts", done: data.staff.length > 1, section: "staff" },
-                { label: "Enroll your students", done: data.students.length > 0, section: "students" },
-                { label: "Link guardian contacts", done: data.links.length > 0, section: "guardians" },
-              ].map((step, index) => <Link href={`/?section=${step.section}`} key={step.section} className="flex min-h-16 items-center gap-3 px-5 py-3 hover:bg-slate-50"><span className={`grid h-7 w-7 shrink-0 place-items-center text-xs font-bold ${step.done ? "bg-emerald-50 text-emerald-700" : "bg-slate-100 text-slate-500"}`}>{step.done ? <Check size={16} aria-label="Complete" /> : index + 1}</span><span className="flex-1 text-sm font-medium">{step.label}</span><ChevronRight size={16} className="text-slate-400" /></Link>)}</div>
-            </section>
-            <section className={panelStyle}><PanelHeading title="Recent activity" description="The latest changes made in your school." action={<Link className="text-xs font-semibold text-blue-700" href="/?section=audit">View history</Link>} />
-              {data.audit.length ? <div className="divide-y divide-slate-100">{data.audit.slice(0, 6).map(event => <div key={event.id} className="flex items-start gap-3 px-5 py-4"><FileClock size={18} className="mt-0.5 shrink-0 text-slate-400" /><div className="min-w-0 flex-1"><p className="text-sm font-semibold">{words(event.action.replaceAll(".", " "))}</p><p className="mt-1 text-xs text-slate-500">{event.actorName ?? "System"}</p></div><span className="text-xs text-slate-500">{date(event.createdAt)}</span></div>)}</div> : <Empty text="Your school's activity will appear here as you set things up." />}
-            </section>
-          </div>
-          <section className={`${panelStyle} flex flex-wrap items-center justify-between gap-4 p-5`}><div><h2 className="font-bold">Ready for the next school day</h2><p className="mt-1 text-sm text-slate-500">Keep your student directory, class assignments and contact records up to date.</p></div><Link href="/?section=students" className="inline-flex min-h-11 items-center gap-2 bg-blue-700 px-4 text-sm font-semibold text-white">Open student directory <ChevronRight size={16} /></Link></section>
-        </>}
+        {current.id === "overview" && <AdministratorOverview data={data} onEnroll={() => setShowEnrollment(true)} />}
 
         {current.id === "students" && <div className="space-y-6">
-          <SchoolAdminStudentDirectory data={data} query={query} currentYearId={currentYear?.id} onEnroll={() => setShowEnrollment(true)}
+          <SchoolAdminStudentDirectory data={data} query={query} onQueryChange={setQuery} currentYearId={currentYear?.id} onEnroll={() => setShowEnrollment(true)}
             onEdit={(student, classId) => edit("student", `Edit ${student.firstName} ${student.lastName}`, { id: student.id, firstName: student.firstName, lastName: student.lastName, dateOfBirth: student.dateOfBirth, status: student.status, classId })} />
           <StudentCsvImport />
         </div>}
 
-        {current.id === "guardians" && <div className="space-y-6"><section className={panelStyle}><PanelHeading title="Guardian contacts" description="Contact records for parents and guardians." action={add("guardian", "Add guardian")} />
-          <DataTable caption="Guardian contacts" headers={["Name", "Email", "Phone", "Linked students", "Actions"]} rows={data.guardians.filter(guardian => matches(guardian.firstName, guardian.lastName, guardian.email, guardian.phone)).map(guardian => ({ key: guardian.id, cells: [<strong key="name">{guardian.firstName} {guardian.lastName}</strong>, guardian.email ?? "Not provided", guardian.phone ?? "Not provided", data.links.filter(link => link.guardianId === guardian.id).map(link => studentName(link.studentId)).join(", ") || "None linked", <div key="actions" className="flex flex-wrap gap-2">{editButton("guardian", `Edit ${guardian.firstName} ${guardian.lastName}`, { id: guardian.id, firstName: guardian.firstName, lastName: guardian.lastName, email: guardian.email, phone: guardian.phone })}<GuardianPortalAccess guardianId={guardian.id} guardianName={`${guardian.firstName} ${guardian.lastName}`} enabled={!!guardian.userId} eligible={data.links.some(link => link.guardianId === guardian.id && link.hasLegalResponsibility)} /></div>] }))} empty="No guardian contacts match this view." />
-        </section><section className={panelStyle}><PanelHeading title="Student relationships" description="Set each contact's relationship and responsibility for a student." action={add("guardian_link", "Link guardian")} />
+        {current.id === "guardians" && <GuardianSmsPreferences staff profiles={data.guardians.filter(guardian => data.links.some(link => link.guardianId === guardian.id && link.hasLegalResponsibility)).map(guardian => ({
+          guardianId: guardian.id, schoolId: data.school.id, label: `${guardian.firstName} ${guardian.lastName}`,
+          announcements: data.smsPreferences.find(preference => preference.guardianId === guardian.id)?.announcements ?? true,
+        }))} />}
+        {current.id === "guardians" && <div className="space-y-6"><GuardianDirectory guardians={data.guardians} students={data.students} links={data.links} query={query} onQueryChange={setQuery} onAdd={() => edit("guardian", "Add guardian")} renderActions={id => { const guardian = data.guardians.find(row => row.id === id)!; return <>{editButton("guardian", `Edit ${guardian.firstName} ${guardian.lastName}`, { id: guardian.id, firstName: guardian.firstName, lastName: guardian.lastName, email: guardian.email, phone: guardian.phone })}<GuardianPortalAccess guardianId={guardian.id} guardianName={`${guardian.firstName} ${guardian.lastName}`} enabled={!!guardian.userId} eligible={data.links.some(link => link.guardianId === guardian.id && link.hasLegalResponsibility)} /></>; }} /><section className={panelStyle}><PanelHeading title="Student relationships" description="Set each contact's relationship and responsibility for a student." action={add("guardian_link", "Link guardian")} />
           <DataTable caption="Student guardian relationships" headers={["Student", "Guardian", "Relationship", "Primary contact", "Legal responsibility", "Actions"]} rows={data.links.filter(link => matches(studentName(link.studentId), guardianName(link.guardianId))).map(link => ({ key: link.id, cells: [studentName(link.studentId), guardianName(link.guardianId), words(link.relationship), link.isPrimary ? "Yes" : "No", link.hasLegalResponsibility ? "Yes" : "No", editButton("guardian_link", "Edit relationship", { studentId: link.studentId, guardianId: link.guardianId, relationship: link.relationship, isPrimary: link.isPrimary, hasLegalResponsibility: link.hasLegalResponsibility })] }))} empty="Add a student and a guardian, then link them here." />
         </section></div>}
 
         {current.id === "staff" && <section className={panelStyle}><PanelHeading title="Staff directory" description="Create accounts, review sign-in security, and manage school access." action={add("staff", "Create staff account")} />
-          <DataTable caption="School staff" headers={["Name", "Login tenant / username", "School role", "Account setup", "Two-factor", "Actions"]} rows={data.staff.filter(member => matches(member.name, member.username, member.role)).map(member => ({ key: member.id, cells: [<strong key="name">{member.name}{member.userId === data.actor.userId && <span className="ml-2 text-xs font-normal text-slate-500">You</span>}</strong>, member.username?.replace(":", " / ") ?? "Not assigned", words(member.role), <Status key="setup" value={member.mustChangePassword ? "password change due" : "ready"} />, <Status key="mfa" value={member.twoFactorEnabled ? "enabled" : "not enabled"} />, member.userId === data.actor.userId ? <span key="own" className="text-xs text-slate-500">Your account</span> : <div key="actions" className="flex flex-wrap gap-2">{editButton("staff_role", `Change role for ${member.name}`, { membershipId: member.id, role: member.role })}<StaffAccessAction membershipId={member.id} staffName={member.name} /></div>] }))} empty="No staff match your search." />
+          <DataTable caption="School staff" headers={["Name", "Login tenant / username", "School role", "Account setup", "Two-factor", "Actions"]} rows={data.staff.filter(member => matches(member.name, member.username, member.role)).map(member => ({ key: member.id, cells: [<strong key="name">{member.name}{member.userId === data.actor.userId && <span className="ml-2 text-xs font-normal text-secondary">You</span>}</strong>, member.username?.replace(":", " / ") ?? "Not assigned", words(member.role), <Status key="setup" value={member.mustChangePassword ? "password change due" : "ready"} />, <Status key="mfa" value={member.twoFactorEnabled ? "enabled" : "not enabled"} />, member.userId === data.actor.userId ? <span key="own" className="text-xs text-secondary">Your account</span> : <div key="actions" className="flex flex-wrap gap-2">{editButton("staff_role", `Change role for ${member.name}`, { membershipId: member.id, role: member.role })}<StaffAccessAction membershipId={member.id} staffName={member.name} /></div>] }))} empty="No staff match your search." />
         </section>}
 
         {current.id === "classes" && <div className="space-y-6"><section className={panelStyle}><PanelHeading title="Classes" description="Organize classes by year and grade, and assign homeroom teachers." action={add("class", "Add class")} />
@@ -162,14 +110,13 @@ export function SchoolAdminWorkspace({ data, workflow, gdpr, section, date: sele
         </section>}
 
         {current.id === "settings" && <div className="space-y-6"><section className={`${panelStyle} max-w-3xl`}><PanelHeading title="School details" description="Manage your school's name. The timezone is fixed at GMT." action={<Button variant="secondary" className="min-h-11" onClick={() => edit("settings", "Edit school settings", { name: data.school.name })}>Edit settings</Button>} />
-          <dl className="grid gap-6 p-5 sm:grid-cols-2">{[["School name", data.school.name], ["Tenant ID", data.school.slug], ["Timezone", SCHOOL_TIME_ZONE_LABEL], ["Current academic year", currentYear?.name ?? "Not set"]].map(([label, value]) => <div key={label}><dt className="text-xs font-semibold uppercase tracking-wide text-slate-500">{label}</dt><dd className="mt-2 font-medium">{value}</dd></div>)}</dl>
-          <p className="border-t border-slate-200 px-5 py-4 text-sm text-slate-500">Your tenant ID is used to sign in. Contact your platform administrator if it needs to change.</p>
+          <dl className="grid gap-6 p-5 sm:grid-cols-2">{[["School name", data.school.name], ["Tenant ID", data.school.slug], ["Timezone", SCHOOL_TIME_ZONE_LABEL], ["Current academic year", currentYear?.name ?? "Not set"]].map(([label, value]) => <div key={label}><dt className="text-xs font-semibold uppercase tracking-wide text-secondary">{label}</dt><dd className="mt-2 font-medium">{value}</dd></div>)}</dl>
+          <p className="border-t border-line-subtle px-5 py-4 text-sm text-secondary">Your tenant ID is used to sign in. Contact your platform administrator if it needs to change.</p>
         </section>{gdpr && <SchoolAdminGdprPanel data={gdpr} students={data.students} />}</div>}
-      </main>
-    </div>
+    </WorkspaceShell>
     {editor && <RecordEditor editor={editor} data={data} onClose={() => setEditor(null)} onSaved={message => { setNotice(message); setEditor(null); }} />}
     {showEnrollment && <StudentEnrollmentFlow classes={data.classes.filter(item => item.academicYearId === currentYear?.id).map(item => ({ id: item.id, label: `${gradeName(item.gradeLevelId)} / ${item.name}` }))}
       existingGuardians={data.guardians.map(item => ({ id: item.id, label: `${item.firstName} ${item.lastName}${item.email ? ` · ${item.email}` : ""}` }))}
       onClose={() => setShowEnrollment(false)} onSaved={message => { setNotice(message); setShowEnrollment(false); }} />}
-  </div>;
+  </>;
 }

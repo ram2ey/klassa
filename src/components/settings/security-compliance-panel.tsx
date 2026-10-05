@@ -9,8 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import type { RestoreDrillRecord } from "@/lib/drills";
 import { executeRestoreDrill } from "@/lib/drills";
-import { getRateLimitMetrics } from "@/lib/rate-limit";
-import { runCryptoSelfTest } from "@/lib/monitoring";
+import { RATE_LIMIT_TIERS } from "@/lib/rate-limit";
 
 interface SecurityCompliancePanelProps {
   initialDrills: RestoreDrillRecord[];
@@ -24,13 +23,26 @@ export function SecurityCompliancePanel({
   currentUserName,
 }: SecurityCompliancePanelProps) {
   const [drills, setDrills] = useState<RestoreDrillRecord[]>(initialDrills);
-  const [cryptoHealthy, setCryptoHealthy] = useState<boolean>(true);
+  const [cryptoHealthy, setCryptoHealthy] = useState<boolean | null>(null);
+  const [isTestingCrypto, setIsTestingCrypto] = useState(false);
   const [isSimulatingDrill, setIsSimulatingDrill] = useState(false);
-  const [rateLimitStats, setRateLimitStats] = useState(getRateLimitMetrics());
 
-  const handleTestCrypto = () => {
-    const ok = runCryptoSelfTest();
-    setCryptoHealthy(ok);
+  const handleTestCrypto = async () => {
+    setIsTestingCrypto(true);
+    try {
+      const cryptoApi = window.crypto?.subtle;
+      if (!cryptoApi) throw new Error("Web Crypto is unavailable");
+      const key = await cryptoApi.generateKey({ name: "AES-GCM", length: 256 }, true, ["encrypt", "decrypt"]);
+      const iv = window.crypto.getRandomValues(new Uint8Array(12));
+      const payload = new TextEncoder().encode("Klassa Web Crypto check");
+      const encrypted = await cryptoApi.encrypt({ name: "AES-GCM", iv }, key, payload);
+      const decrypted = await cryptoApi.decrypt({ name: "AES-GCM", iv }, key, encrypted);
+      setCryptoHealthy(new TextDecoder().decode(decrypted) === "Klassa Web Crypto check");
+    } catch {
+      setCryptoHealthy(false);
+    } finally {
+      setIsTestingCrypto(false);
+    }
   };
 
   const handleRunRestoreDrill = () => {
@@ -51,26 +63,22 @@ export function SecurityCompliancePanel({
     }, 600);
   };
 
-  const handleRefreshMetrics = () => {
-    setRateLimitStats(getRateLimitMetrics());
-  };
-
   return (
     <div className="space-y-6">
       {/* Top Banner */}
-      <div className="flex items-start justify-between rounded-xs border border-slate-300 bg-white p-4 shadow-xs">
+      <div className="flex items-start justify-between rounded-card border border-line-subtle bg-surface p-4 shadow-card">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <ShieldCheck size={20} className="text-blue-700" weight="bold" />
-            <h2 className="text-base font-bold text-slate-900">
+            <ShieldCheck size={20} className="text-primary" weight="bold" />
+            <h2 className="text-base font-bold text-ink">
               Security Compliance & OWASP ASVS Level 2 Verification
             </h2>
-            <span className="rounded-xs border border-emerald-200 bg-emerald-50 px-2 py-0.5 text-[10px] font-bold text-emerald-800">
-              VERIFIED COMPLIANT
+            <span className="rounded-control border border-line-subtle bg-surface-subtle px-2 py-0.5 text-[10px] font-bold text-secondary">
+              POLICY OVERVIEW
             </span>
           </div>
-          <p className="text-xs text-slate-600">
-            Real-time status of cryptographic primitives, HTTP defense-in-depth headers, sliding-window rate limiters, and monthly disaster recovery drills.
+          <p className="text-xs text-secondary">
+            Overview of configured security controls. This preview does not verify the live deployment or run an actual restore.
           </p>
         </div>
 
@@ -79,10 +87,11 @@ export function SecurityCompliancePanel({
             variant="secondary"
             size="sm"
             onClick={handleTestCrypto}
+            disabled={isTestingCrypto}
             className="gap-1.5 text-xs"
           >
             <ArrowClockwise size={14} weight="bold" />
-            Test AES-256-GCM
+            {isTestingCrypto ? "Testing browser crypto..." : "Test browser AES-GCM"}
           </Button>
 
           <Button
@@ -92,7 +101,7 @@ export function SecurityCompliancePanel({
             className="gap-1.5 text-xs"
           >
             <Play size={14} weight="bold" />
-            {isSimulatingDrill ? "Restoring Staging..." : "Execute Restore Drill"}
+            {isSimulatingDrill ? "Simulating drill..." : "Simulate Restore Drill"}
           </Button>
         </div>
       </div>
@@ -100,70 +109,63 @@ export function SecurityCompliancePanel({
       {/* Security Status Cards */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         {/* Card 1: Cryptographic Health */}
-        <div className="border border-slate-200 bg-white p-4 space-y-2 rounded-xs">
+        <div className="rounded-card border border-line-subtle bg-surface p-4 shadow-card space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase text-slate-500">Cryptographic Subsystem</span>
+            <span className="text-[11px] font-bold uppercase text-muted">Cryptographic Subsystem</span>
             <Badge tone={cryptoHealthy ? "green" : "amber"}>
-              {cryptoHealthy ? "AES-256-GCM OK" : "Cipher Error"}
+              {cryptoHealthy === null ? "Not tested" : cryptoHealthy ? "API available" : "API unavailable"}
             </Badge>
           </div>
-          <div className="text-lg font-bold text-slate-900 flex items-center gap-1.5">
-            <LockKey size={20} className="text-blue-700" />
-            Authenticated Cipher
+          <div className="text-lg font-bold text-ink flex items-center gap-1.5">
+            <LockKey size={20} className="text-primary" />
+            Browser Web Crypto
           </div>
-          <p className="text-[11px] text-slate-600 leading-relaxed">
-            Key derivation: SHA-256 (256-bit). Unique 12-byte IV per record with 16-byte GCM authentication tag for tamper detection.
+          <p className="text-[11px] text-secondary leading-relaxed">
+            This check uses a temporary in-memory key to confirm browser AES-GCM support. It does not inspect the school server&apos;s encryption key.
           </p>
         </div>
 
         {/* Card 2: HTTP Security Headers */}
-        <div className="border border-slate-200 bg-white p-4 space-y-2 rounded-xs">
+        <div className="rounded-card border border-line-subtle bg-surface p-4 shadow-card space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase text-slate-500">HTTP Transport Defense</span>
+            <span className="text-[11px] font-bold uppercase text-muted">HTTP Transport Defense</span>
             <Badge tone="green">All 8 Headers Enforced</Badge>
           </div>
-          <div className="text-lg font-bold text-slate-900 flex items-center gap-1.5">
+          <div className="text-lg font-bold text-ink flex items-center gap-1.5">
             <ShieldCheck size={20} className="text-emerald-700" />
             Strict Headers & CSP
           </div>
-          <p className="text-[11px] text-slate-600 leading-relaxed">
+          <p className="text-[11px] text-secondary leading-relaxed">
             HSTS (2-year preload), strict Content-Security-Policy (CSP), COOP/CORP isolation, and X-Frame-Options DENY.
           </p>
         </div>
 
         {/* Card 3: Rate Limiting Metrics */}
-        <div className="border border-slate-200 bg-white p-4 space-y-2 rounded-xs">
+        <div className="rounded-card border border-line-subtle bg-surface p-4 shadow-card space-y-2">
           <div className="flex items-center justify-between">
-            <span className="text-[11px] font-bold uppercase text-slate-500">Sliding Window Limiter</span>
+            <span className="text-[11px] font-bold uppercase text-muted">Sliding Window Limiter</span>
             <div className="flex items-center gap-1.5">
-              <button
-                type="button"
-                onClick={handleRefreshMetrics}
-                className="text-[10px] text-blue-700 hover:underline cursor-pointer"
-              >
-                Refresh
-              </button>
-              <Badge tone="blue">4 Tiers Active</Badge>
+              <Badge tone="primary">{Object.keys(RATE_LIMIT_TIERS).length} tiers configured</Badge>
             </div>
           </div>
-          <div className="text-lg font-bold text-slate-900 flex items-center gap-1.5">
-            <Clock size={20} className="text-slate-700" />
-            {rateLimitStats.activeTrackedKeys} Active Buckets
+          <div className="text-lg font-bold text-ink flex items-center gap-1.5">
+            <Clock size={20} className="text-secondary" />
+            Rate Limit Policy
           </div>
-          <p className="text-[11px] text-slate-600 leading-relaxed">
-            Auth: 5 req/15m. Sensitive Decrypt: 10 req/1m. API: 60 req/1m. General: 120 req/1m. {rateLimitStats.totalViolationsRecorded} total violations logged.
+          <p className="text-[11px] text-secondary leading-relaxed">
+            Auth: 5 req/15m. Sensitive Decrypt: 10 req/1m. API: 60 req/1m. General: 120 req/1m. These are configured limits; live request counts are not shown here.
           </p>
         </div>
       </div>
 
       {/* HTTP Security Headers Detail Table */}
-      <section className="border border-slate-200 bg-white">
-        <div className="border-b border-slate-200 px-4 py-3 font-bold text-xs uppercase text-slate-700">
+      <section className="overflow-hidden rounded-card border border-line-subtle bg-surface shadow-card">
+        <div className="border-b border-line px-4 py-3 font-bold text-xs uppercase text-secondary">
           Enforced HTTP Defense-in-Depth Headers
         </div>
         <table className="w-full border-collapse text-left text-xs">
           <thead>
-            <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase text-slate-500">
+            <tr className="border-b border-line bg-surface-subtle text-[11px] font-semibold uppercase text-muted">
               <th className="px-4 py-2">Header Name</th>
               <th className="px-4 py-2">Configured Directive</th>
               <th className="px-4 py-2">ASVS Reference</th>
@@ -180,10 +182,10 @@ export function SecurityCompliancePanel({
               { name: "X-Frame-Options", value: "DENY", asvs: "V14.4.3", status: "Active" },
               { name: "Permissions-Policy", value: "camera=(), microphone=(), geolocation=()", asvs: "V14.4.5", status: "Active" },
             ].map((hdr) => (
-              <tr key={hdr.name} className="border-b border-slate-100 hover:bg-slate-50">
-                <td className="px-4 py-2.5 font-mono text-[11px] font-semibold text-slate-900">{hdr.name}</td>
-                <td className="px-4 py-2.5 font-mono text-[10px] text-slate-600 max-w-md truncate">{hdr.value}</td>
-                <td className="px-4 py-2.5 font-mono text-[11px] text-blue-700">{hdr.asvs}</td>
+              <tr key={hdr.name} className="border-b border-line-subtle hover:bg-surface-subtle">
+                <td className="px-4 py-2.5 font-mono text-[11px] font-semibold text-ink">{hdr.name}</td>
+                <td className="px-4 py-2.5 font-mono text-[10px] text-secondary max-w-md truncate">{hdr.value}</td>
+                <td className="px-4 py-2.5 font-mono text-[11px] text-primary">{hdr.asvs}</td>
                 <td className="px-4 py-2.5"><Badge tone="green">{hdr.status}</Badge></td>
               </tr>
             ))}
@@ -192,13 +194,13 @@ export function SecurityCompliancePanel({
       </section>
 
       {/* Disaster Recovery Drills Register */}
-      <section className="border border-slate-200 bg-white">
-        <div className="flex items-center justify-between border-b border-slate-200 px-4 py-3">
-          <div className="font-bold text-xs uppercase text-slate-700 flex items-center gap-2">
-            <Database size={16} className="text-blue-700" />
+      <section className="overflow-hidden rounded-card border border-line-subtle bg-surface shadow-card">
+        <div className="flex items-center justify-between border-b border-line px-4 py-3">
+          <div className="font-bold text-xs uppercase text-secondary flex items-center gap-2">
+            <Database size={16} className="text-primary" />
             Disaster Recovery Monthly Restore Drills Register ({drills.length})
           </div>
-          <span className="text-[11px] text-slate-500">
+          <span className="text-[11px] text-muted">
             Mandatory RPO: &lt;24.0h • Mandatory RTO: &lt;8.0h (480m)
           </span>
         </div>
@@ -206,7 +208,7 @@ export function SecurityCompliancePanel({
         <div className="overflow-x-auto">
           <table className="w-full border-collapse text-left text-xs">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50 text-[11px] font-semibold uppercase text-slate-500">
+              <tr className="border-b border-line bg-surface-subtle text-[11px] font-semibold uppercase text-muted">
                 <th className="px-4 py-2.5">Drill Date</th>
                 <th className="px-4 py-2.5">Backup Archive</th>
                 <th className="px-4 py-2.5">Checksum Verified</th>
@@ -219,11 +221,11 @@ export function SecurityCompliancePanel({
             </thead>
             <tbody>
               {drills.map((drill) => (
-                <tr key={drill.id} className="border-b border-slate-100 hover:bg-slate-50">
-                  <td className="px-4 py-3 font-mono text-[11px] text-slate-700">
+                <tr key={drill.id} className="border-b border-line-subtle hover:bg-surface-subtle">
+                  <td className="px-4 py-3 font-mono text-[11px] text-secondary">
                     {drill.drillDate.slice(0, 10)}
                   </td>
-                  <td className="px-4 py-3 font-mono text-[11px] text-slate-900 max-w-xs truncate" title={drill.backupFilename}>
+                  <td className="px-4 py-3 font-mono text-[11px] text-ink max-w-xs truncate" title={drill.backupFilename}>
                     {drill.backupFilename}
                   </td>
                   <td className="px-4 py-3">
@@ -234,17 +236,17 @@ export function SecurityCompliancePanel({
                     )}
                   </td>
                   <td className="px-4 py-3">
-                    <span className="font-bold text-slate-900">{drill.rpoHoursValidated}h</span>{" "}
+                    <span className="font-bold text-ink">{drill.rpoHoursValidated}h</span>{" "}
                     <span className="text-[10px] text-emerald-700">(&lt;24h)</span>
                   </td>
                   <td className="px-4 py-3">
-                    <span className="font-bold text-slate-900">{drill.rtoMinutesElapsed}m</span>{" "}
+                    <span className="font-bold text-ink">{drill.rtoMinutesElapsed}m</span>{" "}
                     <span className="text-[10px] text-emerald-700">(&lt;480m)</span>
                   </td>
-                  <td className="px-4 py-3 font-mono text-[11px] text-slate-600">
+                  <td className="px-4 py-3 font-mono text-[11px] text-secondary">
                     {drill.reconciledStudents} st / {drill.reconciledGuardians} gd / {drill.reconciledCases} cs
                   </td>
-                  <td className="px-4 py-3 text-slate-600">{drill.operatorName}</td>
+                  <td className="px-4 py-3 text-secondary">{drill.operatorName}</td>
                   <td className="px-4 py-3">
                     <Badge tone={drill.status === "passed" ? "green" : "amber"}>
                       {drill.status === "passed" ? "PASSED SLA" : "FAILED"}

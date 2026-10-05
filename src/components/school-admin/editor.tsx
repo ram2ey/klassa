@@ -36,8 +36,8 @@ export function RecordEditor({ editor, data, onClose, onSaved }: { editor: Edito
   const selectedFields = fields[editor.kind];
   const defaults: Record<string, string | number | boolean> = { status: "pending", position: 1, relationship: "parent", role: "office_staff", academicYearId: year?.id ?? "", isCurrent: !year };
   const missingPrerequisite = selectedFields.some(field => field.required && field.options && field.options.every(option => !option.value));
-  return <dialog ref={dialog} aria-labelledby="record-editor-title" onCancel={event => { if (pending) event.preventDefault(); else onClose(); }} className="fixed inset-0 m-auto max-h-[90dvh] w-[min(560px,calc(100%_-_32px))] overflow-y-auto border border-slate-300 bg-white p-0 text-slate-900 shadow-xl backdrop:bg-slate-950/40">
-    <div className="flex items-center justify-between gap-4 border-b border-slate-200 px-6 py-4"><h2 id="record-editor-title" className="text-lg font-bold">{editor.title}</h2><button type="button" disabled={pending} className="grid h-11 w-11 place-items-center" aria-label="Close form" onClick={onClose}><X size={20} /></button></div>
+  return <dialog ref={dialog} aria-labelledby="record-editor-title" onCancel={event => { if (pending) event.preventDefault(); else onClose(); }} className="ui-overlay fixed inset-0 m-auto max-h-[90dvh] w-[min(560px,calc(100%_-_32px))] overflow-y-auto p-0">
+    <div className="flex items-center justify-between gap-4 border-b border-line-subtle px-6 py-4"><h2 id="record-editor-title" className="text-lg font-bold">{editor.title}</h2><button type="button" disabled={pending} className="grid h-11 w-11 place-items-center" aria-label="Close form" onClick={onClose}><X size={20} /></button></div>
     <form className="space-y-5 p-6" onSubmit={event => {
       event.preventDefault(); setError("");
       const values = new FormData(event.currentTarget);
@@ -65,15 +65,15 @@ export function RecordEditor({ editor, data, onClose, onSaved }: { editor: Edito
         const initial = editor.values?.[field.name] ?? defaults[field.name] ?? "";
         const inputId = `school-field-${field.name}`;
         return <div key={field.name}>
-          {field.type === "checkbox" ? <label className="flex min-h-11 items-center gap-3 text-sm font-medium"><input type="checkbox" name={field.name} defaultChecked={Boolean(initial)} className="h-4 w-4 accent-blue-700" disabled={pending} />{field.label}</label> : <><label htmlFor={inputId} className="block text-sm font-semibold">{field.label}</label>
+          {field.type === "checkbox" ? <label className="flex min-h-11 items-center gap-3 text-sm font-medium"><input type="checkbox" name={field.name} defaultChecked={Boolean(initial)} className="h-4 w-4 accent-primary" disabled={pending} />{field.label}</label> : <><label htmlFor={inputId} className="block text-sm font-semibold">{field.label}</label>
             {field.options ? <select id={inputId} name={field.name} required={field.required} disabled={pending || field.disabled} defaultValue={String(initial || field.options[0]?.value || "")} className={fieldStyle} aria-describedby={field.hint ? `${inputId}-hint` : undefined}>{!field.options.length && <option value="">No options available</option>}{field.options.map(option => <option key={option.value} value={option.value}>{option.label}</option>)}</select>
               : <input id={inputId} name={field.name} type={field.type ?? "text"} defaultValue={String(initial)} required={field.required} disabled={pending} min={field.type === "number" ? field.min : undefined} max={field.type === "number" ? field.max : undefined} minLength={field.type !== "number" ? field.min : undefined} maxLength={field.type !== "number" ? field.max : undefined} autoComplete={field.type === "password" ? "new-password" : undefined} className={fieldStyle} aria-describedby={field.hint ? `${inputId}-hint` : undefined} />}</>}
-          {field.hint && <p id={`${inputId}-hint`} className="mt-1.5 text-xs text-slate-500">{field.hint}</p>}
+          {field.hint && <p id={`${inputId}-hint`} className="mt-1.5 text-xs text-secondary">{field.hint}</p>}
         </div>;
       })}
-      {missingPrerequisite && <p className="border border-amber-200 bg-amber-50 p-3 text-sm text-amber-800">Add the required school records first, then return to this form.</p>}
-      {error && <p role="alert" className="border border-red-200 bg-red-50 p-3 text-sm text-red-800">{error}</p>}
-      <div className="flex justify-end gap-2 border-t border-slate-200 pt-5"><Button variant="secondary" className="min-h-11" type="button" disabled={pending} onClick={onClose}>Cancel</Button><Button className="min-h-11" type="submit" disabled={pending || missingPrerequisite}>{pending ? "Saving..." : "Save changes"}</Button></div>
+      {missingPrerequisite && <p className="rounded-control border border-warning/20 bg-warning-subtle p-3 text-sm text-warning">Add the required school records first, then return to this form.</p>}
+      {error && <p role="alert" className="rounded-control border border-danger/20 bg-danger-subtle p-3 text-sm text-danger">{error}</p>}
+      <div className="flex justify-end gap-2 border-t border-line-subtle pt-5"><Button variant="secondary" className="min-h-11" type="button" disabled={pending} onClick={onClose}>Cancel</Button><Button className="min-h-11" type="submit" disabled={pending || missingPrerequisite}>{pending ? "Saving..." : "Save changes"}</Button></div>
     </form>
   </dialog>;
 }

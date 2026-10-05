@@ -2,18 +2,19 @@ import * as React from "react";
 import { Slot } from "@radix-ui/react-slot";
 import { cva, type VariantProps } from "class-variance-authority";
 import { cn } from "@/lib/utils";
+import { LoaderCircle } from "lucide-react";
 
 const buttonVariants = cva(
-  "inline-flex h-9 items-center justify-center gap-2 border px-3 text-[13px] font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:shrink-0",
+  "inline-flex shrink-0 items-center justify-center gap-2 rounded-control border text-sm font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-focus disabled:opacity-50 disabled:pointer-events-none [&_svg]:shrink-0",
   {
     variants: {
       variant: {
-        primary: "border-blue-700 bg-blue-700 text-white hover:border-blue-800 hover:bg-blue-800",
-        secondary: "border-slate-300 bg-white text-slate-700 hover:bg-slate-50",
-        ghost: "border-transparent bg-transparent text-slate-600 hover:bg-slate-100 hover:text-slate-950",
-        danger: "border-red-700 bg-red-700 text-white hover:bg-red-800",
+        primary: "border-primary bg-primary text-white hover:border-primary-hover hover:bg-primary-hover",
+        secondary: "border-line bg-surface text-secondary hover:bg-surface-subtle hover:text-ink",
+        ghost: "border-transparent bg-transparent text-secondary hover:bg-primary-subtle hover:text-selected",
+        danger: "border-danger bg-danger text-white hover:brightness-90",
       },
-      size: { default: "h-9 px-3", sm: "h-8 px-2.5 text-xs", icon: "h-9 w-9 px-0" },
+      size: { default: "min-h-11 px-4 py-2", sm: "min-h-11 px-3 py-2 text-xs sm:min-h-9", icon: "h-11 w-11 p-0" },
     },
     defaultVariants: { variant: "primary", size: "default" },
   },
@@ -21,9 +22,14 @@ const buttonVariants = cva(
 
 export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
   asChild?: boolean;
+  loading?: boolean;
 }
 
-export function Button({ className, variant, size, asChild, ...props }: ButtonProps) {
+export function Button({ className, variant, size, asChild, loading, disabled, children, ...props }: ButtonProps) {
   const Component = asChild ? Slot : "button";
-  return <Component className={cn(buttonVariants({ variant, size }), className)} {...props} />;
+  return <Component className={cn(buttonVariants({ variant, size }), className)} disabled={disabled || loading} aria-busy={loading || undefined} {...props}>{asChild ? children : <>{loading && <LoaderCircle size={16} className="animate-spin motion-reduce:animate-none" aria-hidden="true" />}{children}</>}</Component>;
+}
+
+export function IconButton({ label, ...props }: Omit<ButtonProps, "size" | "asChild" | "aria-label"> & { label: string }) {
+  return <Button variant="ghost" {...props} size="icon" aria-label={label} title={label} />;
 }

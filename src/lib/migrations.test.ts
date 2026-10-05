@@ -35,6 +35,8 @@ describe("deployment and action boundaries", () => {
         const first = node.body.statements[0].getText(ast);
         if (file === "parent-sms-actions.ts") {
           expect(first, `${file}:${node.name?.text}`).toBe('const actor = await requireStaff(["school_admin", "office_staff"]);');
+        } else if (file === "guardian-sms-preferences-actions.ts") {
+          expect(first).toBe('const actor = await requireStaff(["office_staff", "school_admin"]);');
         } else if (file === "school-admin-actions.ts") {
           expect(first).toBe('const actor = await requireStaff(["school_admin"]);');
         } else if (file === "roster-actions.ts" && ["createStudentAction", "updateStudentStatusAction"].includes(node.name!.text)) {

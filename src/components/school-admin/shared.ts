@@ -22,9 +22,9 @@ export const sections = [
 
 export const roles = ["school_admin", "office_staff", "teacher"] as const;
 
-export const fieldStyle = "mt-1.5 block min-h-11 w-full border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-600";
+export const fieldStyle = "ui-field mt-1.5";
 
-export const panelStyle = "border border-slate-200 bg-white";
+export const panelStyle = "ui-card";
 
 export const words = (value: string) => value.replaceAll("_", " ").replace(/\b\w/g, letter => letter.toUpperCase());
 

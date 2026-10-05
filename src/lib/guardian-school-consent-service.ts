@@ -3,7 +3,7 @@ import { z } from "zod";
 import { db } from "@/db";
 import { guardianConsents, guardians, studentGuardians } from "@/db/schema";
 import { logAuditEvent } from "@/lib/audit";
-import type { requireGuardian } from "@/lib/action-access";
+import type { requireGuardian, requireStaff } from "@/lib/action-access";
 
 type GuardianAccount = Awaited<ReturnType<typeof requireGuardian>>;
 export class SchoolConsentError extends Error {}
@@ -16,10 +16,24 @@ export async function updateGuardianSmsPreferences(account: GuardianAccount, raw
   if (!account.guardians.some(profile => profile.id === input.guardianId && profile.organizationId === input.schoolId)) {
     throw new SchoolConsentError("This guardian profile is not linked to your account.");
   }
+  return savePreferences(account.userId, input, account.userId);
+}
+
+export const staffSmsPreferencesSchema = smsPreferencesSchema.omit({ schoolId: true }).extend({
+  evidence: z.string().trim().min(8, "Describe when and how the guardian requested this change.").max(500) });
+
+export async function recordGuardianSmsPreferences(actor: Awaited<ReturnType<typeof requireStaff>>,
+  raw: z.input<typeof staffSmsPreferencesSchema>) {
+  if (!["office_staff", "school_admin"].includes(actor.role)) throw new SchoolConsentError("Office or school administrator access required.");
+  const input = staffSmsPreferencesSchema.parse(raw);
+  return savePreferences(actor.userId, { ...input, schoolId: actor.organizationId }, undefined, input.evidence);
+}
+
+async function savePreferences(actorUserId: string, input: SmsPreferencesInput, ownedUserId?: string, evidence?: string) {
   return db.transaction(async tx => {
     const [guardian] = await tx.select({ id: guardians.id, phone: guardians.phone }).from(guardians)
       .where(and(eq(guardians.id, input.guardianId), eq(guardians.organizationId, input.schoolId),
-        eq(guardians.userId, account.userId))).for("update");
+        ownedUserId ? eq(guardians.userId, ownedUserId) : undefined)).for("update");
     if (!guardian) throw new SchoolConsentError("This guardian profile is unavailable.");
     const [legalLink] = await tx.select({ id: studentGuardians.id }).from(studentGuardians)
       .where(and(eq(studentGuardians.organizationId, input.schoolId),
@@ -33,9 +47,9 @@ export async function updateGuardianSmsPreferences(account: GuardianAccount, raw
     const [saved] = existing ? await tx.update(guardianConsents).set(fields).where(eq(guardianConsents.id, existing.id)).returning({ id: guardianConsents.id }) :
       await tx.insert(guardianConsents).values({ ...fields, organizationId: input.schoolId, guardianId: input.guardianId })
         .returning({ id: guardianConsents.id });
-    await logAuditEvent({ organizationId: input.schoolId, actorUserId: account.userId,
-      action: "guardian.sms_preferences_confirmed", entityType: "guardian_consent", entityId: saved.id,
-      metadata: { guardianId: input.guardianId, announcements: input.announcements } }, tx);
+    await logAuditEvent({ organizationId: input.schoolId, actorUserId,
+      action: evidence ? "guardian.sms_preferences_recorded" : "guardian.sms_preferences_confirmed", entityType: "guardian_consent", entityId: saved.id,
+      metadata: { guardianId: input.guardianId, announcements: input.announcements, ...(evidence ? { evidence } : {}) } }, tx);
     return { confirmedAt: now };
   });
 }

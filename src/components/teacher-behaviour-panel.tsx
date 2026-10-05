@@ -130,39 +130,39 @@ export function TeacherBehaviourPanel({
           <p className="mt-1 text-xs text-rose-700">{incidentCount} sanction event{incidentCount === 1 ? "" : "s"}</p>
         </div>
 
-        <div className="border border-slate-200 bg-white p-5">
+        <div className="border border-line bg-surface p-5">
           <div className="flex items-center justify-between">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+            <span className="text-xs font-semibold uppercase tracking-wider text-muted">
               Positive Ratio
             </span>
-            <Award className="h-5 w-5 text-blue-600" />
+            <Award className="h-5 w-5 text-primary" />
           </div>
-          <p className="mt-2 text-3xl font-bold text-slate-900">{positiveRatio}%</p>
-          <p className="mt-1 text-xs text-slate-500">Conduct positive feedback balance</p>
+          <p className="mt-2 text-3xl font-bold text-ink">{positiveRatio}%</p>
+          <p className="mt-1 text-xs text-muted">Conduct positive feedback balance</p>
         </div>
       </div>
 
       {/* Conduct Entry Card */}
-      <section className="border border-slate-200 bg-white p-6 shadow-xs">
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
+      <section className="border border-line bg-surface p-6 shadow-xs">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line-subtle pb-4">
           <div>
-            <h2 className="text-lg font-bold text-slate-900">Record Student Conduct</h2>
-            <p className="mt-0.5 text-xs text-slate-500">
+            <h2 className="text-lg font-bold text-ink">Record Student Conduct</h2>
+            <p className="mt-0.5 text-xs text-muted">
               Award merit points for positive behavior or log disciplinary sanctions.
             </p>
           </div>
 
           {/* Type Segmented Buttons */}
-          <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-1" role="radiogroup" aria-label="Conduct Type">
+          <div className="inline-flex rounded-lg border border-line bg-surface-subtle p-1" role="radiogroup" aria-label="Conduct Type">
             <button
               type="button"
               role="radio"
               aria-checked={conductType === "praise"}
               onClick={() => handleTypeChange("praise")}
-              className={`flex items-center gap-2 rounded-md px-4 py-2 text-xs font-semibold transition-all ${
+              className={`flex items-center gap-2 rounded-control px-4 py-2 text-xs font-semibold transition-all ${
                 conductType === "praise"
                   ? "bg-emerald-600 text-white shadow-xs"
-                  : "text-slate-600 hover:text-slate-900"
+                  : "text-secondary hover:text-ink"
               }`}
             >
               <CheckCircle2 className="h-4 w-4" />
@@ -173,10 +173,10 @@ export function TeacherBehaviourPanel({
               role="radio"
               aria-checked={conductType === "incident"}
               onClick={() => handleTypeChange("incident")}
-              className={`flex items-center gap-2 rounded-md px-4 py-2 text-xs font-semibold transition-all ${
+              className={`flex items-center gap-2 rounded-control px-4 py-2 text-xs font-semibold transition-all ${
                 conductType === "incident"
                   ? "bg-rose-700 text-white shadow-xs"
-                  : "text-slate-600 hover:text-slate-900"
+                  : "text-secondary hover:text-ink"
               }`}
             >
               <AlertTriangle className="h-4 w-4" />
@@ -189,7 +189,7 @@ export function TeacherBehaviourPanel({
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
             {/* Class Selection */}
             <div>
-              <label htmlFor={`${formId}-class`} className="block text-xs font-semibold uppercase tracking-wider text-slate-600">
+              <label htmlFor={`${formId}-class`} className="block text-xs font-semibold uppercase tracking-wider text-secondary">
                 Class
               </label>
               <select
@@ -200,7 +200,7 @@ export function TeacherBehaviourPanel({
                   setSelectedClassId(e.target.value);
                   setSelectedStudentId("");
                 }}
-                className="mt-1 block min-h-11 w-full border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-600 focus:outline-hidden"
+                className="mt-1 block min-h-11 w-full border border-line bg-surface px-3 py-2 text-sm focus:border-primary focus:outline-hidden"
               >
                 {classes.length === 0 && <option value="">No classes available</option>}
                 {classes.map(c => (
@@ -213,7 +213,7 @@ export function TeacherBehaviourPanel({
 
             {/* Student Selection */}
             <div>
-              <label htmlFor={`${formId}-student`} className="block text-xs font-semibold uppercase tracking-wider text-slate-600">
+              <label htmlFor={`${formId}-student`} className="block text-xs font-semibold uppercase tracking-wider text-secondary">
                 Student <span className="text-red-500">*</span>
               </label>
               <select
@@ -222,7 +222,7 @@ export function TeacherBehaviourPanel({
                 required
                 value={selectedStudentId}
                 onChange={e => setSelectedStudentId(e.target.value)}
-                className="mt-1 block min-h-11 w-full border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-600 focus:outline-hidden"
+                className="mt-1 block min-h-11 w-full border border-line bg-surface px-3 py-2 text-sm focus:border-primary focus:outline-hidden"
               >
                 <option value="">Select student...</option>
                 {classRoster.map(s => (
@@ -235,7 +235,7 @@ export function TeacherBehaviourPanel({
 
             {/* Category Dropdown */}
             <div>
-              <label htmlFor={`${formId}-category`} className="block text-xs font-semibold uppercase tracking-wider text-slate-600">
+              <label htmlFor={`${formId}-category`} className="block text-xs font-semibold uppercase tracking-wider text-secondary">
                 Category <span className="text-red-500">*</span>
               </label>
               <select
@@ -244,7 +244,7 @@ export function TeacherBehaviourPanel({
                 required
                 value={category}
                 onChange={e => setCategory(e.target.value)}
-                className="mt-1 block min-h-11 w-full border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-600 focus:outline-hidden"
+                className="mt-1 block min-h-11 w-full border border-line bg-surface px-3 py-2 text-sm focus:border-primary focus:outline-hidden"
               >
                 {conductType === "praise"
                   ? praiseCategories.map(cat => (
@@ -262,7 +262,7 @@ export function TeacherBehaviourPanel({
 
             {/* Points Selector */}
             <div>
-              <label htmlFor={`${formId}-points`} className="block text-xs font-semibold uppercase tracking-wider text-slate-600">
+              <label htmlFor={`${formId}-points`} className="block text-xs font-semibold uppercase tracking-wider text-secondary">
                 Points ({conductType === "praise" ? "+" : "-"})
               </label>
               <div className="mt-1 flex items-center gap-2">
@@ -275,7 +275,7 @@ export function TeacherBehaviourPanel({
                   required
                   value={points}
                   onChange={e => setPoints(Math.max(1, Math.min(20, Number(e.target.value) || 1)))}
-                  className="block min-h-11 w-24 border border-slate-300 bg-white px-3 py-2 text-sm font-semibold focus:border-blue-600 focus:outline-hidden"
+                  className="block min-h-11 w-24 border border-line bg-surface px-3 py-2 text-sm font-semibold focus:border-primary focus:outline-hidden"
                 />
                 <div className="flex gap-1">
                   {[1, 2, 3, 5].map(preset => (
@@ -288,7 +288,7 @@ export function TeacherBehaviourPanel({
                           ? conductType === "praise"
                             ? "bg-emerald-100 border-emerald-600 text-emerald-900"
                             : "bg-rose-100 border-rose-600 text-rose-900"
-                          : "bg-slate-50 border-slate-200 text-slate-700 hover:bg-slate-100"
+                          : "bg-surface-subtle border-line text-secondary hover:bg-surface-subtle"
                       }`}
                     >
                       {conductType === "praise" ? `+${preset}` : `-${preset}`}
@@ -302,7 +302,7 @@ export function TeacherBehaviourPanel({
           <div className="grid gap-4 sm:grid-cols-2">
             {/* Notes / Description */}
             <div>
-              <label htmlFor={`${formId}-description`} className="block text-xs font-semibold uppercase tracking-wider text-slate-600">
+              <label htmlFor={`${formId}-description`} className="block text-xs font-semibold uppercase tracking-wider text-secondary">
                 Notes & Context (Optional)
               </label>
               <textarea
@@ -314,14 +314,14 @@ export function TeacherBehaviourPanel({
                     ? "e.g., Actively assisted peers with challenging math exercises during group work..."
                     : "e.g., Spoke disrespectfully and interrupted instruction multiple times after warnings..."
                 }
-                className="mt-1 block min-h-20 w-full border border-slate-300 bg-white p-3 text-sm focus:border-blue-600 focus:outline-hidden"
+                className="mt-1 block min-h-20 w-full border border-line bg-surface p-3 text-sm focus:border-primary focus:outline-hidden"
               />
             </div>
 
             {/* Date & Guardian Visibility Guard */}
             <div className="flex flex-col justify-between space-y-3">
               <div>
-                <label htmlFor={`${formId}-date`} className="block text-xs font-semibold uppercase tracking-wider text-slate-600">
+                <label htmlFor={`${formId}-date`} className="block text-xs font-semibold uppercase tracking-wider text-secondary">
                   Event Date
                 </label>
                 <input
@@ -330,23 +330,23 @@ export function TeacherBehaviourPanel({
                   type="date"
                   required
                   defaultValue={defaultDate}
-                  className="mt-1 block min-h-11 w-full border border-slate-300 bg-white px-3 py-2 text-sm focus:border-blue-600 focus:outline-hidden"
+                  className="mt-1 block min-h-11 w-full border border-line bg-surface px-3 py-2 text-sm focus:border-primary focus:outline-hidden"
                 />
               </div>
 
-              <label className="flex items-start gap-3 rounded-md border border-slate-200 bg-slate-50/80 p-3 text-sm cursor-pointer">
+              <label className="flex items-start gap-3 rounded-control border border-line bg-surface-subtle/80 p-3 text-sm cursor-pointer">
                 <input
                   type="checkbox"
                   name="guardianVisible"
                   checked={guardianVisible}
                   onChange={e => setGuardianVisible(e.target.checked)}
-                  className="mt-0.5 h-4 w-4 rounded border-slate-300 text-blue-600 focus:ring-blue-500"
+                  className="mt-0.5 h-4 w-4 rounded border-line text-primary focus:ring-primary"
                 />
                 <div>
-                  <span className="font-semibold text-slate-900">
+                  <span className="font-semibold text-ink">
                     Visible to parents & guardians in portal
                   </span>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-muted">
                     {conductType === "praise"
                       ? "Family will receive celebration feedback on student portal dashboard."
                       : "Family will be able to review this conduct note in the student overview."}
@@ -383,23 +383,23 @@ export function TeacherBehaviourPanel({
       </section>
 
       {/* Behaviour Activity Feed */}
-      <section className="border border-slate-200 bg-white p-6 shadow-xs">
-        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-slate-100 pb-4">
+      <section className="border border-line bg-surface p-6 shadow-xs">
+        <div className="flex flex-wrap items-center justify-between gap-4 border-b border-line-subtle pb-4">
           <div>
-            <h2 className="text-base font-bold text-slate-900">Recent Conduct Log</h2>
-            <p className="text-xs text-slate-500">
+            <h2 className="text-base font-bold text-ink">Recent Conduct Log</h2>
+            <p className="text-xs text-muted">
               Showing recent praise merits and disciplinary entries.
             </p>
           </div>
 
           <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-slate-400" />
-            <div className="inline-flex rounded-md border border-slate-200 bg-slate-50 p-0.5 text-xs">
+            <Filter className="h-4 w-4 text-muted" />
+            <div className="inline-flex rounded-control border border-line bg-surface-subtle p-0.5 text-xs">
               <button
                 type="button"
                 onClick={() => setFilterType("all")}
                 className={`rounded px-2.5 py-1 font-medium ${
-                  filterType === "all" ? "bg-white font-semibold text-slate-900 shadow-xs" : "text-slate-600"
+                  filterType === "all" ? "bg-surface font-semibold text-ink shadow-xs" : "text-secondary"
                 }`}
               >
                 All ({behaviours.length})
@@ -408,7 +408,7 @@ export function TeacherBehaviourPanel({
                 type="button"
                 onClick={() => setFilterType("praise")}
                 className={`rounded px-2.5 py-1 font-medium ${
-                  filterType === "praise" ? "bg-emerald-600 font-semibold text-white shadow-xs" : "text-slate-600"
+                  filterType === "praise" ? "bg-emerald-600 font-semibold text-white shadow-xs" : "text-secondary"
                 }`}
               >
                 Praise ({praiseCount})
@@ -417,7 +417,7 @@ export function TeacherBehaviourPanel({
                 type="button"
                 onClick={() => setFilterType("incident")}
                 className={`rounded px-2.5 py-1 font-medium ${
-                  filterType === "incident" ? "bg-rose-700 font-semibold text-white shadow-xs" : "text-slate-600"
+                  filterType === "incident" ? "bg-rose-700 font-semibold text-white shadow-xs" : "text-secondary"
                 }`}
               >
                 Incidents ({incidentCount})
@@ -429,7 +429,7 @@ export function TeacherBehaviourPanel({
         <div className="mt-4 overflow-x-auto">
           <table className="w-full text-left text-sm">
             <thead>
-              <tr className="border-b border-slate-200 text-xs font-semibold uppercase tracking-wider text-slate-500">
+              <tr className="border-b border-line text-xs font-semibold uppercase tracking-wider text-muted">
                 <th className="py-2.5">Date</th>
                 <th>Student</th>
                 <th>Class</th>
@@ -441,12 +441,12 @@ export function TeacherBehaviourPanel({
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredBehaviours.map(item => (
-                <tr key={item.id} className="hover:bg-slate-50/60">
-                  <td className="py-3 text-xs text-slate-600 whitespace-nowrap">{item.occurredAt}</td>
-                  <td className="font-semibold text-slate-900 whitespace-nowrap">
+                <tr key={item.id} className="hover:bg-surface-subtle/60">
+                  <td className="py-3 text-xs text-secondary whitespace-nowrap">{item.occurredAt}</td>
+                  <td className="font-semibold text-ink whitespace-nowrap">
                     {studentName(item.studentId)}
                   </td>
-                  <td className="text-xs text-slate-600 whitespace-nowrap">{className(item.classId)}</td>
+                  <td className="text-xs text-secondary whitespace-nowrap">{className(item.classId)}</td>
                   <td className="whitespace-nowrap">
                     <span
                       className={`inline-flex items-center gap-1.5 rounded px-2 py-0.5 text-xs font-semibold ${
@@ -474,19 +474,19 @@ export function TeacherBehaviourPanel({
                   </td>
                   <td className="whitespace-nowrap">
                     {item.guardianVisible ? (
-                      <span className="inline-flex items-center gap-1 text-xs text-blue-700" title="Visible to family">
+                      <span className="inline-flex items-center gap-1 text-xs text-primary" title="Visible to family">
                         <Eye className="h-3.5 w-3.5" />
                         Portal visible
                       </span>
                     ) : (
-                      <span className="inline-flex items-center gap-1 text-xs text-slate-400" title="Internal staff only">
+                      <span className="inline-flex items-center gap-1 text-xs text-muted" title="Internal staff only">
                         <EyeOff className="h-3.5 w-3.5" />
                         Internal only
                       </span>
                     )}
                   </td>
-                  <td className="max-w-xs text-xs text-slate-600 truncate" title={item.description ?? ""}>
-                    {item.description || <span className="text-slate-400 italic">No notes</span>}
+                  <td className="max-w-xs text-xs text-secondary truncate" title={item.description ?? ""}>
+                    {item.description || <span className="text-muted italic">No notes</span>}
                   </td>
                 </tr>
               ))}
@@ -494,7 +494,7 @@ export function TeacherBehaviourPanel({
           </table>
 
           {filteredBehaviours.length === 0 && (
-            <div className="py-8 text-center text-sm text-slate-500">
+            <div className="py-8 text-center text-sm text-muted">
               No conduct records found for the selected filter.
             </div>
           )}

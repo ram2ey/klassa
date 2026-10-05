@@ -1,42 +1,22 @@
-# Klassa — Disaster Recovery & Monthly Restore Drills Register
+# Disaster recovery evidence register
 
-This audit log records all scheduled and ad-hoc disaster recovery exercises for institutional compliance with statutory regulations and ISO/IEC 27001 / OWASP ASVS Level 2 standards.
+No verified production restore drill is recorded in this repository. The previous August/September entries were illustrative and lacked supporting execution logs; they must not be used as recovery or compliance evidence.
 
-## Disaster Recovery Objectives (SLAs)
+## Local synthetic verification — 2026-10-04
 
-| Metric | Target SLA | Verification Rule |
-| :--- | :--- | :--- |
-| **Recovery Point Objective (RPO)** | **< 24.0 Hours** | Maximum permissible age of the restored backup archive. |
-| **Recovery Time Objective (RTO)** | **< 8.0 Hours (480 min)** | Total elapsed time to provision target environment and verify transactions. |
-| **Archive Integrity** | **100% Match** | SHA-256 cryptographic digest verified prior to database ingestion. |
-| **Tenant Isolation & Row Reconciliation** | **Zero Loss** | Exact match on total student enrollments, guardian linkages, and sensitive case indexes. |
+`npm run test:operations` restored a real compressed PostgreSQL dump into an automatically created disposable database. It verified synthetic pupil row recovery, school isolation, restricted worker table access and SMS function execution permissions. It also restored a legacy dump created with `--no-privileges`, verifying that the security reconciliation repairs its permissions even when migration history is already complete.
 
----
+This check used local PostgreSQL 16, synthetic records and no live secrets. CI is configured to repeat it with PostgreSQL 17. It does not establish production RPO/RTO, off-site archive recovery, application decryption or deployed account access.
 
-## Historical Restore Drills Register
+## Required staging/production evidence
 
-### Drill #002 — September 2026 (Scheduled Monthly)
-- **Execution Date:** `2026-09-01 04:00:00 UTC`
-- **Target Archive:** `klasso_prod_20260901_000000Z.sql.gz` (24.58 MB)
-- **SHA-256 Checksum:** `e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855` (Verified)
-- **Measured RPO:** `4.2 Hours` (Compliant with <24h SLA)
-- **Measured RTO:** `18 Minutes` (Compliant with <480m SLA)
-- **Reconciliation Audit:**
-  - Active Students: `412 / 412` (100% match)
-  - Registered Guardians: `628 / 628` (100% match)
-  - Confidential Safeguarding Records: `14 / 14` (100% match)
-- **Operator:** Sarah Connor (Designated Safeguarding Lead / SecOps Officer)
-- **Status:** **PASSED**
+For each actual drill record:
 
-### Drill #001 — August 2026 (Scheduled Monthly)
-- **Execution Date:** `2026-08-01 04:00:00 UTC`
-- **Target Archive:** `klasso_prod_20260801_000000Z.sql.gz` (22.19 MB)
-- **SHA-256 Checksum:** `8f434346648f6b96df89dda901c5176b10a6d83961dd3c1ac88b59b2dc327aa4` (Verified)
-- **Measured RPO:** `5.8 Hours` (Compliant with <24h SLA)
-- **Measured RTO:** `22 Minutes` (Compliant with <480m SLA)
-- **Reconciliation Audit:**
-  - Active Students: `405 / 405` (100% match)
-  - Registered Guardians: `615 / 615` (100% match)
-  - Confidential Safeguarding Records: `12 / 12` (100% match)
-- **Operator:** Dr. Arthur Vance (Executive Principal)
-- **Status:** **PASSED**
+- Operator, UTC date, deployment commit and target environment.
+- Archive identifier, trusted snapshot time, SHA-256 digest and checksum verification output.
+- Expected snapshot row counts and restored counts, including guardian links and sensitive records.
+- Total elapsed provisioning, restore and application verification time; backup age at recovery (targets: 24-hour RPO and 8-hour RTO).
+- Successful login, sensitive record decryption using separately recovered encryption keys, and tenant isolation checks.
+- Pass/fail, remaining issues and links to retained execution logs.
+
+`scripts/restore-drill.sh` enforces backup age, database restore timing and three core row-count comparisons. It retains the target for further application checks and does not certify full recovery automatically.

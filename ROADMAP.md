@@ -8,6 +8,12 @@ This document tracks architectural decisions, phase deliverables, completed feat
 
 ## Current live delivery status
 
+### Orange interface redesign
+
+**Continuation handoff:** Read [the detailed orange UI redesign handoff](docs/orange-ui-redesign-handoff.md) for implemented Phases 1–6, verification evidence, remaining staging acceptance and working-tree cautions.
+
+Phases 1–6 of the orange UI redesign are implemented locally: orange semantic tokens and foundations, responsive role shells, scoped overviews, student/guardian directories, operational staff workflows and the remaining page/consistency polish. The administrator, office, teacher, guardian, platform, authentication and synthetic demo surfaces use orange primary styling. See `docs/design-system.md` for component APIs and `docs/orange-ui-redesign-handoff.md` for phase verification. The Webpack production build, typecheck and lint passed after Phase 6. The unit suite was not rerun for Phase 6; authenticated staging and tenant-isolation acceptance remain outstanding.
+
 The school administrator workspace connects school directories, setup, roll call, gradebook, report cards, in-app announcements, encrypted case notes, settings and audit history to PostgreSQL. Platform administrators manage tenants separately. MFA is required only for platform administrators.
 
 The live teacher workspace shows assigned current-year classes and rosters, attendance for homeroom classes, assessments and grading for assigned classes or subjects, draft report cards with teacher remarks, and relevant published notices. The server rechecks assignments on every mutation; school administrators retain report approval and publication.
@@ -28,7 +34,7 @@ Migration `0028_tenant_row_security` introduces row level security for school-ow
   - **Phase 2 Ã¢â‚¬â€ Attendance and Guardian Access** (100% complete and verified)
   - **Phase 3 Ã¢â‚¬â€ Assessments and Report Cards** (100% complete and verified)
 - **Tech Stack**: Next.js 16 (App Router + Turbopack), PostgreSQL 17, Drizzle ORM, Better Auth (with TOTP MFA plugin), Docker / Coolify, Vitest, Tailwind CSS v4.
-- **Design System**: Institutional compact theme (0Ã¢â‚¬â€œ2px radii, Plus Jakarta Sans, Phosphor icons, slate/royal blue palette). See [`docs/design-system.md`](docs/design-system.md).
+- **Design System**: Orange accents, rounded white cards, a soft gray canvas and Plus Jakarta Sans. See [`docs/design-system.md`](docs/design-system.md).
 
 ---
 

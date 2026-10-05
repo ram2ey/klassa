@@ -96,17 +96,17 @@ export function AddSensitiveCaseDialog({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
-      <div className="flex max-h-[90vh] w-full max-w-xl flex-col rounded-xs border border-slate-300 bg-white shadow-xl">
-        <div className="flex items-center justify-between border-b border-slate-200 p-4">
+      <div className="flex max-h-[90vh] w-full max-w-xl flex-col rounded-control border border-line bg-surface shadow-xl">
+        <div className="flex items-center justify-between border-b border-line p-4">
           <div className="flex items-center gap-2">
-            <div className="rounded-xs bg-slate-100 p-1.5 text-slate-700">
+            <div className="rounded-control bg-surface-subtle p-1.5 text-secondary">
               <LockKey size={18} weight="bold" />
             </div>
-            <h2 className="text-base font-bold text-slate-900">Create Confidential Sensitive Case</h2>
+            <h2 className="text-base font-bold text-ink">Create Confidential Sensitive Case</h2>
           </div>
           <button
             onClick={onClose}
-            className="rounded-xs p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            className="rounded-control p-1 text-muted hover:bg-surface-subtle hover:text-secondary"
             aria-label="Close"
           >
             <X size={18} />
@@ -115,7 +115,7 @@ export function AddSensitiveCaseDialog({
 
         <form onSubmit={handleSubmit} className="flex-1 space-y-4 overflow-y-auto p-4 text-xs">
           {error && (
-            <div className="flex items-center gap-2 rounded-xs border border-rose-200 bg-rose-50 p-2.5 text-rose-700">
+            <div className="flex items-center gap-2 rounded-control border border-rose-200 bg-rose-50 p-2.5 text-rose-700">
               <WarningOctagon size={16} />
               <span>{error}</span>
             </div>
@@ -123,13 +123,13 @@ export function AddSensitiveCaseDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block font-semibold text-slate-700">
+              <label className="mb-1 block font-semibold text-secondary">
                 Student <span className="text-rose-600">*</span>
               </label>
               <select
                 value={studentId}
                 onChange={(e) => setStudentId(e.target.value)}
-                className="w-full rounded-xs border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-control border border-line bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-primary focus:outline-none"
               >
                 {AVAILABLE_STUDENTS.map((st) => (
                   <option key={st.id} value={st.id}>
@@ -140,13 +140,13 @@ export function AddSensitiveCaseDialog({
             </div>
 
             <div>
-              <label className="mb-1 block font-semibold text-slate-700">
+              <label className="mb-1 block font-semibold text-secondary">
                 Case Domain Area <span className="text-rose-600">*</span>
               </label>
               <select
                 value={area}
                 onChange={(e) => setArea(e.target.value as SensitiveCaseArea)}
-                className="w-full rounded-xs border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-control border border-line bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-primary focus:outline-none"
               >
                 <option value="safeguarding">Safeguarding (Child Protection)</option>
                 <option value="health_medical">Health & Medical Diagnosis</option>
@@ -158,13 +158,13 @@ export function AddSensitiveCaseDialog({
 
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="mb-1 block font-semibold text-slate-700">
+              <label className="mb-1 block font-semibold text-secondary">
                 Confidentiality Clearance Tier <span className="text-rose-600">*</span>
               </label>
               <select
                 value={confidentialityTier}
                 onChange={(e) => setConfidentialityTier(e.target.value as CaseConfidentialityTier)}
-                className="w-full rounded-xs border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-control border border-line bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-primary focus:outline-none"
               >
                 <option value="standard_sensitive">Standard Sensitive (Departmental)</option>
                 <option value="confidential">Confidential (Specialist Only)</option>
@@ -173,20 +173,20 @@ export function AddSensitiveCaseDialog({
             </div>
 
             <div>
-              <label className="mb-1 block font-semibold text-slate-700">
+              <label className="mb-1 block font-semibold text-secondary">
                 Scheduled Statutory Review Date
               </label>
               <input
                 type="date"
                 value={reviewDate}
                 onChange={(e) => setReviewDate(e.target.value)}
-                className="w-full rounded-xs border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+                className="w-full rounded-control border border-line bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-primary focus:outline-none"
               />
             </div>
           </div>
 
           <div>
-            <label className="mb-1 block font-semibold text-slate-700">
+            <label className="mb-1 block font-semibold text-secondary">
               Case Header / Subject <span className="text-rose-600">*</span>
             </label>
             <input
@@ -194,17 +194,17 @@ export function AddSensitiveCaseDialog({
               placeholder="e.g., Anaphylaxis Emergency Action Plan, or External Agency Referral..."
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="w-full rounded-xs border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-900 focus:border-blue-600 focus:outline-none"
+              className="w-full rounded-control border border-line bg-surface px-2.5 py-1.5 text-xs text-ink focus:border-primary focus:outline-none"
               required
             />
           </div>
 
           <div>
             <div className="flex items-center justify-between mb-1">
-              <label className="font-semibold text-slate-700">
+              <label className="font-semibold text-secondary">
                 Confidential Initial Narrative <span className="text-rose-600">*</span>
               </label>
-              <span className="text-[10px] text-slate-400 font-mono">
+              <span className="text-[10px] text-muted font-mono">
                 Auto-encrypted with AES-256-GCM
               </span>
             </div>
@@ -213,25 +213,25 @@ export function AddSensitiveCaseDialog({
               placeholder="Enter detailed clinical observation, agency minutes, or case background notes..."
               value={initialNarrative}
               onChange={(e) => setInitialNarrative(e.target.value)}
-              className="w-full rounded-xs border border-slate-300 bg-white px-2.5 py-2 text-xs text-slate-900 focus:border-blue-600 focus:outline-none font-sans"
+              className="w-full rounded-control border border-line bg-surface px-2.5 py-2 text-xs text-ink focus:border-primary focus:outline-none font-sans"
               required
             />
           </div>
 
-          <div className="flex items-center gap-2 rounded-xs border border-slate-200 bg-slate-50 p-2.5">
+          <div className="flex items-center gap-2 rounded-control border border-line bg-surface-subtle p-2.5">
             <input
               type="checkbox"
               id="courtOrderCheck"
               checked={hasCourtOrder}
               onChange={(e) => setHasCourtOrder(e.target.checked)}
-              className="rounded-xs text-blue-600 focus:ring-0"
+              className="rounded-control text-primary focus:ring-0"
             />
-            <label htmlFor="courtOrderCheck" className="text-xs text-slate-700 cursor-pointer">
+            <label htmlFor="courtOrderCheck" className="text-xs text-secondary cursor-pointer">
               This case involves active statutory <strong>Court Restrictions or Protective Orders</strong>
             </label>
           </div>
 
-          <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-3">
+          <div className="flex items-center justify-end gap-2 border-t border-line pt-3">
             <Button variant="secondary" type="button" onClick={onClose} disabled={isPending}>
               Cancel
             </Button>

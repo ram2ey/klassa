@@ -1,7 +1,7 @@
 import { and, desc, eq, inArray } from "drizzle-orm";
 import { db } from "@/db";
 import { academicYears, attendanceRecords, attendanceSessions, classes, courtRestrictions, enrollments,
-  gradeLevels, guardianAbsenceNotes, guardians, organizations, receptionLogs, smsDispatches, studentGuardians, students, users,
+  gradeLevels, guardianConsents, guardianAbsenceNotes, guardians, organizations, receptionLogs, smsDispatches, studentGuardians, students, users,
   needToKnowAlerts, sensitiveCases } from "@/db/schema";
 import { requireStaff } from "@/lib/action-access";
 import { buildUnexplainedAbsenceCallList } from "@/lib/office-absence-followup";
@@ -56,7 +56,10 @@ export async function getOfficeData(sessionDate: string) {
       eq(sensitiveCases.organizationId, org))).where(and(eq(needToKnowAlerts.organizationId, org),
       eq(sensitiveCases.area, "health_medical"), eq(needToKnowAlerts.isActive, true)));
   const medicalAlerts = buildTeacherSafetyNotices(studentRows.map(row => row.id), medicalRows, []).alerts;
-  return { actor, school, years, grades, classes: classRows, students: studentRows, guardians: guardianRows,
+  const smsPreferences = await db.select({ guardianId: guardianConsents.guardianId,
+    announcements: guardianConsents.optInSmsAnnouncements }).from(guardianConsents)
+    .where(eq(guardianConsents.organizationId, org));
+  return { actor, school, years, grades, classes: classRows, students: studentRows, guardians: guardianRows, smsPreferences,
     links, enrollments: enrollmentRows, sessions: sessionRows, records, restrictions, absenceNotes,
     unexplainedAbsences, medicalAlerts, receptionLogs: receptionLogRows, dispatches: dispatchRows };
 }

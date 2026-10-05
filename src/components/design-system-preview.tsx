@@ -1,0 +1,27 @@
+"use client";
+import { useState } from "react";
+import Link from "next/link";
+import { ArrowRight, Check, Plus, Search, Users, AlertTriangle } from "lucide-react";
+import { Button, IconButton } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader, PageHeading } from "@/components/ui/card";
+import { Field, Input, Select, Textarea } from "@/components/ui/field";
+import { EmptyState, ErrorState, LoadingState, WarningNotice } from "@/components/ui/states";
+import { Tabs } from "@/components/ui/tabs";
+import { Overlay } from "@/components/ui/overlay";
+import { Metric } from "@/components/school-admin/ui";
+
+export function DesignSystemPreview() {
+  const [overlay, setOverlay] = useState<"dialog" | "drawer" | null>(null);
+  return <main className="mx-auto max-w-6xl space-y-8 p-4 sm:p-6 lg:p-8">
+    <PageHeading title="Klassa design foundations" description="Phase 1 · Orange accents, soft surfaces and accessible shared components." action={<div className="flex flex-wrap items-center gap-3"><Badge tone="primary">Development preview</Badge><Button asChild variant="secondary"><Link href="/design-system/shell">View workspace shell</Link></Button></div>} />
+    <div className="grid gap-6 sm:grid-cols-2 lg:grid-cols-4">{[{ label: "Primary", color: "bg-primary", code: "#C2410C" }, { label: "Selected", color: "bg-primary-subtle", code: "#FFF7ED" }, { label: "Canvas", color: "bg-canvas", code: "#F4F4F5" }, { label: "Surface", color: "bg-surface", code: "#FFFFFF" }].map(item => <Card key={item.label}><div className={`h-16 rounded-t-card border-b border-line-subtle ${item.color}`} /><CardContent><h2 className="font-semibold">{item.label}</h2><p className="mt-1 text-xs text-secondary">{item.code}</p></CardContent></Card>)}</div>
+    <div className="grid gap-6 md:grid-cols-2"><Metric label="Sample pupils" value="248" detail="Synthetic preview value" icon={<Users size={22} aria-hidden="true" />} /><Metric label="Sample attendance" value="96%" detail="Synthetic preview value" icon={<Check size={22} aria-hidden="true" />} /></div>
+    <Card><CardHeader title="Actions" description="Primary, secondary, quiet and destructive actions." /><CardContent className="flex flex-wrap items-center gap-3"><Button><Plus size={16} aria-hidden="true" />Enroll pupil</Button><Button variant="secondary">Export records</Button><Button variant="ghost">View details<ArrowRight size={16} aria-hidden="true" /></Button><Button variant="danger">Delete sample</Button><Button disabled>Unavailable</Button><Button loading>Saving</Button><IconButton label="Search records"><Search size={18} aria-hidden="true" /></IconButton></CardContent></Card>
+    <Card><CardHeader title="Fields" description="Visible labels, linked hints, validation and disabled states." /><CardContent><div className="grid gap-6 sm:grid-cols-2"><Field label="Full name" hint="Use the name recorded by the school."><Input required placeholder="e.g. Ama Mensah" /></Field><Field label="Class"><Select defaultValue=""><option value="">Choose a class</option><option>Primary 1</option><option>Primary 2</option></Select></Field><Field label="Student number" hint="Assigned automatically."><Input disabled value="ST-000248" /></Field><Field label="Guardian contact" error="Enter a valid phone number."><Input defaultValue="123" /></Field><Field label="Teacher remarks"><Textarea placeholder="Write a short remark" /></Field></div></CardContent></Card>
+    <Card><CardHeader title="Status and navigation" /><CardContent className="space-y-6"><div className="flex flex-wrap gap-3"><Badge tone="primary">Selected</Badge><Badge tone="green"><Check size={14} aria-hidden="true" />Active</Badge><Badge tone="amber"><AlertTriangle size={14} aria-hidden="true" />Pending review</Badge><Badge tone="danger">Restricted</Badge><Badge>Draft</Badge></div><Tabs label="Sample record status" items={[{ value: "all", label: "All pupils", content: "All pupil records appear in this view." }, { value: "active", label: "Active", content: "Active pupil records appear in this view." }, { value: "pending", label: "Pending", content: "Pending pupil records appear in this view." }]} /><WarningNotice>Review missing contact details before continuing.</WarningNotice></CardContent></Card>
+    <div className="grid gap-6 md:grid-cols-2"><Card><CardHeader title="Empty state" /><EmptyState title="No pupils yet" description="Start your directory by enrolling the first pupil." action={<Button variant="secondary">Enroll pupil</Button>} /></Card><Card><CardHeader title="Loading and errors" /><LoadingState /><CardContent><ErrorState title="Records could not be loaded" description="Check your connection and try again." /></CardContent></Card></div>
+    <Card><CardHeader title="Overlays" description="Test Escape, outside click, focus containment and return focus." /><CardContent className="flex gap-3"><Button onClick={() => setOverlay("dialog")}>Open dialog</Button><Button variant="secondary" onClick={() => setOverlay("drawer")}>Open drawer</Button></CardContent></Card>
+    <Overlay open={overlay !== null} variant={overlay ?? "dialog"} onClose={() => setOverlay(null)} title="Sample record" description="This preview does not save any data."><div className="space-y-6"><Field label="Name"><Input placeholder="Pupil name" /></Field><Button variant="secondary" onClick={() => setOverlay(null)}>Close preview</Button></div></Overlay>
+  </main>;
+}

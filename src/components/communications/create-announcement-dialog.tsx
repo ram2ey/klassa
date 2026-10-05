@@ -75,20 +75,20 @@ export function CreateAnnouncementDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 p-4">
-      <div className="w-full max-w-xl border border-slate-300 bg-white shadow-2xl animate-in fade-in zoom-in-95 duration-150">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4">
+      <div className="w-full max-w-xl rounded-card border border-line-subtle bg-surface shadow-2xl animate-in fade-in zoom-in-95 duration-150 overflow-hidden">
         {/* Header */}
-        <div className="border-b border-slate-200 bg-slate-50 px-5 py-3.5">
+        <div className="border-b border-line-subtle bg-surface-subtle px-5 py-3.5">
           <div className="flex items-center justify-between">
             <div>
-              <h2 className="text-xs font-bold uppercase tracking-wider text-slate-900">
+              <h2 className="text-xs font-bold uppercase tracking-wider text-ink">
                 Official Institutional Announcement
               </h2>
-              <p className="mt-0.5 text-xs text-slate-500">
+              <p className="mt-0.5 text-xs text-secondary">
                 Draft and dispatch an authorized circular to students, classes, or registered guardians.
               </p>
             </div>
-            <span className="border border-slate-300 bg-white px-2 py-0.5 font-mono text-[11px] font-semibold text-slate-700">
+            <span className="rounded-control border border-line bg-surface px-2 py-0.5 font-mono text-[11px] font-semibold text-secondary">
               AUDITED NOTICE
             </span>
           </div>
@@ -96,31 +96,31 @@ export function CreateAnnouncementDialog({
 
         <form onSubmit={handleSubmit} className="p-5 space-y-4 text-xs">
           {error && (
-            <div className="border border-red-200 bg-red-50 p-3 text-xs text-red-800">
+            <div className="rounded-control border border-danger/20 bg-danger-subtle p-3 text-xs text-danger">
               {error}
             </div>
           )}
 
           {/* Quick Template Picker */}
           {templates.length > 0 && (
-            <div className="border border-slate-200 bg-slate-50 p-2.5">
+            <div className="rounded-control border border-line-subtle bg-surface-subtle p-2.5">
               <div className="flex items-center justify-between">
-                <span className="font-semibold uppercase tracking-wider text-[11px] text-slate-600">
+                <span className="font-semibold uppercase tracking-wider text-[11px] text-secondary">
                   Insert Standard School Template
                 </span>
                 <select
                   defaultValue=""
                   onChange={(e) => handleTemplateSelect(e.target.value)}
-                  className="h-7 border border-slate-300 bg-white px-2 text-xs focus:border-blue-600 focus:outline-none"
+                  className="h-7 rounded-control border border-line bg-surface px-2 text-xs text-ink focus:border-primary focus:outline-none cursor-pointer"
                 >
                   <option value="" disabled>
                     Choose template...
                   </option>
                   {templates.map((t) => (
-                      <option key={t.id} value={t.id}>
-                        {t.title} ({t.category})
-                      </option>
-                    ))}
+                    <option key={t.id} value={t.id}>
+                      {t.title} ({t.category})
+                    </option>
+                  ))}
                 </select>
               </div>
             </div>
@@ -128,21 +128,21 @@ export function CreateAnnouncementDialog({
 
           {/* Title */}
           <label className="block">
-            <span className="mb-1 block font-semibold text-slate-800">Circular Title</span>
+            <span className="mb-1 block font-semibold text-secondary">Circular Title</span>
             <input
               type="text"
               required
               placeholder="e.g. End of Term Examination Schedule & Logistics"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              className="h-9 w-full border border-slate-300 bg-white px-3 focus:border-blue-600 focus:outline-none"
+              className="h-9 w-full rounded-control border border-line bg-surface px-3 text-xs text-ink focus:border-primary focus:outline-none"
             />
           </label>
 
           {/* Audience & Target */}
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
-              <span className="mb-1 block font-semibold text-slate-800">Target Audience</span>
+              <span className="mb-1 block font-semibold text-secondary">Target Audience</span>
               <select
                 value={targetType}
                 onChange={(e) => {
@@ -152,7 +152,7 @@ export function CreateAnnouncementDialog({
                   else if (val === "grade") setTargetId("grade-10");
                   else if (val === "class") setTargetId("class-10a");
                 }}
-                className="h-9 w-full border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                className="h-9 w-full rounded-control border border-line bg-surface px-2 text-xs text-ink focus:border-primary focus:outline-none"
               >
                 <option value="school">All Campuses (Entire School)</option>
                 <option value="grade">Specific Grade Cohort</option>
@@ -161,19 +161,19 @@ export function CreateAnnouncementDialog({
             </label>
 
             <label className="block">
-              <span className="mb-1 block font-semibold text-slate-800">Cohort / Section Selector</span>
+              <span className="mb-1 block font-semibold text-secondary">Cohort / Section Selector</span>
               {targetType === "school" ? (
                 <input
                   type="text"
                   disabled
                   value="All 142 Enrolled Students & Guardians"
-                  className="h-9 w-full border border-slate-200 bg-slate-100 px-3 text-slate-600 font-mono text-[11px]"
+                  className="h-9 w-full rounded-control border border-line bg-surface-subtle px-3 text-secondary font-mono text-[11px]"
                 />
               ) : targetType === "grade" ? (
                 <select
                   value={targetId}
                   onChange={(e) => setTargetId(e.target.value)}
-                  className="h-9 w-full border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                  className="h-9 w-full rounded-control border border-line bg-surface px-2 text-xs text-ink focus:border-primary focus:outline-none"
                 >
                   <option value="grade-7">Grade 7 (32 students)</option>
                   <option value="grade-8">Grade 8 (36 students)</option>
@@ -184,7 +184,7 @@ export function CreateAnnouncementDialog({
                 <select
                   value={targetId}
                   onChange={(e) => setTargetId(e.target.value)}
-                  className="h-9 w-full border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                  className="h-9 w-full rounded-control border border-line bg-surface px-2 text-xs text-ink focus:border-primary focus:outline-none"
                 >
                   <option value="class-7a">Class 7-A</option>
                   <option value="class-7b">Class 7-B</option>
@@ -198,11 +198,11 @@ export function CreateAnnouncementDialog({
           {/* Channels & Priority */}
           <div className="grid grid-cols-2 gap-3">
             <label className="block">
-              <span className="mb-1 block font-semibold text-slate-800">Delivery Channel</span>
+              <span className="mb-1 block font-semibold text-secondary">Delivery Channel</span>
               <select
                 value={channels}
                 onChange={(e) => setChannels(e.target.value as "in_app" | "sms" | "both")}
-                className="h-9 w-full border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                className="h-9 w-full rounded-control border border-line bg-surface px-2 text-xs text-ink focus:border-primary focus:outline-none"
               >
                 <option value="in_app">In-App Notice Board Only (Free)</option>
                 <option value="sms">SMS Text Alert Only</option>
@@ -211,11 +211,11 @@ export function CreateAnnouncementDialog({
             </label>
 
             <label className="block">
-              <span className="mb-1 block font-semibold text-slate-800">Priority Level</span>
+              <span className="mb-1 block font-semibold text-secondary">Priority Level</span>
               <select
                 value={priority}
                 onChange={(e) => setPriority(e.target.value as "normal" | "urgent")}
-                className="h-9 w-full border border-slate-300 bg-white px-2 focus:border-blue-600 focus:outline-none"
+                className="h-9 w-full rounded-control border border-line bg-surface px-2 text-xs text-ink focus:border-primary focus:outline-none"
               >
                 <option value="normal">Normal (Informational Circular)</option>
                 <option value="urgent">Urgent (Action / Attention Required)</option>
@@ -225,9 +225,9 @@ export function CreateAnnouncementDialog({
 
           {/* Content */}
           <label className="block">
-            <div className="mb-1 flex items-center justify-between font-semibold text-slate-800">
+            <div className="mb-1 flex items-center justify-between font-semibold text-secondary">
               <span>Notice Body & Parameters</span>
-              <span className="font-mono text-[11px] text-slate-500 font-normal">
+              <span className="font-mono text-[11px] text-secondary font-normal">
                 {content.length} chars
               </span>
             </div>
@@ -237,22 +237,22 @@ export function CreateAnnouncementDialog({
               placeholder="Write the official communication notice here..."
               value={content}
               onChange={(e) => setContent(e.target.value)}
-              className="w-full border border-slate-300 bg-white p-3 font-sans text-xs focus:border-blue-600 focus:outline-none"
+              className="w-full rounded-control border border-line bg-surface p-3 font-sans text-xs text-ink focus:border-primary focus:outline-none"
             />
           </label>
 
           {/* Live Telecommunications Estimate (if SMS involved) */}
           {(channels === "sms" || channels === "both") && (
-            <div className="border border-blue-200 bg-blue-50/70 p-3 text-xs text-blue-950">
+            <div className="rounded-control border border-primary/20 bg-primary-subtle p-3 text-xs text-selected">
               <div className="flex items-center justify-between">
-                <span className="font-semibold uppercase tracking-wider text-[11px] text-blue-800">
+                <span className="font-semibold uppercase tracking-wider text-[11px] text-selected">
                   SMS Transit Cost Forecast
                 </span>
-                <span className="font-mono font-bold text-blue-900">
+                <span className="font-mono font-bold text-selected">
                   ${(smsMetrics.estimatedCost * (targetType === "school" ? 142 : targetType === "grade" ? 38 : 22)).toFixed(2)} USD est.
                 </span>
               </div>
-              <p className="mt-1 text-[11px] text-blue-700">
+              <p className="mt-1 text-[11px] text-selected/90">
                 Standard GSM-7: {smsMetrics.segments} segment(s) per recipient ({smsMetrics.characters} characters).
                 Only dispatches to guardians with active opt-in consent.
               </p>
@@ -260,19 +260,17 @@ export function CreateAnnouncementDialog({
           )}
 
           {/* Actions */}
-          <div className="flex items-center justify-end gap-2 border-t border-slate-200 pt-3">
+          <div className="flex items-center justify-end gap-2 border-t border-line-subtle pt-3">
             <Button
               type="button"
               variant="secondary"
               onClick={onClose}
-              className="h-8 rounded-none border-slate-300 text-xs text-slate-700 hover:bg-slate-100"
             >
               Cancel
             </Button>
             <Button
               type="submit"
               disabled={loading}
-              className="h-8 rounded-none bg-blue-700 text-xs font-semibold text-white hover:bg-blue-800"
             >
               {loading ? "Publishing..." : "Publish Announcement"}
             </Button>

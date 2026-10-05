@@ -1,27 +1,60 @@
 @import "tailwindcss";
 
 :root {
-  --canvas: #f8fafc;
+  --canvas: #f4f4f5;
   --surface: #ffffff;
-  --surface-subtle: #f1f5f9;
-  --text-primary: #0f172a;
-  --text-secondary: #475569;
-  --text-muted: #64748b;
-  --border: #cbd5e1;
-  --border-subtle: #e2e8f0;
-  --primary: #1d4ed8;
-  --primary-hover: #1e40af;
-  --primary-subtle: #dbeafe;
-  --focus: #2563eb;
+  --surface-subtle: #fafafa;
+  --text-primary: #18181b;
+  --text-secondary: #52525b;
+  --text-muted: #71717a;
+  --border: #d4d4d8;
+  --border-subtle: #e4e4e7;
+  --primary: #c2410c;
+  --primary-hover: #9a3412;
+  --primary-subtle: #fff7ed;
+  --selected-text: #9a3412;
+  --focus: #c2410c;
   --success: #15803d;
   --warning: #b45309;
   --danger: #b91c1c;
+  --success-subtle: #f0fdf4;
+  --warning-subtle: #fffbeb;
+  --danger-subtle: #fef2f2;
+  --shape-card: 16px;
+  --shape-control: 8px;
+  --shape-small: 6px;
+  --elevation-card: 0 1px 3px rgb(24 24 27 / 0.05), 0 4px 16px rgb(24 24 27 / 0.025);
+  --elevation-overlay: 0 16px 48px rgb(24 24 27 / 0.16);
 }
 
 @theme inline {
   --color-background: var(--canvas);
   --color-foreground: var(--text-primary);
   --font-sans: "Plus Jakarta Sans Variable", ui-sans-serif, system-ui, sans-serif;
+  --color-canvas: var(--canvas);
+  --color-surface: var(--surface);
+  --color-surface-subtle: var(--surface-subtle);
+  --color-ink: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-muted: var(--text-muted);
+  --color-line: var(--border);
+  --color-line-subtle: var(--border-subtle);
+  --color-primary: var(--primary);
+  --color-primary-hover: var(--primary-hover);
+  --color-primary-subtle: var(--primary-subtle);
+  --color-selected: var(--selected-text);
+  --color-focus: var(--focus);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+  --color-success-subtle: var(--success-subtle);
+  --color-warning-subtle: var(--warning-subtle);
+  --color-danger-subtle: var(--danger-subtle);
+  --radius-card: var(--shape-card);
+  --radius-control: var(--shape-control);
+  --radius-small: var(--shape-small);
+  --shadow-card: var(--elevation-card);
+  --shadow-overlay: var(--elevation-overlay);
 }
 
 * { box-sizing: border-box; }
@@ -35,11 +68,25 @@ body {
   line-height: 1.5;
 }
 button, input, select, textarea { font: inherit; }
-button, a, input, select { outline: none; }
+button:not(:disabled), [role="button"]:not([aria-disabled="true"]) { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+input[type="checkbox"], input[type="radio"] { accent-color: var(--primary); }
 :focus-visible { outline: 2px solid var(--focus); outline-offset: 2px; }
 ::selection { background: var(--primary-subtle); }
 .tabular-nums { font-variant-numeric: tabular-nums; }
 .scrollbar-thin { scrollbar-width: thin; scrollbar-color: #94a3b8 transparent; }
+
+@layer components {
+  .ui-card { border: 1px solid var(--border-subtle); border-radius: var(--shape-card); background: var(--surface); box-shadow: var(--elevation-card); color: var(--text-primary); }
+  .ui-field { display: block; min-height: 44px; width: 100%; border: 1px solid var(--border); border-radius: var(--shape-control); background: var(--surface); padding: 10px 12px; color: var(--text-primary); font-size: 14px; transition: border-color 150ms, background-color 150ms; }
+  .ui-field::placeholder { color: var(--text-muted); }
+  .ui-field:hover:not(:disabled) { border-color: var(--text-secondary); }
+  .ui-field:focus { border-color: var(--focus); }
+  .ui-field:disabled { cursor: not-allowed; background: var(--surface-subtle); color: var(--text-muted); }
+  .ui-field[aria-invalid="true"], .ui-field[aria-invalid="true"]:hover, .ui-field[aria-invalid="true"]:focus { border-color: var(--danger); }
+  .ui-overlay { border: 1px solid var(--border-subtle); border-radius: var(--shape-card); background: var(--surface); color: var(--text-primary); box-shadow: var(--elevation-overlay); }
+  .ui-overlay::backdrop { background: rgb(24 24 27 / 0.4); }
+}
 
 @media (prefers-reduced-motion: reduce) {
   *, *::before, *::after {

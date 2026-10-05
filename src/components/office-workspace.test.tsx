@@ -27,6 +27,7 @@ vi.mock("@/app/actions/office-actions", () => ({
 }));
 
 const mockData: OfficeData = {
+  smsPreferences: [],
   actor: { organizationId: "org-1", userId: "user-1", name: "Alex Office", role: "office_staff" },
   school: { id: "org-1", name: "Highfield High", slug: "highfield" },
   years: [{ id: "year-1", organizationId: "org-1", name: "2026-2027", startsOn: "2026-09-01", endsOn: "2027-06-30", isCurrent: true, createdAt: new Date(), updatedAt: new Date() }],

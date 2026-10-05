@@ -8,7 +8,7 @@ jobs:
     runs-on: ubuntu-latest
     services:
       postgres:
-        image: postgres:17-alpine
+        image: postgres:17
         env:
           POSTGRES_DB: klassa_test
           POSTGRES_USER: klassa_test_owner
@@ -24,6 +24,9 @@ jobs:
       RLS_TEST_APP_URL: postgres://klassa_app:IntegrationOnlyAppPassword123456789@127.0.0.1:5432/klassa_test
       KLASSO_DEMO_MODE: "false"
       KLASSO_APP_DATABASE_PASSWORD: IntegrationOnlyAppPassword123456789
+      KLASSO_BOOTSTRAP_USERNAME: ci.platform
+      KLASSO_BOOTSTRAP_NAME: CI Administrator
+      KLASSO_BOOTSTRAP_PASSWORD: IntegrationOnlyBootstrapPassword123456789
       KLASSO_SMS_WORKER_PASSWORD: IntegrationOnlySmsPassword123456789
       BETTER_AUTH_SECRET: IntegrationOnlyAuthSecret123456789012345
       SENSITIVE_RECORD_ENCRYPTION_KEY: IntegrationOnlyRecordKey123456789012345
@@ -40,8 +43,36 @@ jobs:
       - run: npm run lint -- --max-warnings=0
       - run: npm test
       - run: npm run test:sms
+      - run: bash -n scripts/backup.sh scripts/restore.sh scripts/restore-drill.sh
       - run: npm run db:check
       - run: npm run db:deploy
+      - run: npm run test:operations
+        env:
+          RLS_TEST_POSTGRES_CONTAINER: ${{ job.services.postgres.id }}
+      - name: Verify Linux backup and restore scripts
+        env:
+          PG_CONTAINER: ${{ job.services.postgres.id }}
+        run: |
+          docker cp scripts "$PG_CONTAINER:/tmp/klassa-scripts"
+          docker exec "$PG_CONTAINER" psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'CREATE DATABASE klassa_shell_restore'
+          docker exec -e DATABASE_URL="$DATABASE_URL" -e BACKUP_DIR=/tmp/klassa-backups "$PG_CONTAINER" bash /tmp/klassa-scripts/backup.sh
+          docker exec -e DATABASE_URL="${DATABASE_URL%/*}/klassa_shell_restore" -e CONFIRM_RESTORE=yes "$PG_CONTAINER" bash -c '
+            set -euo pipefail
+            archives=(/tmp/klassa-backups/*.sql.gz)
+            mkdir /tmp/klassa-relocated
+            cp "${archives[0]}" "${archives[0]}.sha256" /tmp/klassa-relocated/
+            archive="/tmp/klassa-relocated/$(basename "${archives[0]}")"
+            bash /tmp/klassa-scripts/restore.sh "$archive"
+            printf corrupt >> "$archive"
+            if bash /tmp/klassa-scripts/restore.sh "$archive"; then
+              echo "Corrupt archive was accepted"; exit 1
+            fi
+            rm "$archive.sha256"
+            if bash /tmp/klassa-scripts/restore.sh "$archive"; then
+              echo "Archive without checksum was accepted"; exit 1
+            fi
+          '
+          docker exec "$PG_CONTAINER" psql "$DATABASE_URL" -v ON_ERROR_STOP=1 -c 'DROP DATABASE klassa_shell_restore'
       - run: npm run test:integration
       - run: node scripts/workflow-rls-probe.mjs
       - run: npm run build

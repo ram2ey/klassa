@@ -3,10 +3,11 @@
 import { useState, useTransition } from "react";
 import {
   Buildings, Plus, CheckCircle,
-  Gear, X, ArrowRight,
+  Gear, ArrowRight,
 } from "@phosphor-icons/react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
+import { Overlay } from "@/components/ui/overlay";
 import type {
   OrganizationRecord,
   OnboardingChecklist,
@@ -94,18 +95,18 @@ export function MultiSchoolPanel({
   return (
     <div className="space-y-6">
       {/* Header Banner */}
-      <div className="flex items-start justify-between rounded-xs border border-slate-300 bg-white p-4 shadow-xs">
+      <div className="flex items-start justify-between rounded-card border border-line-subtle bg-surface p-4 shadow-card">
         <div className="space-y-1">
           <div className="flex items-center gap-2">
-            <Buildings size={20} className="text-blue-700" weight="bold" />
-            <h2 className="text-base font-bold text-slate-900">
+            <Buildings size={20} className="text-primary" weight="bold" />
+            <h2 className="text-base font-bold text-ink">
               Multi-School Tenant Administration & Expansion
             </h2>
-            <span className="rounded-xs border border-blue-200 bg-blue-50 px-2 py-0.5 text-[10px] font-bold text-blue-800">
+            <span className="rounded-control border border-primary/20 bg-primary-subtle px-2 py-0.5 text-[10px] font-bold text-primary-hover">
               Multi-Tenant Architecture
             </span>
           </div>
-          <p className="text-xs text-slate-600">
+          <p className="text-xs text-secondary">
             Manage multi-institution deployments, onboarding workflows, isolated database schemas, and administrator delegations.
           </p>
         </div>
@@ -135,21 +136,21 @@ export function MultiSchoolPanel({
           return (
             <div
               key={org.id}
-              className={`border p-4 bg-white space-y-3 rounded-xs ${
-                isCurrent ? "border-blue-600 ring-1 ring-blue-600" : "border-slate-200"
+              className={`rounded-card border p-4 bg-surface space-y-3 shadow-card ${
+                isCurrent ? "border-primary ring-1 ring-primary" : "border-line"
               }`}
             >
               <div className="flex items-start justify-between">
                 <div className="space-y-0.5">
                   <div className="flex items-center gap-1.5">
-                    <span className="font-bold text-sm text-slate-900">{org.name}</span>
+                    <span className="font-bold text-sm text-ink">{org.name}</span>
                     {isCurrent && (
-                      <span className="text-[10px] bg-blue-100 text-blue-800 font-bold px-1.5 py-0.2 border border-blue-200">
+                      <span className="text-[10px] bg-primary-subtle text-primary-hover font-bold px-1.5 py-0.2 border border-primary/20">
                         ACTIVE
                       </span>
                     )}
                   </div>
-                  <div className="text-[11px] font-mono text-slate-500">{org.domain}</div>
+                  <div className="text-[11px] font-mono text-muted">{org.domain}</div>
                 </div>
 
                 <Badge tone={org.status === "active" ? "green" : "amber"}>
@@ -157,14 +158,14 @@ export function MultiSchoolPanel({
                 </Badge>
               </div>
 
-              <div className="border-t border-slate-100 pt-2 grid grid-cols-2 gap-2 text-xs text-slate-600">
+              <div className="border-t border-line-subtle pt-2 grid grid-cols-2 gap-2 text-xs text-secondary">
                 <div>
-                  <span className="text-[10px] text-slate-400 block uppercase">Students</span>
-                  <span className="font-semibold text-slate-800">{org.studentCount}</span>
+                  <span className="text-[10px] text-muted block uppercase">Students</span>
+                  <span className="font-semibold text-ink">{org.studentCount}</span>
                 </div>
                 <div>
-                  <span className="text-[10px] text-slate-400 block uppercase">Grading Scheme</span>
-                  <span className="font-semibold text-slate-800">
+                  <span className="text-[10px] text-muted block uppercase">Grading Scheme</span>
+                  <span className="font-semibold text-ink">
                     {org.gradingScheme === "letter" ? "Letter grades" : "Standards-Based"}
                   </span>
                 </div>
@@ -173,13 +174,13 @@ export function MultiSchoolPanel({
               {/* Onboarding Progress Bar */}
               <div className="space-y-1">
                 <div className="flex items-center justify-between text-[11px]">
-                  <span className="text-slate-500 font-medium">Onboarding Verification</span>
-                  <span className="font-bold text-slate-800">{progress}%</span>
+                  <span className="text-muted font-medium">Onboarding Verification</span>
+                  <span className="font-bold text-ink">{progress}%</span>
                 </div>
-                <div className="h-1.5 w-full bg-slate-100 overflow-hidden">
+                <div className="h-1.5 w-full bg-surface-subtle overflow-hidden">
                   <div
                     className={`h-full transition-all ${
-                      progress === 100 ? "bg-emerald-600" : "bg-blue-600"
+                      progress === 100 ? "bg-emerald-600" : "bg-primary"
                     }`}
                     style={{ width: `${progress}%` }}
                   />
@@ -208,7 +209,7 @@ export function MultiSchoolPanel({
                     <ArrowRight size={12} />
                   </Button>
                 ) : (
-                  <span className="text-[11px] text-blue-700 font-semibold flex items-center gap-1">
+                  <span className="text-[11px] text-primary font-semibold flex items-center gap-1">
                     <CheckCircle size={14} weight="fill" /> Selected
                   </span>
                 )}
@@ -220,24 +221,7 @@ export function MultiSchoolPanel({
 
       {/* Checklist Drawer/Modal */}
       {selectedOrgForChecklist && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4" role="presentation">
-          <section role="dialog" aria-modal="true" className="w-full max-w-md border border-slate-300 bg-white shadow-2xl">
-            <div className="flex items-start justify-between border-b border-slate-200 p-4">
-              <div>
-                <h3 className="text-base font-bold text-slate-900">
-                  Onboarding Checklist — {selectedOrgForChecklist.name}
-                </h3>
-                <p className="text-xs text-slate-600">Statutory institutional readiness verification</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setSelectedOrgForChecklist(null)}
-                className="text-slate-400 hover:text-slate-600 p-1"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
+        <Overlay open onClose={() => setSelectedOrgForChecklist(null)} title={`Onboarding Checklist — ${selectedOrgForChecklist.name}`} description="Statutory institutional readiness verification">
             <div className="p-4 space-y-2 text-xs">
               {(() => {
                 const ch = localChecklists[selectedOrgForChecklist.id] || {
@@ -257,7 +241,7 @@ export function MultiSchoolPanel({
                 return items.map((item) => (
                   <label
                     key={item.key}
-                    className="flex items-start gap-2.5 p-2 border border-slate-100 bg-slate-50 hover:bg-slate-100/70 cursor-pointer rounded-xs"
+                    className="flex items-start gap-2.5 p-2 border border-line-subtle bg-surface-subtle hover:bg-surface-subtle/70 cursor-pointer rounded-control"
                   >
                     <input
                       type="checkbox"
@@ -267,43 +251,27 @@ export function MultiSchoolPanel({
                       className="mt-0.5"
                     />
                     <div className="space-y-0.5">
-                      <div className={`font-semibold ${ch[item.key] ? "text-slate-900" : "text-slate-600"}`}>
+                      <div className={`font-semibold ${ch[item.key] ? "text-ink" : "text-secondary"}`}>
                         {item.label}
                       </div>
-                      <div className="text-[10px] text-slate-500">{item.desc}</div>
+                      <div className="text-[10px] text-muted">{item.desc}</div>
                     </div>
                   </label>
                 ));
               })()}
             </div>
 
-            <div className="flex justify-end border-t border-slate-200 p-3 bg-slate-50">
+            <div className="flex justify-end border-t border-line p-3 bg-surface-subtle">
               <Button size="sm" onClick={() => setSelectedOrgForChecklist(null)}>
                 Done
               </Button>
             </div>
-          </section>
-        </div>
+          </Overlay>
       )}
 
       {/* Provision School Modal */}
       {showProvisionModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/45 p-4" role="presentation">
-          <section role="dialog" aria-modal="true" className="w-full max-w-lg border border-slate-300 bg-white shadow-2xl">
-            <div className="flex items-start justify-between border-b border-slate-200 p-4">
-              <div>
-                <h3 className="text-base font-bold text-slate-900">Provision New School Institution</h3>
-                <p className="text-xs text-slate-600">Deploy an isolated tenant with dedicated schema boundaries.</p>
-              </div>
-              <button
-                type="button"
-                onClick={() => setShowProvisionModal(false)}
-                className="text-slate-400 hover:text-slate-600 p-1"
-              >
-                <X size={18} />
-              </button>
-            </div>
-
+        <Overlay open onClose={() => setShowProvisionModal(false)} title="Provision New School Institution" description="Deploy an isolated tenant with dedicated schema boundaries.">
             <div className="p-4 space-y-3 text-xs">
               {formError && (
                 <div className="border border-rose-200 bg-rose-50 p-2.5 text-rose-800 text-xs">
@@ -312,82 +280,82 @@ export function MultiSchoolPanel({
               )}
 
               <div>
-                <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">School Legal Name</label>
+                <label className="block text-[11px] font-bold uppercase text-secondary mb-1">School Legal Name</label>
                 <input
                   type="text"
                   value={schoolName}
                   onChange={(e) => handleNameChange(e.target.value)}
                   placeholder="e.g. Westford Grammar School"
-                  className="w-full border border-slate-300 bg-white px-3 py-2 text-xs focus:outline-hidden"
+                  className="ui-field w-full text-xs"
                 />
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Subdomain Slug</label>
+                  <label className="block text-[11px] font-bold uppercase text-secondary mb-1">Subdomain Slug</label>
                   <input
                     type="text"
                     value={schoolSlug}
                     onChange={(e) => setSchoolSlug(e.target.value)}
                     placeholder="e.g. westford"
-                    className="w-full border border-slate-300 bg-white px-3 py-2 text-xs font-mono focus:outline-hidden"
+                    className="ui-field w-full text-xs font-mono"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Primary Domain</label>
+                  <label className="block text-[11px] font-bold uppercase text-secondary mb-1">Primary Domain</label>
                   <input
                     type="text"
                     value={schoolDomain}
                     onChange={(e) => setSchoolDomain(e.target.value)}
                     placeholder="e.g. westford.edu.is"
-                    className="w-full border border-slate-300 bg-white px-3 py-2 text-xs font-mono focus:outline-hidden"
+                    className="ui-field w-full text-xs font-mono"
                   />
                 </div>
               </div>
 
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Default Grading Model</label>
+                  <label className="block text-[11px] font-bold uppercase text-secondary mb-1">Default Grading Model</label>
                   <select
                     value={schoolGradingScheme}
                     onChange={(e) => setSchoolGradingScheme(e.target.value as "letter" | "standards_based")}
-                    className="w-full border border-slate-300 bg-white px-3 py-2 text-xs focus:outline-hidden"
+                    className="ui-field w-full text-xs"
                   >
                     <option value="letter">Letter grades</option>
                     <option value="standards_based">Standards-Based (4-point Rubric)</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Timezone</label>
-                  <p className="border border-slate-300 bg-slate-50 px-3 py-2 text-xs">GMT</p>
+                  <label className="block text-[11px] font-bold uppercase text-secondary mb-1">Timezone</label>
+                  <p className="border border-line bg-surface-subtle px-3 py-2 text-xs">GMT</p>
                 </div>
               </div>
 
-              <div className="border-t border-slate-200 pt-3 grid grid-cols-2 gap-2">
+              <div className="border-t border-line pt-3 grid grid-cols-2 gap-2">
                 <div>
-                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Initial Admin Name</label>
+                  <label className="block text-[11px] font-bold uppercase text-secondary mb-1">Initial Admin Name</label>
                   <input
                     type="text"
                     value={adminName}
                     onChange={(e) => setAdminName(e.target.value)}
                     placeholder="e.g. Margaret Evans"
-                    className="w-full border border-slate-300 bg-white px-3 py-2 text-xs focus:outline-hidden"
+                    className="ui-field w-full text-xs"
                   />
                 </div>
                 <div>
-                  <label className="block text-[11px] font-bold uppercase text-slate-600 mb-1">Initial Admin Email</label>
+                  <label className="block text-[11px] font-bold uppercase text-secondary mb-1">Initial Admin Email</label>
                   <input
                     type="email"
                     value={adminEmail}
                     onChange={(e) => setAdminEmail(e.target.value)}
                     placeholder="admin@westford.edu.is"
-                    className="w-full border border-slate-300 bg-white px-3 py-2 text-xs focus:outline-hidden"
+                    className="ui-field w-full text-xs"
                   />
                 </div>
               </div>
             </div>
 
-            <div className="flex justify-end gap-2 border-t border-slate-200 p-3 bg-slate-50">
+            <div className="flex justify-end gap-2 border-t border-line p-3 bg-surface-subtle">
               <Button variant="ghost" size="sm" onClick={() => setShowProvisionModal(false)}>
                 Cancel
               </Button>
@@ -395,8 +363,7 @@ export function MultiSchoolPanel({
                 Deploy School Tenant
               </Button>
             </div>
-          </section>
-        </div>
+          </Overlay>
       )}
     </div>
   );

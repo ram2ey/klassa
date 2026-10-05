@@ -99,12 +99,12 @@ export function ViewCaseDetailModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-xs">
-      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-xs border border-slate-300 bg-white shadow-xl">
+      <div className="flex max-h-[90vh] w-full max-w-2xl flex-col rounded-control border border-line bg-surface shadow-xl">
         {/* Modal Header */}
-        <div className="flex items-start justify-between border-b border-slate-200 p-5">
+        <div className="flex items-start justify-between border-b border-line p-5">
           <div className="space-y-1">
             <div className="flex items-center gap-2">
-              <span className="font-mono text-xs font-semibold text-slate-500 uppercase">
+              <span className="font-mono text-xs font-semibold text-muted uppercase">
                 {caseRecord.caseNumber}
               </span>
               <Badge tone={getTierTone(caseRecord.confidentialityTier)}>
@@ -117,14 +117,14 @@ export function ViewCaseDetailModal({
                 </Badge>
               )}
             </div>
-            <h2 className="text-lg font-bold text-slate-900">{caseRecord.title}</h2>
-            <p className="text-xs text-slate-500">
-              Student: <span className="font-medium text-slate-700">{caseRecord.studentName}</span> ({caseRecord.studentGrade}) • Area: <span className="font-medium text-slate-700">{getAreaLabel(caseRecord.area)}</span>
+            <h2 className="text-lg font-bold text-ink">{caseRecord.title}</h2>
+            <p className="text-xs text-muted">
+              Student: <span className="font-medium text-secondary">{caseRecord.studentName}</span> ({caseRecord.studentGrade}) • Area: <span className="font-medium text-secondary">{getAreaLabel(caseRecord.area)}</span>
             </p>
           </div>
           <button
             onClick={onClose}
-            className="rounded-xs p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-700"
+            className="rounded-control p-1 text-muted hover:bg-surface-subtle hover:text-secondary"
             aria-label="Close modal"
           >
             <X size={20} />
@@ -134,30 +134,30 @@ export function ViewCaseDetailModal({
         {/* Modal Body */}
         <div className="flex-1 space-y-5 overflow-y-auto p-5">
           {/* Metadata Grid */}
-          <div className="grid grid-cols-2 gap-3 rounded-xs border border-slate-200 bg-slate-50 p-3 text-xs md:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 rounded-control border border-line bg-surface-subtle p-3 text-xs md:grid-cols-4">
             <div>
-              <span className="block text-slate-500">Status</span>
-              <span className="font-medium capitalize text-slate-800">{caseRecord.status.replace("_", " ")}</span>
+              <span className="block text-muted">Status</span>
+              <span className="font-medium capitalize text-ink">{caseRecord.status.replace("_", " ")}</span>
             </div>
             <div>
-              <span className="block text-slate-500">Lead Specialist</span>
-              <span className="font-medium text-slate-800">{caseRecord.leadSpecialistName}</span>
+              <span className="block text-muted">Lead Specialist</span>
+              <span className="font-medium text-ink">{caseRecord.leadSpecialistName}</span>
             </div>
             <div>
-              <span className="block text-slate-500">Scheduled Review</span>
-              <span className="font-medium text-slate-800">{caseRecord.reviewDate || "None set"}</span>
+              <span className="block text-muted">Scheduled Review</span>
+              <span className="font-medium text-ink">{caseRecord.reviewDate || "None set"}</span>
             </div>
             <div>
-              <span className="block text-slate-500">Encrypted Notes</span>
-              <span className="font-medium text-slate-800">{caseRecord.encryptedNotesCount} file(s)</span>
+              <span className="block text-muted">Encrypted Notes</span>
+              <span className="font-medium text-ink">{caseRecord.encryptedNotesCount} file(s)</span>
             </div>
           </div>
 
           {/* Decryption Security Shield */}
           {!isDecrypted ? (
-            <div className="space-y-4 rounded-xs border border-amber-300 bg-amber-50/70 p-4">
+            <div className="space-y-4 rounded-control border border-amber-300 bg-amber-50/70 p-4">
               <div className="flex items-start gap-3">
-                <div className="rounded-xs bg-amber-100 p-2 text-amber-800">
+                <div className="rounded-control bg-amber-100 p-2 text-amber-800">
                   <LockKey size={24} weight="bold" />
                 </div>
                 <div className="space-y-1">
@@ -179,7 +179,7 @@ export function ViewCaseDetailModal({
                   placeholder="e.g., Annual case conference review or medical dosing verification..."
                   value={accessReason}
                   onChange={(e) => setAccessReason(e.target.value)}
-                  className="w-full rounded-xs border border-amber-300 bg-white px-3 py-2 text-xs text-slate-800 placeholder-slate-400 focus:border-blue-600 focus:outline-none"
+                  className="w-full rounded-control border border-amber-300 bg-surface px-3 py-2 text-xs text-ink placeholder-slate-400 focus:border-primary focus:outline-none"
                   disabled={isPending}
                 />
                 <p className="text-[11px] text-amber-800">
@@ -188,7 +188,7 @@ export function ViewCaseDetailModal({
               </div>
 
               {error && (
-                <div className="rounded-xs border border-rose-200 bg-rose-50 p-2 text-xs text-rose-700 flex items-center gap-1.5">
+                <div className="rounded-control border border-rose-200 bg-rose-50 p-2 text-xs text-rose-700 flex items-center gap-1.5">
                   <WarningOctagon size={16} />
                   <span>{error}</span>
                 </div>
@@ -208,39 +208,39 @@ export function ViewCaseDetailModal({
           ) : (
             <div className="space-y-4">
               {auditNotice && (
-                <div className="flex items-center gap-2 rounded-xs border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800">
+                <div className="flex items-center gap-2 rounded-control border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-medium text-emerald-800">
                   <ShieldCheck size={18} weight="bold" />
                   <span>{auditNotice}</span>
                 </div>
               )}
 
               <div className="space-y-3">
-                <h4 className="text-xs font-bold uppercase tracking-wider text-slate-600">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-secondary">
                   Decrypted Narrative Notes ({decryptedNotes.length})
                 </h4>
 
                 {decryptedNotes.map((note) => (
                   <div
                     key={note.id}
-                    className="rounded-xs border border-slate-200 bg-slate-50/50 p-4 space-y-2"
+                    className="rounded-control border border-line bg-surface-subtle/50 p-4 space-y-2"
                   >
-                    <div className="flex items-center justify-between border-b border-slate-200 pb-2 text-xs">
-                      <div className="flex items-center gap-2 font-medium text-slate-700">
+                    <div className="flex items-center justify-between border-b border-line pb-2 text-xs">
+                      <div className="flex items-center gap-2 font-medium text-secondary">
                         <User size={14} />
                         <span>{note.authorName}</span>
-                        <span className="text-slate-400">•</span>
-                        <span className="capitalize text-slate-500">{note.noteType.replace(/_/g, " ")}</span>
+                        <span className="text-muted">•</span>
+                        <span className="capitalize text-muted">{note.noteType.replace(/_/g, " ")}</span>
                       </div>
-                      <span className="text-slate-400">
+                      <span className="text-muted">
                         {formatGMTDateTime(note.createdAt)}
                       </span>
                     </div>
 
-                    <p className="text-xs text-slate-900 leading-relaxed whitespace-pre-wrap font-sans">
+                    <p className="text-xs text-ink leading-relaxed whitespace-pre-wrap font-sans">
                       {note.decryptedText}
                     </p>
 
-                    <div className="flex items-center justify-between pt-2 text-[10px] text-slate-400 border-t border-slate-100">
+                    <div className="flex items-center justify-between pt-2 text-[10px] text-muted border-t border-line-subtle">
                       <span>Cryptographic Auth Tag: Verified (AES-GCM)</span>
                       <span>IV: {note.ivHex.substring(0, 8)}...</span>
                     </div>
@@ -252,8 +252,8 @@ export function ViewCaseDetailModal({
         </div>
 
         {/* Modal Footer */}
-        <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50 p-4 text-xs">
-          <span className="text-slate-500">
+        <div className="flex items-center justify-between border-t border-line bg-surface-subtle p-4 text-xs">
+          <span className="text-muted">
             Klassa Multi-Tenant Security Scope: Confidential Student Record
           </span>
           <Button variant="secondary" onClick={onClose}>

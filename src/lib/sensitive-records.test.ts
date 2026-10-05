@@ -14,7 +14,7 @@ import {
   INITIAL_SENSITIVE_CASES,
   INITIAL_COURT_RESTRICTIONS,
   type CourtRestrictionRecord,
-} from "./sensitive-records";
+} from "./sensitive-records-server";
 
 describe("Phase 5: Sensitive Records Cryptography (AES-256-GCM)", () => {
   it("encrypts and decrypts sensitive case narratives accurately", () => {
