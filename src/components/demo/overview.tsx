@@ -12,11 +12,13 @@ export function OverviewModule({ studentsCount, guardiansCount, classesCount, st
 }) {
   const attendance = submitted ? { total: metrics.total, attended: metrics.present + metrics.late, absent: metrics.absent } : { total: 0, attended: 0, absent: 0 };
   const admin = persona === "admin";
+  const teacher = persona === "teacher";
   const guardian = persona === "guardian";
   const actions: OverviewModel["actions"] = [
-    { label: "Open attendance", onClick: () => onNavigate("Attendance"), description: "Synthetic session only · 2026-09-22" },
-    ...(guardian ? [{ label: "Read communications", onClick: () => onNavigate("Communications") }] : [{ label: "Open student directory", onClick: () => onNavigate("Students") }]),
-    ...(admin ? [{ label: "Invite staff", onClick: onInviteStaff }] : []),
+    { label: "Open attendance", onClick: () => onNavigate("Attendance"), description: "Daily roll call and attendance records" },
+    ...(guardian ? [{ label: "School notices & consents", onClick: () => onNavigate("Communications") }] : [{ label: "Open student directory", onClick: () => onNavigate("Students"), description: "View enrolled pupils and profiles" }]),
+    ...(teacher ? [{ label: "Enter grades & marks", onClick: () => onNavigate("Gradebook"), description: "Record assessment scores" }] : []),
+    ...(admin ? [{ label: "Send school announcement", onClick: () => onNavigate("Communications"), description: "Broadcast messages & SMS" }, { label: "Invite staff", onClick: onInviteStaff }] : []),
   ];
   return <OverviewDashboard headingAction={admin ? <div className="flex flex-wrap gap-2"><Button variant="secondary" onClick={onImportCsv}>Import roster</Button><Button onClick={onAddStudent}>Add student</Button></div> : undefined} model={{
     description: schoolName + " · Local demo · Synthetic school information",

@@ -35,7 +35,7 @@ import { AddStudentDialog, ImportCsvModal, AddGuardianDialog, AddClassDialog, Ad
 
 export function KlassoWorkspace({ roster }: { roster: Awaited<ReturnType<typeof getWorkspaceData>> }) {
   const [invitationError, setInvitationError] = useState("");
-  const [active, setActive] = useState<NavModule>("Attendance");
+  const [active, setActive] = useState<NavModule>("Overview");
   const [persona, setPersona] = useState<Persona>("admin");
   const [notificationsOpen, setNotificationsOpen] = useState(false);
 
@@ -160,9 +160,9 @@ export function KlassoWorkspace({ roster }: { roster: Awaited<ReturnType<typeof 
   function handlePersonaSwitch(newPersona: Persona) {
     setPersona(newPersona);
     if (newPersona === "guardian") {
-      setActive("Attendance");
+      setActive("Overview");
     } else if (newPersona === "teacher") {
-      setActive("Attendance");
+      setActive("Overview");
     }
   }
 
