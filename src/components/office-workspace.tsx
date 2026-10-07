@@ -111,11 +111,13 @@ function Card({
 }
 
 export function OfficeWorkspace({
+  embedded = false,
   data,
   notices,
   section,
   date,
 }: {
+  embedded?: boolean;
   data: OfficeData;
   notices: (typeof announcements.$inferSelect)[];
   section: string;
@@ -237,6 +239,7 @@ export function OfficeWorkspace({
   return (
     <>
       <WorkspaceShell
+        embedded={embedded}
         schoolName={data.school.name}
         academicYear={year?.name ?? "Academic year not set"}
         actorName={data.actor.name}
@@ -480,7 +483,7 @@ export function OfficeWorkspace({
                     </div>
                   ),
                 },
-              ]}
+              ].filter(item => !embedded || item.value !== "verification")}
             />
           </div>
         )}
@@ -1058,7 +1061,7 @@ export function OfficeWorkspace({
       )}
 
       {/* ---------------- CSV IMPORTS ---------------- */}
-      {current.id === "imports" && <StudentCsvImport role="office_staff" />}
+      {(current.id === "imports" || (embedded && current.id === "students")) && <StudentCsvImport role="office_staff" />}
 
       {/* ---------------- NOTICES ---------------- */}
       {current.id === "notices" && (
@@ -1272,7 +1275,7 @@ export function OfficeWorkspace({
     )}
 
     {showEnrollment && (
-      <StudentEnrollmentFlow
+      <StudentEnrollmentFlow mvp={embedded}
         classes={classOptions.map(item => ({ id: item.id, label: item.name }))}
         existingGuardians={data.guardians.map(item => ({
           id: item.id,

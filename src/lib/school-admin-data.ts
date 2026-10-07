@@ -6,7 +6,7 @@ import { academicYears, attendanceRecords, attendanceSessions, auditEvents, clas
 import { requireStaff } from "@/lib/action-access";
 import { formatPeriodLabel, type TimetablePeriodItem } from "@/lib/timetable-service";
 
-export async function getSchoolAdminData() {
+export async function getSchoolAdminData(mvp = false) {
   const actor = await requireStaff(["school_admin"]);
   const org = actor.organizationId;
   const [school] = await db.select({ id: organizations.id, name: organizations.name, slug: organizations.slug, timezone: organizations.timezone })
@@ -57,11 +57,11 @@ export async function getSchoolAdminData() {
     publishedReportIds.length
       ? db.select().from(reportCardSubjectGrades).where(and(eq(reportCardSubjectGrades.organizationId, org), inArray(reportCardSubjectGrades.reportCardId, publishedReportIds)))
       : Promise.resolve([]),
-    db.select().from(studentBehaviours).where(eq(studentBehaviours.organizationId, org)).orderBy(desc(studentBehaviours.occurredAt), desc(studentBehaviours.createdAt)).limit(500),
+    db.select().from(studentBehaviours).where(and(eq(studentBehaviours.organizationId, org), sql`${!mvp}`)).orderBy(desc(studentBehaviours.occurredAt), desc(studentBehaviours.createdAt)).limit(500),
     db.select({ id: guardianAbsenceNotes.id, studentId: guardianAbsenceNotes.studentId,
       absenceDate: guardianAbsenceNotes.absenceDate, reasonCategory: guardianAbsenceNotes.reasonCategory,
       status: guardianAbsenceNotes.status, createdAt: guardianAbsenceNotes.createdAt })
-      .from(guardianAbsenceNotes).where(eq(guardianAbsenceNotes.organizationId, org))
+      .from(guardianAbsenceNotes).where(and(eq(guardianAbsenceNotes.organizationId, org), sql`${!mvp}`))
       .orderBy(desc(guardianAbsenceNotes.createdAt)).limit(100),
     db.select({
       id: classTimetablePeriods.id,
@@ -74,7 +74,7 @@ export async function getSchoolAdminData() {
       teacherId: classTimetablePeriods.teacherId,
       room: classTimetablePeriods.room,
       building: classTimetablePeriods.building,
-    }).from(classTimetablePeriods).where(eq(classTimetablePeriods.organizationId, org))
+    }).from(classTimetablePeriods).where(and(eq(classTimetablePeriods.organizationId, org), sql`${!mvp}`))
       .orderBy(asc(classTimetablePeriods.startTime)),
   ]);
   const timetable: TimetablePeriodItem[] = timetableRows.map((row) => {
@@ -92,7 +92,7 @@ export async function getSchoolAdminData() {
   });
   const smsPreferences = await db.select({ guardianId: guardianConsents.guardianId,
     announcements: guardianConsents.optInSmsAnnouncements }).from(guardianConsents)
-    .where(eq(guardianConsents.organizationId, org));
+    .where(and(eq(guardianConsents.organizationId, org), sql`${!mvp}`));
   return { school, actor, students: studentRows, guardians: guardianRows, smsPreferences, links, staff, classes: classRows, assignments,
     grades, years, terms: termRows, subjects: subjectRows, enrollments: enrollmentRows, audit, absenceNotes,
     attendanceSummary, publishedReports, reportSubjects, behaviours, timetable, activeAlerts: activeAlerts.filter(alert => !alert.expiresAt || alert.expiresAt > new Date()),

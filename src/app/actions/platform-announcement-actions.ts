@@ -1,4 +1,5 @@
 "use server";
+import { requireDeferredFeature } from "@/lib/mvp-release";
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -12,6 +13,7 @@ const inputSchema = z.object({ title: z.string().trim().min(3).max(200),
 
 export async function publishPlatformAnnouncementAction(raw: z.input<typeof inputSchema>) {
   const actor = await requirePlatformAdmin();
+  requireDeferredFeature("Notices");
   if (!actor.twoFactorEnabled) throw new Error("Multi-factor authentication is required.");
   const input = inputSchema.parse(raw);
   const result = await db.transaction(async tx => {

@@ -1,4 +1,5 @@
 "use server";
+import { requireMvpLegacyWorkflow } from "@/lib/mvp-release";
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -9,6 +10,7 @@ import type { WorkflowCommand } from "@/lib/school-workflow-policy";
 
 export async function saveTeacherWorkflowAction(input: WorkflowCommand) {
   const actor = await requireStaff(["teacher"]);
+  requireMvpLegacyWorkflow(input.kind, "period" in input ? input.period : undefined);
   try {
     const result = await saveSchoolWorkflow(actor, input);
     revalidatePath("/");

@@ -1,4 +1,5 @@
 "use server";
+import { requireDeferredFeature } from "@/lib/mvp-release";
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -7,6 +8,7 @@ import { recordGuardianSmsPreferences, SchoolConsentError, staffSmsPreferencesSc
 
 export async function recordGuardianSmsPreferencesAction(input: z.input<typeof staffSmsPreferencesSchema>) {
   const actor = await requireStaff(["office_staff", "school_admin"]);
+  requireDeferredFeature("Parent SMS");
   try {
     await recordGuardianSmsPreferences(actor, input);
     revalidatePath("/");

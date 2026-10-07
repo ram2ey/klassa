@@ -1,4 +1,5 @@
 "use server";
+import { requireDeferredFeature } from "@/lib/mvp-release";
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -43,6 +44,7 @@ export async function correctOfficeAttendanceAction(input: WorkflowCommand) {
 
 export async function recordReceptionDeskAction(input: WorkflowCommand) {
   const actor = await requireStaff(["office_staff"]);
+  requireDeferredFeature("Reception and parent absence notes");
   try {
     const result = await saveSchoolWorkflow(actor, input);
     revalidatePath("/");
@@ -61,6 +63,7 @@ export async function importOfficeStudentsAction(csvText: string) {
 
 export async function markGuardianAbsenceNoteReviewedAction(noteId: string) {
   const actor = await requireStaff(["office_staff"]);
+  requireDeferredFeature("Reception and parent absence notes");
   try {
     const id = z.uuid().parse(noteId);
     await db.transaction(async tx => {
@@ -81,6 +84,7 @@ export async function markGuardianAbsenceNoteReviewedAction(noteId: string) {
 
 export async function reviewAndExcuseGuardianAbsenceAction(noteId: string) {
   const actor = await requireStaff(["office_staff"]);
+  requireDeferredFeature("Reception and parent absence notes");
   try {
     const result = await reviewAndExcuseGuardianAbsence(actor, noteId);
     revalidatePath("/");

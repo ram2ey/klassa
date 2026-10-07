@@ -2,7 +2,7 @@ import {
   type AnyPgColumn, bigint, boolean, date, index, integer, jsonb, numeric, pgEnum, pgTable, text,
   primaryKey, timestamp, uniqueIndex, uuid, varchar,
 } from "drizzle-orm/pg-core";
-import { isNull } from "drizzle-orm";
+import { isNull, sql } from "drizzle-orm";
 import { SCHOOL_TIME_ZONE } from "@/lib/timezone";
 
 const timestamps = {
@@ -172,6 +172,7 @@ export const terms = pgTable("terms", {
   lockedAt: timestamp("locked_at", { withTimezone: true }),
   lockedById: text("locked_by_id").references(() => users.id, { onDelete: "set null" }),
   lockNotes: text("lock_notes"),
+  classworkWeight: integer("classwork_weight").default(40).notNull(),
   ...timestamps,
 }, (table) => [
   index("terms_year_idx").on(table.academicYearId),
@@ -499,8 +500,10 @@ export const reportCards = pgTable("report_cards", {
   daysPresent: integer("days_present").default(0).notNull(),
   daysAbsent: integer("days_absent").default(0).notNull(),
   daysLate: integer("days_late").default(0).notNull(),
+  daysExcused: integer("days_excused").default(0).notNull(),
   teacherRemarks: text("teacher_remarks"),
   principalRemarks: text("principal_remarks"),
+  sourceFingerprint: text("source_fingerprint"),
   approvedBy: text("approved_by").references(() => users.id, { onDelete: "set null" }),
   publishedAt: timestamp("published_at", { withTimezone: true }),
   ...timestamps,
@@ -516,7 +519,11 @@ export const reportCardSubjectGrades = pgTable("report_card_subject_grades", {
   subjectId: uuid("subject_id").notNull().references(() => subjects.id, { onDelete: "cascade" }),
   teacherId: text("teacher_id").references(() => users.id, { onDelete: "set null" }),
   scorePercentage: numeric("score_percentage", { precision: 5, scale: 2 }).notNull(),
-  letterGrade: varchar("letter_grade", { length: 10 }).notNull(),
+  classworkScore: numeric("classwork_score", { precision: 5, scale: 2 }),
+  examScore: numeric("exam_score", { precision: 5, scale: 2 }),
+  classworkWeight: integer("classwork_weight"),
+  subjectName: varchar("subject_name", { length: 120 }),
+  letterGrade: varchar("letter_grade", { length: 10 }),
   standardsLevel: varchar("standards_level", { length: 50 }),
   comments: text("comments"),
   ...timestamps,
@@ -825,7 +832,87 @@ export const platformIncidentEvents = pgTable("platform_incident_events", {
   createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
 }, table => [index("platform_incident_events_incident_idx").on(table.incidentId, table.createdAt)]);
 
+// First-release records. Older module tables remain available for later releases.
+export const classSubjects = pgTable("class_subjects", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  classId: uuid("class_id").notNull().references(() => classes.id, { onDelete: "cascade" }),
+  subjectId: uuid("subject_id").notNull().references(() => subjects.id, { onDelete: "restrict" }),
+}, t => [uniqueIndex("class_subjects_unique").on(t.organizationId, t.classId, t.subjectId)]);
+
+export const termMarks = pgTable("term_marks", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  classId: uuid("class_id").notNull().references(() => classes.id, { onDelete: "restrict" }),
+  studentId: uuid("student_id").notNull().references(() => students.id, { onDelete: "restrict" }),
+  termId: uuid("term_id").notNull().references(() => terms.id, { onDelete: "restrict" }),
+  subjectId: uuid("subject_id").notNull().references(() => subjects.id, { onDelete: "restrict" }),
+  classworkScore: numeric("classwork_score", { precision: 5, scale: 2 }),
+  examScore: numeric("exam_score", { precision: 5, scale: 2 }),
+  remark: text("remark").notNull().default(""),
+  updatedBy: text("updated_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+  ...timestamps,
+}, t => [uniqueIndex("term_marks_unique").on(t.organizationId, t.studentId, t.termId, t.subjectId), index("term_marks_class_term_idx").on(t.organizationId, t.classId, t.termId)]);
+
+export const feeDefinitions = pgTable("fee_definitions", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  classId: uuid("class_id").notNull().references(() => classes.id, { onDelete: "restrict" }),
+  termId: uuid("term_id").notNull().references(() => terms.id, { onDelete: "restrict" }),
+  name: varchar("name", { length: 120 }).notNull(),
+  amountPesewas: bigint("amount_pesewas", { mode: "number" }).notNull(),
+  ...timestamps,
+}, t => [uniqueIndex("fee_definitions_unique").on(t.organizationId, t.classId, t.termId, t.name)]);
+
+export const feeEntries = pgTable("fee_entries", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  studentId: uuid("student_id").notNull().references(() => students.id, { onDelete: "restrict" }),
+  termId: uuid("term_id").references(() => terms.id, { onDelete: "restrict" }),
+  definitionId: uuid("definition_id").references(() => feeDefinitions.id, { onDelete: "restrict" }),
+  kind: varchar("kind", { length: 20 }).$type<"charge" | "opening" | "adjustment">().notNull(),
+  label: varchar("label", { length: 120 }).notNull(),
+  amountPesewas: bigint("amount_pesewas", { mode: "number" }).notNull(),
+  reason: text("reason").notNull().default(""),
+  entryDate: date("entry_date").notNull(),
+  recordedBy: text("recorded_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, t => [index("fee_entries_student_idx").on(t.organizationId, t.studentId), uniqueIndex("fee_entries_charge_unique").on(t.organizationId, t.studentId, t.definitionId), uniqueIndex("fee_entries_opening_unique").on(t.organizationId, t.studentId).where(sql`${t.kind} = 'opening'`)]);
+
+export const feePayments = pgTable("fee_payments", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  studentId: uuid("student_id").notNull().references(() => students.id, { onDelete: "restrict" }),
+  amountPesewas: bigint("amount_pesewas", { mode: "number" }).notNull(),
+  balanceAfterPesewas: bigint("balance_after_pesewas", { mode: "number" }).notNull(),
+  receiptNumber: varchar("receipt_number", { length: 40 }).notNull(),
+  paymentDate: date("payment_date").notNull(),
+  method: varchar("method", { length: 20 }).$type<"cash" | "mobile_money" | "bank">().notNull(),
+  reference: varchar("reference", { length: 120 }).notNull().default(""),
+  recordedBy: text("recorded_by").notNull().references(() => users.id, { onDelete: "restrict" }),
+  voidedAt: timestamp("voided_at", { withTimezone: true }),
+  voidedBy: text("voided_by").references(() => users.id, { onDelete: "restrict" }),
+  voidReason: text("void_reason"),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, t => [uniqueIndex("fee_payments_receipt_unique").on(t.organizationId, t.receiptNumber), index("fee_payments_student_idx").on(t.organizationId, t.studentId)]);
+
+export const feeCounters = pgTable("fee_counters", {
+  organizationId: uuid("organization_id").primaryKey().references(() => organizations.id, { onDelete: "cascade" }),
+  nextNumber: bigint("next_number", { mode: "number" }).notNull().default(1),
+});
+
+export const mvpOperations = pgTable("mvp_operations", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  organizationId: uuid("organization_id").notNull().references(() => organizations.id, { onDelete: "cascade" }),
+  requestId: uuid("request_id").notNull(),
+  actorId: text("actor_id").notNull().references(() => users.id, { onDelete: "restrict" }),
+  fingerprint: text("fingerprint").notNull(),
+  result: jsonb("result").$type<{ entityId: string; message: string; ids?: string[] }>().notNull(),
+  createdAt: timestamp("created_at", { withTimezone: true }).defaultNow().notNull(),
+}, t => [uniqueIndex("mvp_operations_request_unique").on(t.organizationId, t.requestId)]);
+
 export const schema = {
+  classSubjects, termMarks, feeDefinitions, feeEntries, feePayments, feeCounters, mvpOperations,
   organizationMemberships,
   smsInvitations,
   invitationSmsLimits,

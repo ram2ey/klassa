@@ -50,7 +50,7 @@ export type StudentDrawerSubjectGrade = {
   reportCardId: string;
   subjectId: string;
   scorePercentage: string | number;
-  letterGrade: string;
+  letterGrade: string | null;
   comments?: string | null;
 };
 
@@ -93,6 +93,7 @@ export type StudentDrawerSafetyNotice = {
 };
 
 export type StudentAcademicDrawerProps = {
+  mvp?: boolean;
   student: StudentDrawerProfile;
   classPlacement?: string;
   academicYears?: Array<{ id: string; name: string }>;
@@ -116,6 +117,7 @@ export type StudentAcademicDrawerProps = {
 type DrawerTab = "transcript" | "subjects" | "attendance" | "conduct" | "timetable" | "guardians";
 
 export function StudentAcademicDrawer({
+  mvp = false,
   student,
   classPlacement,
   academicYears = [],
@@ -303,7 +305,7 @@ export function StudentAcademicDrawer({
             </div>
 
             {/* Conduct Balance */}
-            <div className="ui-card p-3 shadow-xs">
+            {!mvp && <div className="ui-card p-3 shadow-xs">
               <span className="text-[10px] font-bold uppercase tracking-wider text-secondary">
                 Conduct
               </span>
@@ -321,7 +323,7 @@ export function StudentAcademicDrawer({
               <span className="text-[10px] text-secondary">
                 +{praiseMerits} / -{incidentSanctions} pts
               </span>
-            </div>
+            </div>}
           </div>
 
           {/* Safety Warning Banner if notices present */}
@@ -348,7 +350,7 @@ export function StudentAcademicDrawer({
               { id: "conduct", label: "Behaviour & Merits", icon: Award },
               { id: "timetable", label: "Daily Timetable", icon: Clock },
               { id: "guardians", label: "Guardians & Contacts", icon: GraduationCap },
-            ].map((tab) => {
+            ].filter(tab => !mvp || !["conduct", "timetable"].includes(tab.id)).map((tab) => {
               const Icon = tab.icon;
               const isActive = activeTab === tab.id;
               return (
@@ -520,7 +522,7 @@ export function StudentAcademicDrawer({
                       <tr className="border-b border-line-subtle text-[11px] font-semibold text-secondary">
                         <th className="py-2.5">Subject</th>
                         <th className="py-2.5">Score</th>
-                        <th className="py-2.5">Letter Grade</th>
+                        {!mvp && <th className="py-2.5">Letter Grade</th>}
                         <th className="py-2.5">Teacher Remarks</th>
                       </tr>
                     </thead>
@@ -549,11 +551,11 @@ export function StudentAcademicDrawer({
                                 <span className="font-bold">{grade.scorePercentage}%</span>
                               </div>
                             </td>
-                            <td className="py-3">
+                            {!mvp && <td className="py-3">
                               <span className="inline-block rounded-xs bg-slate-100 px-2 py-0.5 font-bold text-slate-800">
                                 {grade.letterGrade}
                               </span>
-                            </td>
+                            </td>}
                             <td className="py-3 text-slate-600">
                               {grade.comments || "No comments recorded."}
                             </td>

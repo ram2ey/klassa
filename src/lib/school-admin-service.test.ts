@@ -197,8 +197,7 @@ describe("live school administration boundaries", () => {
   });
   it.each([
     { incompleteTable: "attendance_sessions", rows: [[other, "2026-09-26", "morning_roll_call", "in_progress"]], message: "Submit every recorded roll call" },
-    { incompleteTable: "assessments", rows: [[record, other, "draft"]], message: "Publish every term assessment" },
-    { incompleteTable: "assessment_grades", rows: [], message: "Publish a grade for every active student" },
+    { incompleteTable: "term_marks", rows: [[record, "2026-09-26T12:00:00.000Z"]], message: "Publish a new report version for corrected marks" },
     { incompleteTable: "report_cards", rows: [[record, 1, "published"], [record, 2, "draft"]], message: "Publish the latest report card" },
   ])("refuses term closure with incomplete $incompleteTable", async ({ incompleteTable, rows, message }) => {
     mocks.execute.mockImplementation(async query => {
@@ -209,6 +208,7 @@ describe("live school administration boundaries", () => {
       if (query.includes('from "enrollments"')) return [[record, other, "2026-09-26", null]];
       if (query.includes('from "assessment_grades"')) return incompleteTable === "assessment_grades" ? rows : [[record, record, "published"]];
       if (query.includes('from "report_cards"')) return incompleteTable === "report_cards" ? rows : [[record, 1, "published"]];
+      if (query.includes('from "term_marks"')) return incompleteTable === "term_marks" ? rows : [];
       return [];
     });
     await expect(saveSchoolRecord(actor, { kind: "term_lock", termId: record })).rejects.toThrow(message);

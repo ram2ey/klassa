@@ -1,7 +1,7 @@
 import { and, count, eq, inArray, isNotNull, isNull, ne, sql } from "drizzle-orm";
 import { db } from "@/db";
-import { academicYears, assessmentGrades, assessments, attendanceSessions, classes, enrollments, gradeLevels, guardianConsents, guardians, organizationMemberships, organizations,
-  reportCards, studentGuardians, students, subjects, teacherClassAssignments, terms } from "@/db/schema";
+import { academicYears, attendanceSessions, classes, enrollments, gradeLevels, guardianConsents, guardians, organizationMemberships, organizations,
+  reportCards, studentGuardians, students, subjects, teacherClassAssignments, termMarks, terms } from "@/db/schema";
 import { AuditActions, logAuditEvent } from "@/lib/audit";
 import { SCHOOL_TIME_ZONE } from "@/lib/timezone";
 import { bulkStudentUpdateSchema, schoolCommandSchema, SchoolAdminError, type BulkStudentUpdate, type SchoolCommand } from "@/lib/school-admin-policy";
@@ -212,11 +212,6 @@ export async function saveSchoolRecord(actor: Actor, raw: SchoolCommand) {
         if (termSessions.some(session => session.status !== "submitted")) {
           throw new SchoolAdminError("Submit every recorded roll call before closing this term.");
         }
-        const termAssessments = await tx.select({ id: assessments.id, classId: assessments.classId, status: assessments.status })
-          .from(assessments).where(and(eq(assessments.organizationId, org), eq(assessments.termId, term.id)));
-        if (termAssessments.some(assessment => assessment.status !== "published")) {
-          throw new SchoolAdminError("Publish every term assessment before closing this term.");
-        }
         const activeEnrollments = await tx.select({ studentId: enrollments.studentId, classId: enrollments.classId,
           startsOn: enrollments.startsOn, endsOn: enrollments.endsOn })
           .from(enrollments).where(and(eq(enrollments.organizationId, org), eq(enrollments.academicYearId, term.academicYearId),
@@ -225,24 +220,17 @@ export async function saveSchoolRecord(actor: Actor, raw: SchoolCommand) {
         if (activeEnrollments.some(enrollment => !enrollment.classId)) {
           throw new SchoolAdminError("Assign every active student to a class before closing this term.");
         }
-        const termGrades = termAssessments.length ? await tx.select({ assessmentId: assessmentGrades.assessmentId, studentId: assessmentGrades.studentId,
-          status: assessmentGrades.status }).from(assessmentGrades).where(and(eq(assessmentGrades.organizationId, org),
-            inArray(assessmentGrades.assessmentId, termAssessments.map(assessment => assessment.id)))) : [];
-        const publishedGrades = new Set(termGrades.filter(grade => grade.status === "published")
-          .map(grade => `${grade.assessmentId}:${grade.studentId}`));
-        if (termAssessments.some(assessment => activeEnrollments.some(enrollment => enrollment.classId === assessment.classId &&
-          !publishedGrades.has(`${assessment.id}:${enrollment.studentId}`)))) {
-          throw new SchoolAdminError("Publish a grade for every active student in each term assessment before closing.");
-        }
-        const cards = await tx.select({ studentId: reportCards.studentId, version: reportCards.version, status: reportCards.status })
+        const cards = await tx.select({ studentId: reportCards.studentId, version: reportCards.version, status: reportCards.status, publishedAt: reportCards.publishedAt })
           .from(reportCards).where(and(eq(reportCards.organizationId, org), eq(reportCards.termId, term.id)));
-        const latestCards = new Map<string, { version: number; status: string }>();
+        const latestCards = new Map<string, { version: number; status: string; publishedAt: Date | null }>();
         for (const card of cards) {
           if ((latestCards.get(card.studentId)?.version ?? 0) < card.version) latestCards.set(card.studentId, card);
         }
         if (activeEnrollments.some(enrollment => latestCards.get(enrollment.studentId)?.status !== "published")) {
           throw new SchoolAdminError("Publish the latest report card for every active student before closing this term.");
         }
+        const savedMarks = await tx.select({ studentId: termMarks.studentId, updatedAt: termMarks.updatedAt }).from(termMarks).where(and(eq(termMarks.organizationId, org), eq(termMarks.termId, term.id)));
+        if (savedMarks.some(mark => { const card = latestCards.get(mark.studentId); return !card?.publishedAt || mark.updatedAt > card.publishedAt; })) throw new SchoolAdminError("Publish a new report version for corrected marks before closing this term.");
         await tx.update(terms).set({
           isLocked: true,
           lockedAt: new Date(),

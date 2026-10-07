@@ -39,70 +39,18 @@ beforeEach(() => {
   mocks.revalidatePath.mockReset();
 });
 
-describe("timetable actions", () => {
-  describe("saveTimetablePeriodAction", () => {
-    it("calls saveTimetablePeriod and revalidates path on success", async () => {
-      mocks.requireStaff.mockResolvedValue({
-        userId: "admin-1",
-        organizationId: "org-1",
-        role: "school_admin",
-      });
-      mocks.saveTimetablePeriod.mockResolvedValue({
-        success: true,
-        periodId: "p-1",
-      });
 
-      const result = await saveTimetablePeriodAction({
-        classId: "11111111-1111-4111-8111-111111111111",
-        dayOfWeek: "monday",
-        period: "period_1",
-        startTime: "08:50",
-        endTime: "09:40",
-      });
-
-      expect(result).toEqual({ success: true, periodId: "p-1" });
-      expect(mocks.saveTimetablePeriod).toHaveBeenCalledWith(
-        expect.objectContaining({ organizationId: "org-1" }),
-        expect.objectContaining({ period: "period_1" })
-      );
-      expect(mocks.revalidatePath).toHaveBeenCalledWith("/");
-    });
-
-    it("returns error on validation failure", async () => {
-      mocks.requireStaff.mockResolvedValue({
-        userId: "admin-1",
-        organizationId: "org-1",
-      });
-
-      const result = await saveTimetablePeriodAction({
-        classId: "not-a-uuid",
-        dayOfWeek: "monday",
-        period: "period_1",
-        startTime: "08:50",
-        endTime: "09:40",
-      });
-
-      expect(result.success).toBe(false);
-      expect(mocks.saveTimetablePeriod).not.toHaveBeenCalled();
-    });
+describe("timetable release boundary", () => {
+  it("authorizes the caller and rejects timetable writes before the service runs", async () => {
+    mocks.requireStaff.mockResolvedValue({ userId: "admin", organizationId: "school", role: "school_admin" });
+    await expect(saveTimetablePeriodAction({ classId: "11111111-1111-4111-8111-111111111111", dayOfWeek: "monday", period: "period_1", startTime: "08:50", endTime: "09:40" })).rejects.toThrow("not included");
+    await expect(deleteTimetablePeriodAction({ periodId: "11111111-1111-4111-8111-111111111111" })).rejects.toThrow("not included");
+    expect(mocks.saveTimetablePeriod).not.toHaveBeenCalled();
+    expect(mocks.deleteTimetablePeriod).not.toHaveBeenCalled();
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
-
-  describe("deleteTimetablePeriodAction", () => {
-    it("calls deleteTimetablePeriod and revalidates path on success", async () => {
-      mocks.requireStaff.mockResolvedValue({
-        userId: "admin-1",
-        organizationId: "org-1",
-        role: "school_admin",
-      });
-      mocks.deleteTimetablePeriod.mockResolvedValue({ success: true });
-
-      const result = await deleteTimetablePeriodAction({
-        periodId: "11111111-1111-4111-8111-111111111111",
-      });
-
-      expect(result).toEqual({ success: true });
-      expect(mocks.deleteTimetablePeriod).toHaveBeenCalled();
-      expect(mocks.revalidatePath).toHaveBeenCalledWith("/");
-    });
+  it("does not bypass authorization for a deferred feature", async () => {
+    mocks.requireStaff.mockRejectedValue(new Error("Access denied"));
+    await expect(deleteTimetablePeriodAction({ periodId: "11111111-1111-4111-8111-111111111111" })).rejects.toThrow("Access denied");
   });
 });

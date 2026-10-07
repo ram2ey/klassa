@@ -12,6 +12,7 @@ export type WorkspaceNavItem = { id: string; label: string; icon: ReactNode; hre
 export type WorkspaceNavGroup = { label: string; items: WorkspaceNavItem[] };
 
 type WorkspaceShellProps = {
+  embedded?: boolean;
   schoolName: string;
   academicYear?: string;
   actorName: string;
@@ -29,7 +30,7 @@ type WorkspaceShellProps = {
 };
 
 /** Presentation only: callers supply authorized navigation and scoped content. */
-export function WorkspaceShell({ schoolName, academicYear, actorName, roleLabel, navigationLabel, groups, activeId, contentId, children, onNavigate, switchSchoolHref, accountActions, banner, toolbar }: WorkspaceShellProps) {
+export function WorkspaceShell({ embedded, schoolName, academicYear, actorName, roleLabel, navigationLabel, groups, activeId, contentId, children, onNavigate, switchSchoolHref, accountActions, banner, toolbar }: WorkspaceShellProps) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const navId = useId();
@@ -51,6 +52,7 @@ export function WorkspaceShell({ schoolName, academicYear, actorName, roleLabel,
     return () => media.removeEventListener("change", closeMobile);
   }, []);
 
+  if (embedded) return <div className="space-y-5">{children}</div>;
   const navigate = (id: string) => { setMobileOpen(false); if (account.current) account.current.open = false; onNavigate?.(id); };
   const navigation = (compact: boolean, mobile: boolean) => <nav id={mobile ? `${navId}-mobile` : navId} aria-label={navigationLabel} className="space-y-6">
     {groups.filter(group => group.items.length > 0).map(group => <div key={group.label}>

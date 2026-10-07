@@ -1,4 +1,5 @@
 "use server";
+import { requireDeferredFeature } from "@/lib/mvp-release";
 
 import { revalidatePath } from "next/cache";
 import { z } from "zod";
@@ -15,6 +16,7 @@ import {
 
 export async function saveTimetablePeriodAction(raw: SaveTimetablePeriodInput) {
   const actor = await requireStaff(["school_admin", "teacher"]);
+  requireDeferredFeature("Timetables");
   try {
     const input = saveTimetablePeriodSchema.parse(raw);
     const result = await saveTimetablePeriod(actor, input);
@@ -41,6 +43,7 @@ export async function deleteTimetablePeriodAction(
   raw: DeleteTimetablePeriodInput
 ) {
   const actor = await requireStaff(["school_admin"]);
+  requireDeferredFeature("Timetables");
   try {
     const input = deleteTimetablePeriodSchema.parse(raw);
     await deleteTimetablePeriod(actor, input);

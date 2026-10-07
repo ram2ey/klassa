@@ -2,11 +2,11 @@
 
 ## First release rollout gate
 
-The app has not been used, so there are no school accounts or pupil records to migrate. Validate the current schema on a fresh or disposable PostgreSQL database before deploying. The migration chain removes specialist, inquiry, clinical, SEN and school-calendar exception features.
+The app has not been used. Validate the complete migration chain on a fresh PostgreSQL 17 database, including migration 0040_staff_school_mvp. The first release supports one pilot school and three staff roles; see the [MVP release checklist](mvp-release.md).
 
-Keep SMS disabled in production until staging verifies an mNotify parent announcement from composition through provider delivery status. Confirm recipient count and unreachable numbers before sending. Use Coolify secrets for provider credentials.
+Keep SMS_DELIVERY_ENABLED=false and leave COMPOSE_PROFILES unset. The sms-worker service is opt-in under the sms profile. Parent access, notices and specialist workflows are disabled for this release.
 
-Verify two-school data isolation, account setup, enrollment, attendance, marks, report publication, year placement, guardian access, pickup restrictions, backups and the health endpoint before enabling a school.
+Verify setup, enrolment/import, daily attendance, classwork/exam marks, report publication/printing, fee posting, payments/receipts, two-school isolation and a restored backup before entering real pupil data.
 
 This is the recommended production deployment path for Klassa. It uses the repository's `compose.yaml` so Coolify builds the web image, provisions a private PostgreSQL service, creates persistent storage, generates strong secrets, runs database migrations, creates the first platform administrator, and starts the web application only after database preparation succeeds.
 
@@ -15,7 +15,7 @@ This is the recommended production deployment path for Klassa. It uses the repos
 - `web`: the public Next.js application on internal port `3000`
 - `postgres`: a private PostgreSQL 17 database with a persistent Docker volume
 - `migrate`: a one-time deployment container that applies Drizzle migrations and safely bootstraps the first platform administrator
-- `sms-worker`: a private mNotify queue processor with provider delivery reconciliation
+- `sms-worker`: deferred, opt-in under the sms Compose profile; leave disabled for the MVP
 
 The database has no published host port. Coolify's proxy exposes only `web`. Every later deployment runs the migrations again; already-applied migrations are skipped. The bootstrap command is idempotent and skips itself after any platform administrator exists.
 
@@ -43,7 +43,7 @@ Use a username such as `admin` (3-64 letters, numbers, dots, underscores or hyph
 6. Set **Base Directory** to `/`.
 7. Set **Docker Compose Location** to `/compose.yaml` (some Coolify versions display this as `compose.yaml`).
 8. Leave **Raw Compose Deployment** disabled. Coolify should manage proxy labels and the resource network.
-9. Save and allow Coolify to parse the four services.
+9. Save and allow Coolify to parse the services. Only web, postgres and migrate run in the MVP; verify the sms profile is disabled.
 
 Do not create PostgreSQL as a separate public application. It is already defined in the stack and is reachable only as `postgres` on the private Compose network.
 

@@ -1,4 +1,4 @@
-import { and, desc, eq, inArray } from "drizzle-orm";
+import { and, desc, eq, inArray, sql } from "drizzle-orm";
 import { db } from "@/db";
 import { academicYears, attendanceRecords, attendanceSessions, classes, courtRestrictions, enrollments,
   gradeLevels, guardianConsents, guardianAbsenceNotes, guardians, organizations, receptionLogs, smsDispatches, studentGuardians, students, users,
@@ -7,7 +7,7 @@ import { requireStaff } from "@/lib/action-access";
 import { buildUnexplainedAbsenceCallList } from "@/lib/office-absence-followup";
 import { buildTeacherSafetyNotices } from "@/lib/teacher-safety";
 
-export async function getOfficeData(sessionDate: string) {
+export async function getOfficeData(sessionDate: string, mvp = false) {
   const actor = await requireStaff(["office_staff"]);
   const org = actor.organizationId;
   const [school, years, grades, classRows, studentRows, guardianRows, links, enrollmentRows, sessionRows, restrictions, absenceNotes, dateNotes, receptionLogRows, dispatchRows] = await Promise.all([
@@ -31,15 +31,15 @@ export async function getOfficeData(sessionDate: string) {
       createdAt: guardianAbsenceNotes.createdAt, reviewedAt: guardianAbsenceNotes.reviewedAt, guardianName: guardians.firstName,
       guardianLastName: guardians.lastName, reviewerName: users.name })
       .from(guardianAbsenceNotes).innerJoin(guardians, eq(guardianAbsenceNotes.guardianId, guardians.id))
-      .leftJoin(users, eq(guardianAbsenceNotes.reviewedBy, users.id)).where(eq(guardianAbsenceNotes.organizationId, org))
+      .leftJoin(users, eq(guardianAbsenceNotes.reviewedBy, users.id)).where(and(eq(guardianAbsenceNotes.organizationId, org), sql`${!mvp}`))
       .orderBy(desc(guardianAbsenceNotes.createdAt)).limit(200),
     db.select({ studentId: guardianAbsenceNotes.studentId, absenceDate: guardianAbsenceNotes.absenceDate })
-      .from(guardianAbsenceNotes).where(and(eq(guardianAbsenceNotes.organizationId, org), eq(guardianAbsenceNotes.absenceDate, sessionDate))),
+      .from(guardianAbsenceNotes).where(and(and(eq(guardianAbsenceNotes.organizationId, org), sql`${!mvp}`), eq(guardianAbsenceNotes.absenceDate, sessionDate))),
     db.select().from(receptionLogs)
-      .where(and(eq(receptionLogs.organizationId, org), eq(receptionLogs.logDate, sessionDate)))
+      .where(and(and(eq(receptionLogs.organizationId, org), sql`${!mvp}`), eq(receptionLogs.logDate, sessionDate)))
       .orderBy(desc(receptionLogs.createdAt)),
     db.select().from(smsDispatches)
-      .where(and(eq(smsDispatches.organizationId, org), eq(smsDispatches.purpose, "announcement")))
+      .where(and(and(eq(smsDispatches.organizationId, org), sql`${!mvp}`), eq(smsDispatches.purpose, "announcement")))
       .orderBy(desc(smsDispatches.sentAt))
       .limit(50),
   ]);
@@ -53,12 +53,12 @@ export async function getOfficeData(sessionDate: string) {
     directiveSummary: needToKnowAlerts.directiveSummary, actionRequired: needToKnowAlerts.actionRequired,
     isActive: needToKnowAlerts.isActive, expiresAt: needToKnowAlerts.expiresAt })
     .from(needToKnowAlerts).innerJoin(sensitiveCases, and(eq(sensitiveCases.id, needToKnowAlerts.caseId),
-      eq(sensitiveCases.organizationId, org))).where(and(eq(needToKnowAlerts.organizationId, org),
+      and(eq(sensitiveCases.organizationId, org), sql`${!mvp}`))).where(and(eq(needToKnowAlerts.organizationId, org),
       eq(sensitiveCases.area, "health_medical"), eq(needToKnowAlerts.isActive, true)));
   const medicalAlerts = buildTeacherSafetyNotices(studentRows.map(row => row.id), medicalRows, []).alerts;
   const smsPreferences = await db.select({ guardianId: guardianConsents.guardianId,
     announcements: guardianConsents.optInSmsAnnouncements }).from(guardianConsents)
-    .where(eq(guardianConsents.organizationId, org));
+    .where(and(eq(guardianConsents.organizationId, org), sql`${!mvp}`));
   return { actor, school, years, grades, classes: classRows, students: studentRows, guardians: guardianRows, smsPreferences,
     links, enrollments: enrollmentRows, sessions: sessionRows, records, restrictions, absenceNotes,
     unexplainedAbsences, medicalAlerts, receptionLogs: receptionLogRows, dispatches: dispatchRows };

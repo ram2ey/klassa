@@ -56,6 +56,7 @@ services:
         condition: service_healthy
 
   sms-worker:
+    profiles: ["sms"]
     build:
       context: .
       target: sms-worker

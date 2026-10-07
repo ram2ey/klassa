@@ -1,75 +1,45 @@
+
 import { beforeEach, describe, expect, it, vi } from "vitest";
-
-const mocks = vi.hoisted(() => ({
-  responses: [] as unknown[][],
-  account: vi.fn(), guardian: vi.fn(), staff: vi.fn(),
-}));
-
-vi.mock("@/lib/action-access", () => ({
-  requireAccount: mocks.account, requireGuardian: mocks.guardian, requireStaff: mocks.staff,
-}));
+const mocks = vi.hoisted(() => ({ responses: [] as unknown[][], staff: vi.fn() }));
+vi.mock("@/lib/action-access", () => ({ requireStaff: mocks.staff }));
 vi.mock("next/navigation", () => ({ notFound: () => { throw new Error("NEXT_NOT_FOUND"); } }));
 vi.mock("@/db", () => ({ db: { select: () => ({ from: () => ({ where: () => {
   const rows = mocks.responses.shift() ?? [];
-  return { then: (resolve: (value: unknown[]) => unknown, reject?: (error: unknown) => unknown) => Promise.resolve(rows).then(resolve, reject),
-    limit: async () => rows };
+  return { then: (resolve: (value: unknown[]) => unknown) => Promise.resolve(rows).then(resolve), limit: async () => rows };
 } }) }) } }));
-
 import ReportCardPage from "./page";
-
 const id = "11111111-1111-4111-8111-111111111111";
-const card = { id, organizationId: "school-a", studentId: "student-a", classId: "class-a",
-  termId: "term-a", academicYearId: "year-a", status: "published", version: 1,
-  daysPresent: 0, daysAbsent: 0, daysLate: 0 };
+const card = { id, organizationId: "school-a", studentId: "student-a", classId: "class-a", termId: "term-a", academicYearId: "year-a", status: "published", version: 1, daysPresent: 1, daysAbsent: 0, daysLate: 0, daysExcused: 0 };
 const params = { params: Promise.resolve({ id }) };
-const details = [[{ id: "school-a", name: "School A" }], [{ id: "student-a", firstName: "Ada", lastName: "Lee", studentNumber: "100" }],
-  [{ id: "term-a", name: "Autumn" }], [{ id: "year-a", name: "2026" }], [], []];
-
-beforeEach(() => {
-  mocks.responses = [];
-  mocks.account.mockReset().mockResolvedValue({ user: { role: null, isPlatformAdmin: false } });
-  mocks.guardian.mockReset().mockResolvedValue({ guardians: [{ id: "guardian-a", organizationId: "school-a" }] });
-  mocks.staff.mockReset();
-});
-
-describe("printable report card access", () => {
-  it("opens a published report for a guardian with a legal link", async () => {
-    mocks.responses = [[card], [{ id: "legal-link" }], ...details];
-    await expect(ReportCardPage(params)).resolves.toHaveProperty("type", "main");
-    expect(mocks.staff).not.toHaveBeenCalled();
-  });
-
-  it("denies a guardian without legal responsibility", async () => {
-    mocks.responses = [[card], []];
-    await expect(ReportCardPage(params)).rejects.toThrow("NEXT_NOT_FOUND");
-  });
-
-  it("denies draft and approved reports to guardians", async () => {
-    for (const status of ["draft", "approved"]) {
-      mocks.responses = [[{ ...card, status }]];
-      await expect(ReportCardPage(params)).rejects.toThrow("NEXT_NOT_FOUND");
-      expect(mocks.responses).toHaveLength(0);
+const details = [[{ name: "School A" }], [{ firstName: "Ada", lastName: "Lee", studentNumber: "100" }], [{ name: "Term 1" }], [{ name: "2026" }], [{ id: "class-a", name: "4A", homeroomTeacherId: "teacher-a" }], [], []];
+beforeEach(() => { mocks.responses = []; mocks.staff.mockReset().mockResolvedValue({ role: "school_admin", organizationId: "school-a", userId: "admin" }); });
+describe("staff printable report access", () => {
+  it("opens an administrator's draft and published reports", async () => {
+    for (const status of ["draft", "published"]) {
+      mocks.responses = [[{ ...card, status }], ...details];
+      await expect(ReportCardPage(params)).resolves.toHaveProperty("type", "main");
     }
   });
-
-  it("denies a report from another school before checking student links", async () => {
+  it("denies parent access through staff authorization", async () => {
+    mocks.staff.mockRejectedValue(new Error("School staff access required"));
+    await expect(ReportCardPage(params)).rejects.toThrow("School staff");
+    expect(mocks.responses).toEqual([]);
+  });
+  it("denies office access to a draft", async () => {
+    mocks.staff.mockResolvedValue({ role: "office_staff", organizationId: "school-a", userId: "office" });
+    mocks.responses = [[{ ...card, status: "draft" }]];
+    await expect(ReportCardPage(params)).rejects.toThrow("NEXT_NOT_FOUND");
+  });
+  it("denies another school's report", async () => {
     mocks.responses = [[{ ...card, organizationId: "school-b" }]];
     await expect(ReportCardPage(params)).rejects.toThrow("NEXT_NOT_FOUND");
-    expect(mocks.responses).toHaveLength(0);
   });
-
-  it("preserves staff access to an internal report in their school", async () => {
-    mocks.account.mockResolvedValue({ user: { role: "school_admin", isPlatformAdmin: false } });
-    mocks.staff.mockResolvedValue({ role: "school_admin", organizationId: "school-a", userId: "admin" });
-    mocks.responses = [[{ ...card, status: "draft" }], ...details];
+  it("allows only the class teacher to read full draft reports", async () => {
+    mocks.staff.mockResolvedValue({ role: "teacher", organizationId: "school-a", userId: "teacher-a" });
+    mocks.responses = [[card], ...details];
     await expect(ReportCardPage(params)).resolves.toHaveProperty("type", "main");
-    expect(mocks.guardian).not.toHaveBeenCalled();
-  });
-
-  it("denies staff from another school", async () => {
-    mocks.account.mockResolvedValue({ user: { role: "school_admin", isPlatformAdmin: false } });
-    mocks.staff.mockResolvedValue({ role: "school_admin", organizationId: "school-b", userId: "admin" });
-    mocks.responses = [[card]];
+    mocks.staff.mockResolvedValue({ role: "teacher", organizationId: "school-a", userId: "unassigned" });
+    mocks.responses = [[card], ...details, []];
     await expect(ReportCardPage(params)).rejects.toThrow("NEXT_NOT_FOUND");
   });
 });

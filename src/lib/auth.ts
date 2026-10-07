@@ -34,9 +34,10 @@ function createAuth() {
   }) },
   session: { additionalFields: { activeOrganizationId: { type: "string", required: false, input: false } } },
   databaseHooks: { session: { create: { before: async session => {
-    const [user] = await db.select({ id: users.id, suspendedAt: users.suspendedAt,
+    const [user] = await db.select({ id: users.id, role: users.role, suspendedAt: users.suspendedAt,
       isPlatformAdmin: users.isPlatformAdmin, organizationId: users.organizationId }).from(users)
       .where(eq(users.id, session.userId)).limit(1);
+    if (user && !user.isPlatformAdmin && user.role === null) throw new APIError("FORBIDDEN", { message: "This release is available to school staff only." });
     if (!user || user.suspendedAt || await isSchoolSuspendedForUser(user)) {
       throw new APIError("FORBIDDEN", { message: "This account is suspended." });
     }

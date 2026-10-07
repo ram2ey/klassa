@@ -16,9 +16,9 @@ describe("platform maintenance announcements", () => {
     await expect(publishPlatformAnnouncementAction(input)).rejects.toThrow("Platform administrator access required");
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
-  it("requires MFA before starting a broadcast", async () => {
+  it("blocks deferred notices before starting a broadcast", async () => {
     mocks.authorize.mockResolvedValue({ id: "admin", twoFactorEnabled: false });
-    await expect(publishPlatformAnnouncementAction(input)).rejects.toThrow("Multi-factor");
+    await expect(publishPlatformAnnouncementAction(input)).rejects.toThrow("not included");
     expect(mocks.transaction).not.toHaveBeenCalled();
   });
   it("rejects an empty notice before starting a transaction", async () => {

@@ -1,134 +1,44 @@
 # Klassa
 
-## Current live workflow status
+Klassa is a staff-only school management MVP for the first Ghana pilot school. The supported roles are administrator, office staff and teacher.
 
-This app has not been used and has no school data to preserve. It is being trimmed for its first Ghana school release. The supported school roles are administrator, office staff and teacher, with guardians in a separate portal. The core flow covers pupil records, attendance, marks, reports, year placement, pickup checks and school notices.
+The daily workflow is **enrol pupil → assign class → submit daily attendance → enter term marks → publish a report → record fees and payments**.
 
-The current migration chain removes unused specialist, inquiry and calendar features. Validate it against a fresh or disposable database before deployment. The SMS queue and delivery tracking remain; production SMS must stay disabled until the mNotify flow has passed a controlled staging check. See the [simplified Ghana school plan](docs/simplified-ghana-school-plan.md), [Phase 3 staging acceptance checklist](docs/phase-3-staging-acceptance.md), and [Coolify deployment guide](docs/coolify-deployment.md).
+## Staff workspace
 
-Klassa is a school administration app for Ghana. Schools configure their own grade names, classes and grading approach.
+Administrators have six navigation items: Home, Pupils, Attendance, Marks & Reports, Fees and Settings. Guardian contacts and CSV import/export live within Pupils. Settings contains staff access, classes and teacher assignments, subjects, class subjects, academic years/terms, weighting, reviewed year placement and audit history.
+
+Office staff maintain pupil/contact records, follow up submitted attendance and record payments/receipts. Teachers see assigned classes, submit daily registers, save permitted subject marks and prepare homeroom report drafts. Teachers cannot access fees or school administration.
+
+Marks use Classwork /100 and Exam /100, initially weighted 40% and 60%. Blank scores differ from zero. Administrators may change a term's weights before its first marks are saved. All configured class subjects need both scores before publication. Published reports preserve component scores, weights, attendance and remarks; corrections require a reason and a new version. Term locking and reviewed year placement remain available.
+
+Fees use integer Ghana pesewas. Administrators define and review class/term charges, apply only missing charges, record one opening debt and signed adjustments, and void payments with a reason. Administrators and office staff record cash, mobile-money or bank payments. Partial payments reduce debt and overpayments become credit. Receipts have transactional school-specific numbers and preserve the balance at posting. Posted ledger entries and published report snapshots are immutable. Fees never block attendance or reports.
+
+Parent accounts, SMS, notices, timetables, behaviour and specialist workflows are deferred through route/action guards. Existing pickup/disclosure flags remain visible on pupil records. The internal platform console remains available for provisioning. Legacy setup and gradebook/report bookmarks redirect to the new workspace.
 
 ## Local development
 
-1. Copy `.env.example` to both `.env.local` (Next.js) and `.env` (local Compose), then replace every placeholder you use.
-2. Start PostgreSQL with `docker compose -f compose.local.yaml up -d`, or point `DATABASE_URL` at an existing PostgreSQL 17 database.
-3. Run `npm run db:migrate`. Use `npm run db:generate` only after intentionally changing the schema.
-4. Start Klassa with `npm run dev`.
+1. Copy .env.example to .env.local for Next.js and .env for local Compose; replace placeholders.
+2. Start PostgreSQL 17 using docker compose -f compose.local.yaml up -d, or configure an existing database.
+3. Run npm run db:deploy with the migration-owner connection. This applies the migration history, reconciles restricted roles and bootstraps the initial platform administrator. Runtime must use the restricted klassa_app role.
+4. Start npm run dev and provision a synthetic school/staff account through the platform console.
 
-The local demo uses representative records. In live mode, school administrators have a database-connected workspace for school administration. Better Auth is mounted at `/api/auth/[...all]`; public registration is disabled and platform administrator MFA is provided through the TOTP plugin.
+The application has not previously been used. Validate the complete migration chain on a fresh disposable database before first deployment. Migration 0040 adds the school MVP; existing migrations remain intact. Generate independent authentication and sensitive-record encryption secrets of at least 32 characters. Back up the encryption key separately from the database.
 
-### Preview and live boundaries
-
-For the synthetic local preview, set `KLASSO_DEMO_MODE=true` in `.env.local` and run `npm run dev`. Demo actions never write to PostgreSQL. Preview changes remain temporary and are shared by visitors to that local server; use synthetic information only. Roster changes are loaded from the server on refresh, but restarting the server resets the demo.
-
-Demo mode is rejected in production. With demo mode disabled, the home page requires an existing staff account and school membership. Platform administrators also need enabled MFA. Live roster reads, student enrollment and status updates use PostgreSQL and enforce the authenticated organization. Enrollment requires an existing class/grade in the school's current academic year. Mutations and their audit entries commit atomically. Database errors are never converted into successful demo writes.
-
-The older demo action routes for attendance, assessments, communications and sensitive records remain preview-only; the live school sections use separate school-scoped actions. The old school-provisioning preview remains local. Live privacy requests support reviewed export, rectification and processing restriction; erasure cannot be fulfilled until approved retention and dependency controls exist. Parent SMS is limited to staff-written announcements, reviewed by recipient count before they enter the durable queue. Automated absence texts, invitation texts, scheduling and emergency approval broadcasts are removed. SMS simulations have zero cost and are not marked delivered.
-
-### Live school administrator workspace
-
-School administrators land on the school overview at `/`. Navigation links use `?section=` so sections can be bookmarked. The workspace includes:
-
-- Overview: real student, staff, class and guardian counts, school setup checklist, and recent activity.
-- Students: search, filter, sort and page through the directory; inspect profiles with enrollment history, submitted attendance summaries and published report-card summaries; see record-completeness and restricted-record indicators; export all filtered or selected students; and bulk update status or current-year class placement (up to 100 students, with one audited transaction). Staff can also enroll, edit and import validated CSV files. The enrollment wizard captures the student, class, new or existing guardian contacts, and optional category-only sensitive referrals in one transaction. Klassa assigns a permanent school-specific number such as `ST-000001` when a student is created.
-- Guardians: create and edit optional contact details, link students, and maintain primary-contact and legal-responsibility flags.
-- Staff & access: create tenant username accounts, list staff, and change school roles. Administrators cannot change their own role.
-- Classes & grades: create and edit grade levels and classes, assign a homeroom teacher, and see enrollment counts.
-- Subjects: create and edit the school subject catalog.
-- Academic years: create and edit years and terms, select one current year, and validate term dates against year boundaries.
-- Attendance: mark active class rosters by date, submit complete roll calls, record reasons for later corrections, and export a dated CSV.
-- Gradebook: create weighted categories and assessments, enter scores, publish complete class grades, and explain published-grade corrections.
-- Report cards: generate versioned cards from published grades and submitted attendance, inspect subject results, approve, publish, and print or save a PDF.
-- Communications: draft and publish school, grade and class in-app announcements. Staff see published notices relevant to their role and class assignment.
-- Pupil concerns and pickup: administrators review restricted flags that affect pupil release or access; private notes stay with administrators.
-- Audit history: search the latest 100 events for this school.
-- School settings: edit the school's display name. The sign-in tenant ID remains managed separately; the timezone is fixed at GMT.
-
-For a new school, create the academic year and mark it current, add grades and classes, then enroll students and link guardians. Every mutation checks the authenticated school and commits its audit entry in the same transaction. The live administrator workspace includes the guardian portal, parent announcements, pickup checks, and reviewed privacy requests.
-
-Student numbers are assigned from a per-school counter inside the enrollment transaction, including CSV imports. Existing student numbers stay unchanged, and staff cannot edit assigned numbers. The CSV template does not require a student number; `externalReference` is optional for a school's old ID. Older CSVs with a `studentNumber` column are accepted and that value is stored as the external reference. A repeated external reference in the same school is rejected. After import, download the row-by-row mapping of old IDs and assigned numbers; both are searchable in the student directory. Apply migration `0011_student_number_counters` with `npm run db:migrate` before using live enrollment or import.
-
-### Live school office workspace
-
-Office staff land on their own overview at `/`. They can enroll and update students, change current-year class placement and status, maintain guardian contacts and relationships, import validated student CSV files, and correct a submitted roll call with a written reason. Student numbers are assigned automatically for both individual enrollment and CSV import. The student directory flags active pickup or disclosure restrictions for office follow-up. Staff can read published school notices. Server actions reject attempts to manage staff roles, academic setup, grades, report publication, or direct sensitive case editing.
-
-The enrollment form collects basic pupil and guardian details. Administrators can review restricted pickup or access flags separately; do not enter clinical or case narratives into the general pupil record.
-
-### Live teacher workspace
-
-Teachers land on their own overview at `/`. School administrators assign a teacher to a class as homeroom teacher; subject assignments already stored in `teacher_class_assignments` are also supported. Teachers see only current-year classes assigned to them, their enrolled students, and the published notices addressed to them.
-
-Homeroom teachers can record and submit attendance and generate draft report cards with teacher remarks. Assigned subject teachers can create assessments from administrator-defined categories, enter grades and publish complete assessments for their subject and class. Homeroom teachers can also manage assessments in their class. Administrators retain approval and publication of report cards. Server actions recheck the teacher's class or subject assignment on every save. No school-wide roster, guardian contacts or sensitive case details are sent to the teacher workspace.
-
-### Live guardian portal
-
-School administrators can enable a guardian account from the Guardian directory after linking that contact to a student with legal responsibility. The account is not added to staff memberships. Share its tenant ID, username and temporary password through a verified private channel; the guardian must change the password at first sign-in. The portal displays only students whose guardian link grants legal responsibility and has no active disclosure or processing restriction, plus submitted attendance, published report cards, and targeted notices. Guardians can submit an absence date and reason category; office staff can mark the note reviewed. A note does not change attendance and contains no free-text health details. The portal does not expose sensitive case notes or attendance reasons. Guardian direct messaging and inquiry conversations are not part of this release. Guardian accounts are provisioned by school administrators and shared through a verified private channel.
-
-Production startup requires `DATABASE_URL`, `BETTER_AUTH_SECRET` and `SENSITIVE_RECORD_ENCRYPTION_KEY`. Generate independent random secrets (at least 32 characters) and keep them outside source control. Keep the narrative key securely backed up; changing it without a migration makes existing ciphertext unreadable. No default production key is provided. Platform-managed school and staff provisioning, forced temporary-password replacement, and MFA enrollment are implemented. No SMS provider is required for the in-app workflows.
-
-### Migration recovery
-
-The migration journal includes the phone identity, platform administration, school membership, account provisioning, and temporary-password schema changes. A fresh database can use `npm run db:migrate`. If you previously applied SQL files manually, first reconcile the actual schema and migration history in a staging copy; do not blindly rerun migrations against that database.
+KLASSO_DEMO_MODE=true provides a synthetic read-only MVP preview during local development. Live saves require authenticated staff and PostgreSQL. Production rejects demo mode. Public registration is disabled; platform administrators require MFA, and temporary staff passwords must be replaced on first sign-in.
 
 ## Verification
 
-```text
-npm run typecheck
-npm run lint
-npm test
-npm run test:sms
-npm run db:check
-npm run build
-```
+Run npm run typecheck, npm run lint -- --max-warnings=0, npm test, npm run test:sms, npm run db:check and npm run build. The installed Next.js guides in node_modules/next/dist/docs are authoritative. On Windows ARM64, a local Turbopack worker failure may require npm run build -- --webpack; the Docker production build retains the default compiler.
 
-Release verification also requires `npm run test:integration` and `npm run test:e2e` against a migrated disposable PostgreSQL database. Set `RLS_TEST_ADMIN_URL` to its owner connection, `RLS_TEST_APP_URL` to its `klassa_app` connection, and `KLASSO_SMS_WORKER_PASSWORD` to its restricted worker password. These commands fail when the database URLs are missing; browser checks use synthetic records and require a local database. Install Chromium once with `npx playwright install chromium`, and run `npm run build` before the browser checks. The integration suite checks tenant isolation, enrollment through report publication and rollover, complete rollover receipts, SMS eligibility at send time, lease recovery, concurrent retries, and transactional rollback. Browser checks exercise real staff and guardian sign-in, scoped rosters, and an audited administrator save against the production server behind a local HTTPS proxy. The certificate and key in `e2e/fixtures` are public test fixtures for localhost only; never use them in a deployment.
+Database checks require a migrated disposable PostgreSQL database: RLS_TEST_ADMIN_URL is its owner connection and RLS_TEST_APP_URL its restricted klassa_app connection. Run npm run test:integration and npm run test:operations. The latter uses pg_dump and psql (set PG_BIN to their directory when needed) to verify real backup restoration, ACLs and tenant isolation. Set restricted worker credentials as documented in .env.example. Never point these suites at real pupil data.
 
-The verification workflow in `.github/workflows/verify.yml` creates a fresh PostgreSQL 17 database, applies the entire migration chain, runs the unit and integration checks, then builds production code and runs the browser checks. Test-only credentials in that workflow are for its ephemeral database. Keep live SMS disabled until the separate controlled mNotify staging acceptance is complete.
-
-Parent SMS uses only current-year classes and active pupils without processing restrictions. A reviewed announcement keeps one request ID across retries; its audit receipt and dispatches commit together. Repeating that request returns the original counts without queueing messages again. Editing the audience or message starts a new request.
-
-The worker rechecks the stored recipient against the current verified phone, legal link, SMS preference, pupil status and contact restrictions immediately before claiming a message. Ineligible dispatches are cancelled. Each provider request owns one lease; health reporting continues independently, and unknown outcomes are never automatically resent. Apply migration `0039_sms_send_eligibility` before starting the updated worker. Rollover receipts also compare all move, graduate and withdraw decisions; earlier receipts without a fingerprint require manual review instead of being treated as a verified retry.
+Install Chromium with npx playwright install chromium, build production code, then run npm run test:e2e. The browser suite runs staff sign-in and the school workflow behind a local HTTPS proxy using public localhost-only certificates. GitHub Actions validates a fresh PostgreSQL 17 deployment and runs the same checks.
 
 ## Deployment
 
-The recommended Coolify deployment is defined in `compose.yaml`. Coolify generates the database credentials, authentication secret, encryption key and public application URL. A one-time migration container applies the schema and creates the first platform administrator before the web service starts. PostgreSQL stays private and persists in a named volume. The application health endpoint at `/api/health` performs live database and cryptography checks.
+Use the existing [Coolify deployment guide](docs/coolify-deployment.md) and [pilot release checklist](docs/mvp-release.md). Compose starts private PostgreSQL, a one-time migrator/bootstrap service and the web service. SMS_DELIVERY_ENABLED must remain false and the sms Compose profile must remain disabled for this release. /api/health checks database access and cryptography without requiring a disabled SMS worker.
 
-Follow the complete [Coolify deployment guide](docs/coolify-deployment.md). For local PostgreSQL, use `compose.local.yaml`; the production Compose file is intentionally optimized for Coolify's generated variables.
+Before entering real pupil data, verify HTTPS sign-in, health checks and a restored production backup. Start with one school and expand only after its staff complete daily attendance, term reporting and fee collection successfully.
 
-## Documentation & Roadmap
-
-- **Progress & Roadmap:** See [`ROADMAP.md`](ROADMAP.md) for the historical project roadmap and current release status.
-- **Visual Guidelines:** See [`docs/design-system.md`](docs/design-system.md) for Klassaâ€™s design system rules.
-- **Backup & Disaster Recovery:** See [`docs/backup-and-restore.md`](docs/backup-and-restore.md) for Coolify and Docker automated backup runbooks.
-- **Coolify Deployment:** See [`docs/coolify-deployment.md`](docs/coolify-deployment.md) for the complete first deployment, verification, backup, update and rollback procedure.
-
-## First platform administrator and school provisioning
-
-1. Configure PostgreSQL, set `KLASSO_DEMO_MODE=false`, and apply migrations with `npm run db:migrate`. Supply `DATABASE_URL` to the migration process.
-2. Set the public `BETTER_AUTH_URL` to the production HTTPS origin.
-3. In a trusted administration shell, set `KLASSO_BOOTSTRAP_USERNAME` (for example, `admin`), `KLASSO_BOOTSTRAP_NAME`, and `KLASSO_BOOTSTRAP_PASSWORD` (12â€“128 characters). Run `npm run admin:bootstrap`. Clear the bootstrap variables afterward.
-4. Sign in at `/login` and complete authenticator enrollment at `/setup-mfa`. Save the one-use recovery codes offline.
-5. Open `/platform`. Create each school together with its initial administrator, username, and a unique temporary password. Platform administrators can add more staff there; after setup, each school administrator can also create staff accounts directly inside their own school.
-6. Share the tenant ID, username and temporary password through a secure channel. On first sign-in, the account must replace the temporary password before school access.
-
-In **Users & access**, platform administrators can revoke staff sessions, reset a temporary password, suspend an account with an audited reason, and reactivate it. Suspension blocks sign-in and revokes existing sessions across every school membership. The last active administrator of any affected school cannot be suspended. Apply migration `0014_charming_stryfe` before using these controls in a live deployment.
-
-The staff access review lists each account's school and role, last recorded sign-in, temporary-password state, and latest review decision. Administrators can filter dormant accounts (90 days since a recorded sign-in), accounts without a sign-in record, and reviews due after 90 days or an account or role change. A retain or follow-up decision is saved with the reviewer and an audit event; follow-up requires a note. Sign-ins are tracked durably after migration `0018_free_trish_tilby`. The migration backfills from sessions still present at deployment, so older sign-ins with deleted sessions remain unknown.
-
-In **Security**, platform administrators can add another platform administrator with a temporary password. The new administrator signs in with tenant ID `platform`, changes the password, and enrolls an authenticator before entering the console. Existing administrators can have their sessions revoked, be suspended with an audited reason and all sessions revoked, then be reactivated. Self-suspension and suspension of the last active platform administrator are blocked. Apply migration `0017_flippant_preak` before using these controls; platform-level audit events have no school ID.
-
-The platform **Schools** directory links to a detail page for each school. Platform administrators can update the display name, review setup and staff status, and suspend or reactivate the school with an audit trail. School suspension signs out its accounts and blocks new sign-ins and protected actions. It refuses to proceed if an account has a membership in another school. Apply migration `0015_rich_krista_starr` before using school suspension in a live deployment. School time is fixed at GMT; migration `0019_gigantic_rocket_raccoon` updates existing school timezone values and the default.
-
-**System health** records high application error rates and failed cryptography self-tests as persistent platform incidents. Administrators can acknowledge or resolve an incident with a recorded history; recovered metrics resolve their incidents automatically. Apply migration `0016_public_roulette` before using this view. The database health endpoint reports an outage immediately, but an unavailable database cannot persist that outage as an incident; use an external uptime check for database-outage notifications.
-
-Tenant IDs are school slugs, and `platform` is reserved for platform administrators. Usernames are case insensitive and unique within a tenant. A duplicate username in the same school is rejected; the same username in another school creates a separate account. Existing users with several memberships can still choose a school at `/schools`.
-
-The platform role is separate from school roles and is checked from the database. Memberships determine school access; a platform administrator does not automatically receive permission to read school records. Public registration, phone OTP, SMS delivery, and self-service password reset remain disabled. Authenticator recovery codes are supported at sign-in. Better Auth's required email column holds an internal non-mailbox identifier. Sign-in uses tenant ID and username; no phone or email service is needed.
-
-### Moving existing accounts to tenant usernames
-
-Deploy migration `0009_tenant_usernames` before starting the updated application. It keeps existing passwords, MFA secrets, recovery codes, and memberships. The earliest platform administrator receives tenant ID `platform` and username `admin`; additional platform administrators receive `admin-2`, `admin-3`, and so on. Existing school staff receive `staff-N` usernames, visible alongside their login tenant in **Users & access**. Distribute those login details before staff sign in again. Accounts without a school membership or primary school need administrator provisioning. A school slug named `platform` must be renamed before migration.
-
-For new deployments use `KLASSO_BOOTSTRAP_USERNAME` instead of `KLASSO_BOOTSTRAP_PHONE`. An existing administrator is not recreated by bootstrap; use the migrated username and existing password.
-
-Authenticator MFA is required only for platform administrators. Migration `0010_platform_admin_mfa` disables previously enrolled MFA for school accounts while retaining platform administrator enrollment. School administrators and all other staff use tenant ID, username and password; temporary password changes still apply.
+The older [roadmap](ROADMAP.md) and staging documents contain historical work; the MVP release checklist defines the current release boundary.

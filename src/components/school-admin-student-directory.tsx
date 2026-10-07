@@ -11,6 +11,7 @@ import { bulkUpdateSchoolStudentsAction } from "@/app/actions/school-admin-actio
 import { StudentAcademicDrawer } from "@/components/student-academic-drawer";
 
 type Props = {
+  mvp?: boolean;
   data: SchoolAdminData;
   query: string;
   onQueryChange?: (value: string) => void;
@@ -21,7 +22,7 @@ type Props = {
 
 type QuickFilter = "all" | "unassigned" | "no_guardian" | "incomplete" | "pending" | "alert";
 
-export function SchoolAdminStudentDirectory({ data, query, onQueryChange, currentYearId, onEnroll, onEdit }: Props) {
+export function SchoolAdminStudentDirectory({ mvp = false, data, query, onQueryChange, currentYearId, onEnroll, onEdit }: Props) {
   const [filter, setFilter] = useState<QuickFilter>("all");
   const [selected, setSelected] = useState<string[]>([]);
   const [profileId, setProfileId] = useState<string | null>(null);
@@ -117,7 +118,7 @@ export function SchoolAdminStudentDirectory({ data, query, onQueryChange, curren
       resetKey={filter} hasExternalFilters={filter !== "all"} onClearFilters={() => setFilter("all")} emptyTitle="No students yet" emptyDescription="Set up current-year classes, then enroll your first pupil or import a roster below." emptyAction={<Button onClick={onEnroll}>Enroll your first student</Button>}
     />
     {student && (
-      <StudentAcademicDrawer
+      <StudentAcademicDrawer mvp={mvp}
         student={student}
         classPlacement={classPlacement}
         academicYears={data.years}

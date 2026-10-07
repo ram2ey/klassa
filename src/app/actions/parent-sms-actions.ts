@@ -1,4 +1,5 @@
 "use server";
+import { requireDeferredFeature } from "@/lib/mvp-release";
 
 import { revalidatePath } from "next/cache";
 import { requireStaff } from "@/lib/action-access";
@@ -8,12 +9,14 @@ function message(error: unknown) { return error instanceof Error ? error.message
 
 export async function previewParentSmsAction(input: ParentSmsInput) {
   const actor = await requireStaff(["school_admin", "office_staff"]);
+  requireDeferredFeature("Parent SMS");
   try { return { success: true as const, ...await previewParentSmsRecipients(actor, input) }; }
   catch (error) { return { success: false as const, error: message(error) }; }
 }
 
 export async function queueParentSmsAction(input: ParentSmsQueueInput) {
   const actor = await requireStaff(["school_admin", "office_staff"]);
+  requireDeferredFeature("Parent SMS");
   try {
     const result = await queueParentSmsAnnouncement(actor, input);
     revalidatePath("/");

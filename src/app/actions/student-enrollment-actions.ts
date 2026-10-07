@@ -9,6 +9,7 @@ import { SchoolAdminError } from "@/lib/school-admin-policy";
 export async function enrollStudentAction(input: EnrollmentInput) {
   const actor = await requireStaff(["school_admin", "office_staff"]);
   try {
+    if (input.concerns?.length) throw new SchoolAdminError("Specialist referrals are unavailable in the school MVP.");
     const result = await enrollSchoolStudent(actor, input);
     revalidatePath("/");
     return { success: true as const, ...result };

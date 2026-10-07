@@ -28,7 +28,7 @@ export async function getLiveSystemHealthReport(): Promise<SystemHealthReport> {
 
   const report = getSystemHealthReport(database);
   if (database.status === "unhealthy") report.status = "unhealthy";
-  try {
+  if (process.env.SMS_DELIVERY_ENABLED === "true") try {
     const [worker] = await db.select().from(smsWorkerStatus).limit(1);
     const fresh = !!worker?.heartbeatAt && Date.now() - worker.heartbeatAt.getTime() < 90_000;
     report.checks.smsWorker = { status: fresh ? (worker.failedCount || worker.unknownCount ? "degraded" : "healthy") : "unhealthy",

@@ -23,7 +23,7 @@ import { SchoolAdminGdprPanel } from "@/components/school-admin-gdpr-panel";
 import { RecordEditor } from "@/components/school-admin/editor";
 import { StudentEnrollmentFlow } from "@/components/student-enrollment-flow";
 
-export function SchoolAdminWorkspace({ data, workflow, gdpr, section, date: selectedDate }: { data: SchoolAdminData; workflow?: SchoolWorkflowData; gdpr?: SchoolGdprData; section: string; date?: string }) {
+export function SchoolAdminWorkspace({ embedded = false, data, workflow, gdpr, section, date: selectedDate }: { embedded?: boolean; data: SchoolAdminData; workflow?: SchoolWorkflowData; gdpr?: SchoolGdprData; section: string; date?: string }) {
   const current = sections.find(item => item.id === section) ?? sections[0];
   const [query, setQuery] = useState("");
   const [editor, setEditor] = useState<Editor | null>(null);
@@ -40,7 +40,7 @@ export function SchoolAdminWorkspace({ data, workflow, gdpr, section, date: sele
   const add = (kind: Editor["kind"], title: string) => <Button aria-label={title} className="min-h-11" onClick={() => edit(kind, title)}><Plus size={16} />{title}</Button>;
   const editButton = (kind: Editor["kind"], title: string, values: NonNullable<Editor["values"]>) => <Button variant="secondary" aria-label={title} className="min-h-11" onClick={() => edit(kind, title, values)}>Edit</Button>;
 
-  return <><WorkspaceShell schoolName={data.school.name} academicYear={currentYear?.name ?? "Academic year not set"} actorName={data.actor.name} roleLabel="School administrator" navigationLabel="School navigation" groups={groupWorkspaceNavigation(sections)} activeId={current.id} contentId="school-content" switchSchoolHref="/schools" onNavigate={() => { setQuery(""); setNotice(""); }}>
+  return <><WorkspaceShell embedded={embedded} schoolName={data.school.name} academicYear={currentYear?.name ?? "Academic year not set"} actorName={data.actor.name} roleLabel="School administrator" navigationLabel="School navigation" groups={groupWorkspaceNavigation(sections)} activeId={current.id} contentId="school-content" switchSchoolHref="/schools" onNavigate={() => { setQuery(""); setNotice(""); }}>
 
         {current.id !== "overview" && <div className="flex flex-wrap items-end justify-between gap-4"><div><p className="text-xs font-medium text-secondary">School administration</p><h1 className="mt-1 text-2xl font-bold tracking-tight text-ink">{current.label}</h1></div>
           {!["students", "guardians", "overview", "settings", "attendance", "gradebook", "reports", "behaviour", "communications", "sensitive"].includes(current.id) && <label className="relative block"><span className="sr-only">Search {current.label}</span><Search size={16} className="absolute left-3 top-3.5 text-muted" /><input value={query} onChange={event => setQuery(event.target.value)} placeholder={`Search ${current.label.toLowerCase()}`} className="ui-field min-h-11 w-72 max-w-full pl-9 pr-3 text-sm" /></label>}
@@ -51,16 +51,16 @@ export function SchoolAdminWorkspace({ data, workflow, gdpr, section, date: sele
         {current.id === "overview" && <AdministratorOverview data={data} onEnroll={() => setShowEnrollment(true)} />}
 
         {current.id === "students" && <div className="space-y-6">
-          <SchoolAdminStudentDirectory data={data} query={query} onQueryChange={setQuery} currentYearId={currentYear?.id} onEnroll={() => setShowEnrollment(true)}
+          <SchoolAdminStudentDirectory mvp={embedded} data={data} query={query} onQueryChange={setQuery} currentYearId={currentYear?.id} onEnroll={() => setShowEnrollment(true)}
             onEdit={(student, classId) => edit("student", `Edit ${student.firstName} ${student.lastName}`, { id: student.id, firstName: student.firstName, lastName: student.lastName, dateOfBirth: student.dateOfBirth, status: student.status, classId })} />
           <StudentCsvImport />
         </div>}
 
-        {current.id === "guardians" && <GuardianSmsPreferences staff profiles={data.guardians.filter(guardian => data.links.some(link => link.guardianId === guardian.id && link.hasLegalResponsibility)).map(guardian => ({
+        {!embedded && current.id === "guardians" && <GuardianSmsPreferences staff profiles={data.guardians.filter(guardian => data.links.some(link => link.guardianId === guardian.id && link.hasLegalResponsibility)).map(guardian => ({
           guardianId: guardian.id, schoolId: data.school.id, label: `${guardian.firstName} ${guardian.lastName}`,
           announcements: data.smsPreferences.find(preference => preference.guardianId === guardian.id)?.announcements ?? true,
         }))} />}
-        {current.id === "guardians" && <div className="space-y-6"><GuardianDirectory guardians={data.guardians} students={data.students} links={data.links} query={query} onQueryChange={setQuery} onAdd={() => edit("guardian", "Add guardian")} renderActions={id => { const guardian = data.guardians.find(row => row.id === id)!; return <>{editButton("guardian", `Edit ${guardian.firstName} ${guardian.lastName}`, { id: guardian.id, firstName: guardian.firstName, lastName: guardian.lastName, email: guardian.email, phone: guardian.phone })}<GuardianPortalAccess guardianId={guardian.id} guardianName={`${guardian.firstName} ${guardian.lastName}`} enabled={!!guardian.userId} eligible={data.links.some(link => link.guardianId === guardian.id && link.hasLegalResponsibility)} /></>; }} /><section className={panelStyle}><PanelHeading title="Student relationships" description="Set each contact's relationship and responsibility for a student." action={add("guardian_link", "Link guardian")} />
+        {current.id === "guardians" && <div className="space-y-6"><GuardianDirectory guardians={data.guardians} students={data.students} links={data.links} query={query} onQueryChange={setQuery} onAdd={() => edit("guardian", "Add guardian")} renderActions={id => { const guardian = data.guardians.find(row => row.id === id)!; return <>{editButton("guardian", `Edit ${guardian.firstName} ${guardian.lastName}`, { id: guardian.id, firstName: guardian.firstName, lastName: guardian.lastName, email: guardian.email, phone: guardian.phone })}{!embedded && <GuardianPortalAccess guardianId={guardian.id} guardianName={`${guardian.firstName} ${guardian.lastName}`} enabled={!!guardian.userId} eligible={data.links.some(link => link.guardianId === guardian.id && link.hasLegalResponsibility)} />}</>; }} /><section className={panelStyle}><PanelHeading title="Student relationships" description="Set each contact's relationship and responsibility for a student." action={add("guardian_link", "Link guardian")} />
           <DataTable caption="Student guardian relationships" headers={["Student", "Guardian", "Relationship", "Primary contact", "Legal responsibility", "Actions"]} rows={data.links.filter(link => matches(studentName(link.studentId), guardianName(link.guardianId))).map(link => ({ key: link.id, cells: [studentName(link.studentId), guardianName(link.guardianId), words(link.relationship), link.isPrimary ? "Yes" : "No", link.hasLegalResponsibility ? "Yes" : "No", editButton("guardian_link", "Edit relationship", { studentId: link.studentId, guardianId: link.guardianId, relationship: link.relationship, isPrimary: link.isPrimary, hasLegalResponsibility: link.hasLegalResponsibility })] }))} empty="Add a student and a guardian, then link them here." />
         </section></div>}
 
@@ -115,7 +115,7 @@ export function SchoolAdminWorkspace({ data, workflow, gdpr, section, date: sele
         </section>{gdpr && <SchoolAdminGdprPanel data={gdpr} students={data.students} />}</div>}
     </WorkspaceShell>
     {editor && <RecordEditor editor={editor} data={data} onClose={() => setEditor(null)} onSaved={message => { setNotice(message); setEditor(null); }} />}
-    {showEnrollment && <StudentEnrollmentFlow classes={data.classes.filter(item => item.academicYearId === currentYear?.id).map(item => ({ id: item.id, label: `${gradeName(item.gradeLevelId)} / ${item.name}` }))}
+    {showEnrollment && <StudentEnrollmentFlow mvp={embedded} classes={data.classes.filter(item => item.academicYearId === currentYear?.id).map(item => ({ id: item.id, label: `${gradeName(item.gradeLevelId)} / ${item.name}` }))}
       existingGuardians={data.guardians.map(item => ({ id: item.id, label: `${item.firstName} ${item.lastName}${item.email ? ` · ${item.email}` : ""}` }))}
       onClose={() => setShowEnrollment(false)} onSaved={message => { setNotice(message); setShowEnrollment(false); }} />}
   </>;

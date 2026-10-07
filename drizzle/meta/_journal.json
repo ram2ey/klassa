@@ -274,6 +274,13 @@
       "when": 1790520000000,
       "tag": "0039_sms_send_eligibility",
       "breakpoints": true
+    },
+    {
+      "idx": 39,
+      "version": "7",
+      "when": 1791370000000,
+      "tag": "0040_staff_school_mvp",
+      "breakpoints": true
     }
   ]
 }

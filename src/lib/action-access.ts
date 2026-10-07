@@ -6,6 +6,7 @@ import { guardians, organizationMemberships, users } from "@/db/schema";
 import { and, eq } from "drizzle-orm";
 import { isSchoolSuspended, isSchoolSuspendedForUser } from "@/lib/school-access-state";
 import { beginRlsContext } from "@/db/rls-context";
+import { requireDeferredFeature } from "@/lib/mvp-release";
 
 export type StaffRole = typeof users.$inferSelect.role;
 
@@ -56,6 +57,7 @@ export async function requireStaff(roles: NonNullable<StaffRole>[]) {
 
 /** Guardian access is granted only through an explicit guardian record link. */
 export async function requireGuardian() {
+  requireDeferredFeature("Parent portal");
   const scope = beginRlsContext();
   const { user } = await requireAccount();
   if (user.isPlatformAdmin || user.role !== null) throw new Error("Guardian access required.");

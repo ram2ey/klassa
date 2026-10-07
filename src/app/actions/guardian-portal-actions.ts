@@ -1,4 +1,5 @@
 "use server";
+import { requireDeferredFeature } from "@/lib/mvp-release";
 
 import { randomUUID } from "node:crypto";
 import { hashPassword } from "better-auth/crypto";
@@ -19,6 +20,7 @@ const absenceNoteSchema = z.object({ studentId: z.uuid(), absenceDate: z.iso.dat
 
 export async function provisionGuardianPortalAccountAction(raw: z.input<typeof provisionSchema>) {
   const actor = await requireStaff(["school_admin"]);
+  requireDeferredFeature("Parent portal");
   try {
     const input = provisionSchema.parse(raw);
     const result = await db.transaction(async tx => {
@@ -57,6 +59,7 @@ export async function provisionGuardianPortalAccountAction(raw: z.input<typeof p
 
 export async function submitGuardianAbsenceNoteAction(raw: z.input<typeof absenceNoteSchema>) {
   const guardian = await requireGuardian();
+  requireDeferredFeature("Parent portal");
   try {
     const input = absenceNoteSchema.parse(raw);
     const today = new Date().toISOString().slice(0, 10);
@@ -105,6 +108,7 @@ export async function submitGuardianAbsenceNoteAction(raw: z.input<typeof absenc
 
 export async function updateGuardianSmsPreferencesAction(input: SmsPreferencesInput) {
   const guardian = await requireGuardian();
+  requireDeferredFeature("Parent portal");
   try {
     const result = await updateGuardianSmsPreferences(guardian, input);
     revalidatePath("/");

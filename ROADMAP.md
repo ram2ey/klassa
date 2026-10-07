@@ -1,6 +1,6 @@
 # Klasso Project Roadmap & Implementation Progress
 
-> **Current release status:** Pre-release simplification for Ghana schools. The app has not been used and has no historical school data to preserve. Phase 1 removed specialist roles and unused records. Phase 2 aligns screens, workflows and documentation with the smaller release; validate migrations on a fresh database and complete staging checks before deployment.
+> **Current release status:** The first pilot is the staff-only [school MVP](docs/mvp-release.md), including manual fees. The lists below describe historical development; deferred modules remain disabled. Validate a fresh database and complete the pilot release gates before real pupil data.
 
 This document tracks architectural decisions, phase deliverables, completed features, and the immediate backlog. **Any AI assistant or developer continuing work on Klasso should review this document first.**
 
